@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import ScrollToTop from "./components/ScrollToTop";
 
@@ -12,6 +12,7 @@ import Loader from './components/ui/loader';
 // Layouts
 import PublicLayout from "./components/layout/PublicLayout";
 import AdminLayout from "./components/layout/AdminLayout";
+import CaregiverLayout from "./components/layout/CaregiverLayout";
 
 // Public Pages
 import Index from "./pages/Public/HomePublic";
@@ -23,6 +24,17 @@ import Contact from "./pages/Public/Contact";
 import Login from "./pages/Auth/Login";
 import Register from "./pages/Auth/Register";
 import NotFound from "./pages/Public/NotFound";
+
+// Caregiver Pages
+import ActiveShift from './pages/Caregivers/ActiveShift';
+import CareLogs from './pages/Caregivers/CareLogs';
+import CareLogDetails from './pages/Caregivers/CareLogDetails';
+import EditCareLog from './pages/Caregivers/EditCareLog';
+import CaregiverDashboard from './pages/Caregivers/Dashboard';
+import Incidents from './pages/Caregivers/Incidents';
+import MySchedule from './pages/Caregivers/MySchedule';
+import Profile from './pages/Caregivers/Profile';
+import CaregiverReports from './pages/Caregivers/Reports';
 
 // Admin Pages (Lazy Loaded)
 const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
@@ -37,7 +49,6 @@ const Payments = lazy(() => import("./pages/admin/Payments"));
 // Family Pages (Lazy Loaded)
 const FamilyLayout = lazy(() => import("./components/layout/FamilyLayout"));
 const FamilyWelcome = lazy(() => import("./pages/Family/Welcome"));
-
 
 const queryClient = new QueryClient();
 
@@ -61,7 +72,7 @@ const App = () => (
                 <Route path="/caregivers" element={<OurCaregivers />} />
               </Route>
 
-              {/* Auth Routes (without layout) */}
+              {/* Auth Routes */}
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
 
@@ -81,6 +92,22 @@ const App = () => (
               <Route path="/family" element={<FamilyLayout />}>
                 <Route index element={<FamilyWelcome />} />
               </Route>
+
+              {/* Caregiver Routes - FIXED: Added path and fixed nesting */}
+              <Route path="/caregiver" element={<CaregiverLayout />}>
+                <Route index element={<CaregiverDashboard />} />
+                <Route path="active-shift" element={<ActiveShift />} />
+                <Route path="care-logs" element={<CareLogs />} />
+                <Route path="care-logs/:id" element={<CareLogDetails />} />
+                <Route path="care-logs/edit/:id" element={<EditCareLog />} />
+                <Route path="my-schedule" element={<MySchedule />} />
+                <Route path="incidents" element={<Incidents />} />
+                <Route path="profile" element={<Profile />} />
+                <Route path="reports" element={<CaregiverReports />} />
+              </Route>
+
+              {/* Redirect /CaregiverDashboard to /caregiver to fix 404 */}
+              <Route path="/CaregiverDashboard" element={<Navigate to="/caregiver" replace />} />
 
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />
