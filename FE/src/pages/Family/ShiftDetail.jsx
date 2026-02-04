@@ -1,8 +1,82 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { scheduleApi, careLogApi } from '@/lib/api';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 
 const ShiftDetail = () => {
+    const { id } = useParams();
+    const [shift, setShift] = useState(null);
+    const [careLogs, setCareLogs] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        const fetchDetails = async () => {
+            try {
+                setLoading(true);
+                const shiftData = await scheduleApi.getById(id);
+                setShift(shiftData);
+
+                try {
+                    const logs = await careLogApi.getBySchedule(id);
+                    setCareLogs(logs || []);
+                } catch (e) {
+                    console.warn('No logs found for this shift');
+                }
+            } catch (err) {
+                console.error('Failed to fetch shift details:', err);
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchDetails();
+    }, [id]);
+
+    const formatTime = (timeStr) => {
+        if (!timeStr) return '--:--';
+        // Handle TimeSpan format "HH:mm:ss"
+        const parts = timeStr.split(':');
+        if (parts.length >= 2) {
+            const hours = parseInt(parts[0]);
+            const minutes = parts[1];
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const displayHours = hours % 12 || 12;
+            return `${displayHours}:${minutes} ${ampm}`;
+        }
+        return timeStr;
+    };
+
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        return new Date(dateStr).toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric'
+        });
+    };
+
+    const formatDateTime = (dateTimeStr) => {
+        if (!dateTimeStr) return '--:--';
+        return new Date(dateTimeStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+
+    if (loading) return <div className="h-screen flex items-center justify-center font-['Public_Sans']"><span className="material-symbols-outlined animate-spin text-4xl text-[#5fa5ba]">progress_activity</span></div>;
+
+    if (error || !shift) return (
+        <div className="h-screen flex flex-col items-center justify-center font-['Public_Sans'] text-center px-4">
+            <span className="material-symbols-outlined text-6xl text-red-100 mb-6 bg-red-50 p-6 rounded-full">error</span>
+            <h2 className="text-2xl font-bold text-stone-800 mb-2">Failed to Load Shift</h2>
+            <p className="text-stone-500 mb-8 max-w-md">{error || "The shift details could not be found."}</p>
+            <Link to="/family/schedule" className="px-8 py-3 bg-[#5fa5ba] text-white rounded-full font-bold shadow-lg shadow-[#5fa5ba]/20 hover:bg-[#4d8ca0] transition-all">
+                Back to Schedule
+            </Link>
+        </div>
+    );
+
+    const mainLog = careLogs.length > 0 ? careLogs[0] : null;
+
     return (
         <div className="flex h-full min-h-screen font-['Public_Sans'] bg-slate-50 text-stone-900 animate-fade-in-up pb-12">
             <main className="flex-1 flex flex-col min-w-0 overflow-y-auto space-y-8">
@@ -12,25 +86,14 @@ const ShiftDetail = () => {
                         <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
                         <div className="relative z-10 w-full flex flex-col md:flex-row justify-between items-center gap-6">
                             <div className="flex items-center gap-4 self-start md:self-center">
-                                <Link to="/family/dashboard" className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/20 hover:bg-white hover:text-[#5fa5ba] transition-all">
+                                <Link to="/family/schedule" className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/20 hover:bg-white hover:text-[#5fa5ba] transition-all">
                                     <span className="material-symbols-outlined">arrow_back</span>
                                 </Link>
                                 <div>
                                     <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-xs font-bold uppercase tracking-widest text-white/90 bg-white/10 px-2 py-0.5 rounded-md">Log #2938</span>
+                                        <span className="text-xs font-bold uppercase tracking-widest text-white/90 bg-white/10 px-2 py-0.5 rounded-md">Shift #{shift.id}</span>
                                     </div>
                                     <h2 className="text-3xl font-bold tracking-tight">Shift Detail</h2>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-4 w-full md:w-auto">
-                                <div className="hidden md:flex relative flex-1 md:flex-none">
-                                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-white/70 text-xl">search</span>
-                                    <input
-                                        className="bg-white/10 border border-white/20 rounded-full pl-12 pr-4 py-3 text-sm focus:ring-2 focus:ring-white/50 w-full md:w-80 placeholder-white/60 outline-none transition-shadow text-white"
-                                        placeholder="Search shifts..."
-                                        type="text"
-                                    />
                                 </div>
                             </div>
                         </div>
@@ -44,22 +107,27 @@ const ShiftDetail = () => {
                             <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                                 <div className="flex flex-col md:flex-row items-center gap-8">
                                     <div className="relative">
-                                        <div className="size-28 rounded-full bg-center bg-cover border-4 border-white shadow-2xl ring-4 ring-[#E0F2F1]" style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDehSEQ4ZqpC5ZgXYV2wWFWiwUMaWeiugW6M4ZJJ9DKBu4uqTaNRYMCDfQwBkPazfdHlyS2j5jmEEtbJ5700pIjhDc1av79NfR1XW6EekdvnJupOb3JpkwFSM6fXho_KKMyYLoYDI7_g_nuYG-0JL8Mf8nQavxbAMsS8wZDmFqZ_u4RUqDW62ODH9n7HP-GFnpm2YkAwl_8Wlxdbl4zoOC2xeQaHFU-KH99cOlCyS5WsrMJwxrSBVjmXxuwqYxRcFgTOryVu6DKM1Tq')" }}></div>
+                                        <div className="size-28 rounded-full bg-center bg-cover border-4 border-white shadow-2xl ring-4 ring-[#E0F2F1]" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1559839734-2b71f1536783?auto=format&fit=crop&q=80&w=200')" }}></div>
                                         <div className="absolute bottom-1 right-1 size-6 bg-emerald-500 border-4 border-white rounded-full"></div>
                                     </div>
                                     <div className="text-center md:text-left">
-                                        <h3 className="text-3xl font-bold text-stone-900">Sarah Jenkins, RN</h3>
+                                        <h3 className="text-3xl font-bold text-stone-900">{shift.caregiverName || 'Assigned Caregiver'}</h3>
                                         <div className="flex items-center justify-center md:justify-start gap-2 mt-2">
                                             <span className="material-symbols-outlined text-[#5fa5ba] text-xl">medical_services</span>
-                                            <p className="text-stone-500 font-bold text-lg leading-none">Nursing Care for <span className="text-stone-900">John Doe</span></p>
+                                            <p className="text-stone-500 font-bold text-lg leading-none">{shift.serviceName || 'Home Care Service'} for <span className="text-stone-900">{shift.patientName}</span></p>
                                         </div>
-                                        <p className="text-sm text-[#5fa5ba] mt-3 font-bold uppercase tracking-wider bg-[#E0F2F1] w-fit px-3 py-1 rounded-full mx-auto md:mx-0">Date: Tuesday, October 24, 2023</p>
+                                        <p className="text-sm text-[#5fa5ba] mt-3 font-bold uppercase tracking-wider bg-[#E0F2F1] w-fit px-3 py-1 rounded-full mx-auto md:mx-0">Date: {formatDate(shift.date)}</p>
                                     </div>
                                 </div>
                                 <div className="flex flex-col items-center lg:items-end gap-6 w-full lg:w-auto">
-                                    <div className="bg-[#E0F2F1] text-[#00695C] px-8 py-3 rounded-full font-bold text-xs flex items-center gap-2 uppercase tracking-widest border border-[#B2EBF2]">
-                                        <span className="material-symbols-outlined text-base">check_circle</span>
-                                        COMPLETED
+                                    <div className={`px-8 py-3 rounded-full font-bold text-xs flex items-center gap-2 uppercase tracking-widest border ${shift.status === 'Completed'
+                                            ? 'bg-[#E0F2F1] text-[#00695C] border-[#B2EBF2]'
+                                            : 'bg-amber-50 text-amber-600 border-amber-100'
+                                        }`}>
+                                        <span className="material-symbols-outlined text-base">
+                                            {shift.status === 'Completed' ? 'check_circle' : 'pending'}
+                                        </span>
+                                        {shift.status}
                                     </div>
                                     <button className="w-full lg:w-auto flex items-center justify-center gap-3 px-10 py-4 rounded-full bg-[#5fa5ba] text-white font-bold hover:bg-[#4d8ca0] transition-all shadow-lg shadow-[#5fa5ba]/20 text-md">
                                         <span className="material-symbols-outlined text-xl">chat</span>
@@ -86,31 +154,32 @@ const ShiftDetail = () => {
                                                 <div className="size-2.5 bg-[#5fa5ba] rounded-full"></div>
                                             </div>
                                             <div>
-                                                <p className="font-bold text-stone-600 text-sm mb-1 uppercase tracking-wider">Scheduled Start</p>
-                                                <p className="text-[#5fa5ba] font-black text-2xl">08:00 AM</p>
+                                                <p className="font-bold text-stone-600 text-sm mb-1 uppercase tracking-wider">Scheduled Window</p>
+                                                <p className="text-[#5fa5ba] font-black text-2xl">{formatTime(shift.startTime)} - {formatTime(shift.endTime)}</p>
                                             </div>
                                         </div>
                                         <div className="relative flex gap-8 pb-12">
-                                            <div className="relative z-10 size-8 bg-emerald-500 rounded-full flex items-center justify-center text-white translate-x-[-1px] shadow-md ring-4 ring-emerald-50">
-                                                <span className="material-symbols-outlined text-[16px] font-black">check</span>
+                                            <div className={`relative z-10 size-8 rounded-full flex items-center justify-center text-white translate-x-[-1px] shadow-md ${shift.checkInTime ? 'bg-emerald-500 ring-4 ring-emerald-50' : 'bg-stone-100'}`}>
+                                                <span className="material-symbols-outlined text-[16px] font-black">{shift.checkInTime ? 'check' : 'login'}</span>
                                             </div>
                                             <div className="flex-1">
                                                 <p className="font-bold text-stone-900 text-sm mb-1 uppercase tracking-wider">Actual Check-in</p>
-                                                <p className="text-emerald-600 font-black text-2xl">08:05 AM</p>
-                                                <p className="text-xs text-stone-400 flex items-center gap-2 mt-2 font-bold bg-stone-50 w-fit px-3 py-1.5 rounded-full border border-stone-100">
-                                                    <span className="material-symbols-outlined text-sm text-[#5fa5ba]">location_on</span>
-                                                    GPS Verified
-                                                </p>
+                                                <p className={`${shift.checkInTime ? 'text-emerald-600' : 'text-stone-300'} font-black text-2xl`}>{formatDateTime(shift.checkInTime)}</p>
+                                                {shift.checkInTime && (
+                                                    <p className="text-xs text-stone-400 flex items-center gap-2 mt-2 font-bold bg-stone-50 w-fit px-3 py-1.5 rounded-full border border-stone-100">
+                                                        <span className="material-symbols-outlined text-sm text-[#5fa5ba]">location_on</span>
+                                                        GPS Verified
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="relative flex gap-8">
-                                            <div className="relative z-10 size-8 bg-white border-2 border-stone-200 rounded-full flex items-center justify-center translate-x-[-1px]">
-                                                <span className="material-symbols-outlined text-[16px] text-stone-400">logout</span>
+                                            <div className={`relative z-10 size-8 bg-white border-2 rounded-full flex items-center justify-center translate-x-[-1px] ${shift.checkOutTime ? 'border-emerald-500' : 'border-stone-200'}`}>
+                                                <span className={`material-symbols-outlined text-[16px] ${shift.checkOutTime ? 'text-emerald-500' : 'text-stone-400'}`}>logout</span>
                                             </div>
                                             <div>
                                                 <p className="font-bold text-stone-600 text-sm mb-1 uppercase tracking-wider">Actual Check-out</p>
-                                                <p className="text-stone-900 font-black text-2xl">12:00 PM</p>
-                                                <p className="text-sm text-stone-400 mt-2 font-medium italic">Duration: 3h 55m</p>
+                                                <p className="text-stone-900 font-black text-2xl">{formatDateTime(shift.checkOutTime)}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -127,49 +196,72 @@ const ShiftDetail = () => {
                                         Activities Performed
                                     </h4>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {[
-                                            { title: "Vital Signs", desc: "BP: 120/80 mmHg" },
-                                            { title: "Medication Admin.", desc: "Morning doses given" },
-                                            { title: "Light Meal Prep", desc: "Oatmeal & Fresh Fruit" },
-                                            { title: "Personal Care", desc: "Assisted with bath" }
-                                        ].map((activity, i) => (
-                                            <div key={i} className="flex items-start gap-4 p-5 rounded-3xl bg-[#F8FAFC] border border-stone-100 hover:border-[#B2EBF2] hover:bg-[#E0F2F1]/30 transition-colors group">
-                                                <span className="material-symbols-outlined text-emerald-500 text-xl mt-0.5">check_circle</span>
-                                                <div>
-                                                    <p className="text-base font-bold text-stone-900 group-hover:text-[#00695C]">{activity.title}</p>
-                                                    <p className="text-sm text-stone-500 mt-1 font-medium">{activity.desc}</p>
-                                                </div>
+                                        {mainLog ? (
+                                            <>
+                                                {mainLog.activities?.split(',').map((activity, i) => (
+                                                    <div key={i} className="flex items-start gap-4 p-5 rounded-3xl bg-[#F8FAFC] border border-stone-100 hover:border-[#B2EBF2] hover:bg-[#E0F2F1]/30 transition-colors group">
+                                                        <span className="material-symbols-outlined text-emerald-500 text-xl mt-0.5">check_circle</span>
+                                                        <div>
+                                                            <p className="text-base font-bold text-stone-900 group-hover:text-[#00695C]">{activity.trim()}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {mainLog.medicationsGiven && (
+                                                    <div className="flex items-start gap-4 p-5 rounded-3xl bg-blue-50/30 border border-blue-100">
+                                                        <span className="material-symbols-outlined text-blue-500 text-xl mt-0.5">medication</span>
+                                                        <div>
+                                                            <p className="text-base font-bold text-stone-900">Medications Given</p>
+                                                            <p className="text-sm text-stone-500 mt-1">{mainLog.medicationsGiven}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {mainLog.vitalSigns && (
+                                                    <div className="flex items-start gap-4 p-5 rounded-3xl bg-red-50/30 border border-red-100">
+                                                        <span className="material-symbols-outlined text-red-500 text-xl mt-0.5">vital_signs</span>
+                                                        <div>
+                                                            <p className="text-base font-bold text-stone-900">Vital Signs</p>
+                                                            <p className="text-sm text-stone-500 mt-1">{mainLog.vitalSigns}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <div className="col-span-2 py-12 text-center text-stone-400 bg-stone-50 rounded-3xl border-2 border-dashed border-stone-100">
+                                                <span className="material-symbols-outlined text-4xl mb-2 opacity-50">description</span>
+                                                <p className="font-bold">No activity logs recorded for this shift yet.</p>
                                             </div>
-                                        ))}
+                                        )}
                                     </div>
                                 </section>
                             </ScrollAnimation>
 
                             {/* Notes Section */}
-                            <ScrollAnimation animation="fade-up" delay={0.3}>
-                                <section className="bg-[#FFF8E1] rounded-[2.5rem] p-8 md:p-10 shadow-sm relative overflow-hidden border border-[#FFECB3]">
-                                    <div className="absolute -top-4 -right-2 text-[#FFE082] scale-[3.5] pointer-events-none opacity-40">
-                                        <span className="material-symbols-outlined text-8xl">format_quote</span>
-                                    </div>
-                                    <h4 className="text-lg font-bold mb-6 flex items-center gap-3 text-amber-700">
-                                        <span className="material-symbols-outlined text-2xl">chat_bubble</span>
-                                        Note from Sarah
-                                    </h4>
-                                    <p className="text-stone-700 leading-relaxed italic text-lg pr-8 font-serif relative z-10 border-l-4 border-amber-300 pl-4 py-2 bg-white/50 rounded-r-xl">
-                                        "John had a great morning! He was in high spirits today. He especially enjoyed the walk around the garden and finished all of his breakfast. His blood pressure remains stable."
-                                    </p>
-                                    <div className="mt-6 flex items-center gap-3 relative z-10">
-                                        <div className="size-2 bg-amber-400 rounded-full"></div>
-                                        <p className="text-xs font-bold text-stone-400 uppercase tracking-widest">Posted at 12:05 PM</p>
-                                    </div>
-                                </section>
-                            </ScrollAnimation>
+                            {mainLog && mainLog.notes && (
+                                <ScrollAnimation animation="fade-up" delay={0.3}>
+                                    <section className="bg-[#FFF8E1] rounded-[2.5rem] p-8 md:p-10 shadow-sm relative overflow-hidden border border-[#FFECB3]">
+                                        <div className="absolute -top-4 -right-2 text-[#FFE082] scale-[3.5] pointer-events-none opacity-40">
+                                            <span className="material-symbols-outlined text-8xl">format_quote</span>
+                                        </div>
+                                        <h4 className="text-lg font-bold mb-6 flex items-center gap-3 text-amber-700">
+                                            <span className="material-symbols-outlined text-2xl">chat_bubble</span>
+                                            Note from {shift.caregiverName?.split(' ')[0]}
+                                        </h4>
+                                        <p className="text-stone-700 leading-relaxed italic text-lg pr-8 font-serif relative z-10 border-l-4 border-amber-300 pl-4 py-2 bg-white/50 rounded-r-xl">
+                                            "{mainLog.notes}"
+                                        </p>
+                                        <div className="mt-6 flex items-center gap-3 relative z-10">
+                                            <div className="size-2 bg-amber-400 rounded-full"></div>
+                                            <p className="text-xs font-bold text-stone-400 uppercase tracking-widest">Logged at {new Date(mainLog.loggedAt).toLocaleTimeString()}</p>
+                                        </div>
+                                    </section>
+                                </ScrollAnimation>
+                            )}
 
                             {/* Actions */}
                             <div className="flex flex-col sm:flex-row gap-4 mt-2">
-                                <Link to="/family/reports/detail/1" className="flex-1 bg-[#5fa5ba] text-white font-bold py-4 px-8 rounded-full shadow-lg shadow-[#5fa5ba]/20 hover:bg-[#4d8ca0] transition-all flex items-center justify-center gap-3 text-base group">
+                                <Link to={`/family/reports?patientId=${shift.patientId}`} className="flex-1 bg-[#5fa5ba] text-white font-bold py-4 px-8 rounded-full shadow-lg shadow-[#5fa5ba]/20 hover:bg-[#4d8ca0] transition-all flex items-center justify-center gap-3 text-base group">
                                     <span className="material-symbols-outlined group-hover:scale-110 transition-transform">analytics</span>
-                                    View Full Health Report
+                                    View Patient Reports
                                 </Link>
                                 <button className="px-8 py-4 rounded-full bg-white font-bold text-stone-600 hover:bg-stone-50 transition-colors text-base flex items-center justify-center border border-stone-200 hover:border-[#99C5D3]">
                                     Download PDF

@@ -1,15 +1,117 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { SCHEDULE_EVENTS } from '../../data/Family/schedule';
+import { scheduleApi, familyApi } from '@/lib/api';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 
 const CareSchedule = () => {
     const [view, setView] = useState('Monthly');
+    const [schedules, setSchedules] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [currentMonth, setCurrentMonth] = useState(new Date());
 
-    // Generate accurate calendar days for October 2024 (Starting from a Tuesday)
-    // 29, 30 are prev month placeholder
-    const days = Array.from({ length: 31 }, (_, i) => i + 1);
+    useEffect(() => {
+        const fetchSchedules = async () => {
+            try {
+                setLoading(true);
+                // Get all patients first
+                const patients = await familyApi.getPatients();
+
+                // Fetch schedules for all patients
+                const allSchedules = [];
+                for (const patient of patients) {
+                    try {
+                        const patientSchedules = await scheduleApi.getByPatient(patient.id);
+                        allSchedules.push(...patientSchedules.map(s => ({
+                            ...s,
+                            patientName: patient.fullName
+                        })));
+                    } catch (e) {
+                        console.warn(`Failed to fetch schedules for patient ${patient.id}`);
+                    }
+                }
+
+                setSchedules(allSchedules);
+            } catch (err) {
+                console.error('Failed to fetch schedules:', err);
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchSchedules();
+    }, []);
+
+    const upcomingVisits = schedules
+        .filter(s => s.status !== 'Completed' && new Date(s.date) >= new Date().setHours(0, 0, 0, 0))
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+    const nextVisit = upcomingVisits[0];
+
+    // Convert API schedules to calendar events
+    const getEventsForDay = (day) => {
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth();
+        const checkDate = new Date(year, month, day);
+
+        return schedules.filter(s => {
+            const scheduleDate = new Date(s.date);
+            // Normalize both dates to midnight local time for robust comparison
+            const checkDay = new Date(year, month, day);
+            const d = new Date(scheduleDate.getFullYear(), scheduleDate.getMonth(), scheduleDate.getDate());
+
+            return d.getTime() === checkDay.getTime();
+        }).map(s => ({
+            id: s.id,
+            day: day,
+            name: s.serviceName || s.service?.name || 'Care Visit',
+            type: 'CONTRACT',
+            time: s.startTime ? new Date(`2000-01-01T${s.startTime}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:00 AM',
+            patient: s.patientName || s.patient?.name,
+            isDone: s.status === 'Completed',
+            isToday: checkDate.toDateString() === new Date().toDateString()
+        }));
+    };
+
+    // Dynamic calendar generation based on currentMonth
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDayOfMonth = new Date(year, month, 1).getDay();
+    const prevMonthDays = new Date(year, month, 0).getDate();
+
+    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
     const weekDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    // Generate prev month placeholder days
+    const prevDays = Array.from({ length: firstDayOfMonth }, (_, i) => prevMonthDays - firstDayOfMonth + i + 1);
+
+    const goToPrevMonth = () => {
+        setCurrentMonth(new Date(year, month - 1, 1));
+    };
+
+    const goToNextMonth = () => {
+        setCurrentMonth(new Date(year, month + 1, 1));
+    };
+
+    if (loading) {
+        return (
+            <div className="space-y-8 animate-pulse pb-12 pt-4 font-['Public_Sans']">
+                <div className="bg-stone-200 rounded-2xl h-24"></div>
+                <div className="bg-stone-200 rounded-[2rem] h-[600px]"></div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+                <span className="material-symbols-outlined text-4xl text-red-400 mb-4">error</span>
+                <p className="text-red-600 font-medium">Failed to load schedule</p>
+                <p className="text-stone-500 text-sm">{error}</p>
+            </div>
+        );
+    }
 
     return (
         <div className="font-['Public_Sans'] space-y-8 pb-12 pt-4 bg-transparent animate-fade-in-up">
@@ -52,12 +154,12 @@ const CareSchedule = () => {
                     {/* Controls Bar */}
                     <div className="px-6 py-5 border-b border-stone-100 flex flex-col md:flex-row items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
-                            <h2 className="text-2xl font-bold text-stone-800">October 2024</h2>
+                            <h2 className="text-2xl font-bold text-stone-800">{monthNames[month]} {year}</h2>
                             <div className="flex gap-1">
-                                <button className="w-8 h-8 rounded-full border border-stone-200 flex items-center justify-center hover:bg-stone-50 text-stone-500 hover:text-[#5fa5ba] transition-colors">
+                                <button onClick={goToPrevMonth} className="w-8 h-8 rounded-full border border-stone-200 flex items-center justify-center hover:bg-stone-50 text-stone-500 hover:text-[#5fa5ba] transition-colors">
                                     <span className="material-symbols-outlined text-sm">chevron_left</span>
                                 </button>
-                                <button className="w-8 h-8 rounded-full border border-stone-200 flex items-center justify-center hover:bg-stone-50 text-stone-500 hover:text-[#5fa5ba] transition-colors">
+                                <button onClick={goToNextMonth} className="w-8 h-8 rounded-full border border-stone-200 flex items-center justify-center hover:bg-stone-50 text-stone-500 hover:text-[#5fa5ba] transition-colors">
                                     <span className="material-symbols-outlined text-sm">chevron_right</span>
                                 </button>
                             </div>
@@ -89,7 +191,7 @@ const CareSchedule = () => {
                         {/* Note: Using gap-px with bg-stone-200 creates the precise grid lines expected in professional apps */}
 
                         {/* Empty Slots (Prev Month) */}
-                        {[29, 30].map(day => (
+                        {prevDays.map(day => (
                             <div key={`prev-${day}`} className="bg-white/50 min-h-[120px] md:min-h-[160px] p-2 flex flex-col justify-end pb-4 items-center md:items-start md:justify-start md:p-3 relative">
                                 <span className="text-sm font-bold text-stone-300 pointer-events-none">{day}</span>
                                 <div className="absolute inset-0 bg-stone-50/50 pattern-grid-lg opacity-30"></div>
@@ -97,9 +199,11 @@ const CareSchedule = () => {
                         ))}
 
                         {/* Month Days */}
-                        {days.slice(0, 29).map(day => {
-                            const event = SCHEDULE_EVENTS.find(e => e.day === day);
-                            const isToday = event?.isToday;
+                        {days.map(day => {
+                            const dayEvents = getEventsForDay(day);
+                            const event = dayEvents[0]; // Show first event
+                            const today = new Date();
+                            const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
 
                             return (
                                 <div key={day} className={`bg-white min-h-[120px] md:min-h-[160px] p-2 md:p-3 transition-colors hover:bg-stone-50 group relative flex flex-col gap-2 ${isToday ? 'bg-sky-50/20' : ''}`}>
@@ -114,7 +218,7 @@ const CareSchedule = () => {
 
                                     {/* Event Rendering */}
                                     {event ? (
-                                        <Link to={`/family/schedule/detail/${day}`} className="flex-1">
+                                        <Link to={`/family/schedule/detail/${event.id}`} className="flex-1">
                                             {event.isDone ? (
                                                 <div className="mt-1 flex items-center justify-center md:justify-start gap-1 p-1.5 md:p-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100/50 group-hover:border-emerald-200 transition-colors">
                                                     <div className="w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
@@ -163,18 +267,34 @@ const CareSchedule = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <ScrollAnimation animation="fade-up" delay={0.2} className="md:col-span-2">
                     <div className="bg-white rounded-[2rem] border border-stone-200 shadow-sm p-6 flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 bg-[#E0F2F1] rounded-2xl flex items-center justify-center text-[#00695C]">
-                                <span className="material-symbols-outlined text-2xl">event_upcoming</span>
+                        {nextVisit ? (
+                            <>
+                                <div className="flex items-center gap-4">
+                                    <div className="w-14 h-14 bg-[#E0F2F1] rounded-2xl flex items-center justify-center text-[#00695C]">
+                                        <span className="material-symbols-outlined text-2xl">event_upcoming</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-lg text-stone-900">Upcoming Visit</h3>
+                                        <p className="text-sm text-stone-500">
+                                            {new Date(nextVisit.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} at <span className="font-bold text-stone-700">{nextVisit.startTime.substring(0, 5)}</span> with <span className="font-bold text-stone-700">{nextVisit.caregiverName || 'TBD'}</span>
+                                        </p>
+                                    </div>
+                                </div>
+                                <Link to={`/family/schedule/detail/${nextVisit.id}`} className="px-6 py-3 bg-stone-900 text-white rounded-full text-sm font-bold hover:bg-stone-800 transition-colors shadow-lg shadow-stone-900/10">
+                                    View Details
+                                </Link>
+                            </>
+                        ) : (
+                            <div className="flex items-center gap-4 py-2">
+                                <div className="w-14 h-14 bg-stone-50 rounded-2xl flex items-center justify-center text-stone-400">
+                                    <span className="material-symbols-outlined text-2xl">event_busy</span>
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-lg text-stone-400">No Upcoming Visits</h3>
+                                    <p className="text-sm text-stone-400 font-medium">Schedule a new visit to get started.</p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="font-bold text-lg text-stone-900">Upcoming Visit</h3>
-                                <p className="text-sm text-stone-500">Tomorrow at <span className="font-bold text-stone-700">09:00 AM</span> with <span className="font-bold text-stone-700">Dr. Sarah</span></p>
-                            </div>
-                        </div>
-                        <Link to="/family/schedule/detail/1" className="px-6 py-3 bg-stone-900 text-white rounded-full text-sm font-bold hover:bg-stone-800 transition-colors shadow-lg shadow-stone-900/10">
-                            View Details
-                        </Link>
+                        )}
                     </div>
                 </ScrollAnimation>
 

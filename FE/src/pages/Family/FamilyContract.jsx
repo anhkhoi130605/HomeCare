@@ -1,9 +1,65 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { CONTRACTS_LIST } from '../../data/Family/contracts';
+import { contractApi } from '@/lib/api';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 
 const FamilyContract = () => {
+    const [contracts, setContracts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [stats, setStats] = useState({ active: 0, pending: 0, nextRenewal: null });
+
+    useEffect(() => {
+        const fetchContracts = async () => {
+            try {
+                setLoading(true);
+                const data = await contractApi.getMyContracts();
+                setContracts(data);
+
+                // Calculate stats
+                const active = data.filter(c => c.status === 'Active' || c.status === 'Approved').length;
+                const pending = data.filter(c => c.status === 'Pending').length;
+                const nearestRenewal = data
+                    .filter(c => c.endDate)
+                    .sort((a, b) => new Date(a.endDate) - new Date(b.endDate))[0];
+
+                setStats({
+                    active,
+                    pending,
+                    nextRenewal: nearestRenewal?.endDate ? new Date(nearestRenewal.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null
+                });
+            } catch (err) {
+                console.error('Failed to fetch contracts:', err);
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchContracts();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="space-y-8 animate-pulse pb-12 font-['Public_Sans']">
+                <div className="bg-stone-200 rounded-[2.5rem] h-48"></div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {[1, 2, 3].map(i => <div key={i} className="bg-stone-200 h-32 rounded-[2.5rem]"></div>)}
+                </div>
+                <div className="bg-stone-200 rounded-[2.5rem] h-96"></div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+                <span className="material-symbols-outlined text-4xl text-red-400 mb-4">error</span>
+                <p className="text-red-600 font-medium">Failed to load contracts</p>
+                <p className="text-stone-500 text-sm">{error}</p>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-8 animate-fade-in-up pb-12 font-['Public_Sans']">
             {/* Blue Header */}
@@ -38,8 +94,7 @@ const FamilyContract = () => {
                         </div>
                         <p className="text-xs font-black text-stone-400 uppercase tracking-widest mb-2">Active Contracts</p>
                         <div className="flex items-baseline gap-4">
-                            <span className="text-5xl font-black text-stone-900">12</span>
-                            <span className="text-[#5fa5ba] font-bold text-sm">+2% this month</span>
+                            <span className="text-5xl font-black text-stone-900">{String(stats.active).padStart(2, '0')}</span>
                         </div>
                     </div>
                 </ScrollAnimation>
@@ -51,7 +106,7 @@ const FamilyContract = () => {
                         </div>
                         <p className="text-xs font-black text-stone-400 uppercase tracking-widest mb-2">Pending Approval</p>
                         <div className="flex flex-col">
-                            <span className="text-5xl font-black text-stone-900">03</span>
+                            <span className="text-5xl font-black text-stone-900">{String(stats.pending).padStart(2, '0')}</span>
                             <span className="text-stone-400 font-bold text-sm mt-1">Requiring admin review</span>
                         </div>
                     </div>
@@ -64,11 +119,13 @@ const FamilyContract = () => {
                         </div>
                         <p className="text-xs font-black text-stone-400 uppercase tracking-widest mb-2">Next Renewal</p>
                         <div className="flex flex-col">
-                            <span className="text-3xl font-black tracking-tight text-stone-900">Oct 24, 2023</span>
-                            <span className="text-rose-500 font-bold text-sm mt-2 flex items-center gap-1">
-                                <span className="material-symbols-outlined text-sm">notification_important</span>
-                                Action required soon
-                            </span>
+                            <span className="text-3xl font-black tracking-tight text-stone-900">{stats.nextRenewal || 'N/A'}</span>
+                            {stats.nextRenewal && (
+                                <span className="text-rose-500 font-bold text-sm mt-2 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-sm">notification_important</span>
+                                    Action required soon
+                                </span>
+                            )}
                         </div>
                     </div>
                 </ScrollAnimation>
@@ -96,36 +153,43 @@ const FamilyContract = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-stone-50">
-                                {CONTRACTS_LIST.map((c) => (
-                                    <tr key={c.id} className="hover:bg-[#E0F2F1]/30 transition-colors group cursor-pointer">
-                                        <td className="px-8 py-6 font-bold flex items-center gap-3">
-                                            <div className="w-1.5 h-8 bg-[#5fa5ba] rounded-full mr-2 group-hover:h-10 transition-all"></div>
-                                            <span className="text-stone-900">{c.patient.name}</span>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <div className="flex items-center gap-3">
-                                                <img src={c.caregiver.image} className="w-8 h-8 rounded-full object-cover border border-stone-100 shadow-sm" alt="CG" />
-                                                <span className="font-bold text-stone-600 text-sm">{c.caregiver.name}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-6 font-medium text-stone-500 text-sm">{c.type}</td>
-                                        <td className="px-8 py-6">
-                                            <span className="px-4 py-1.5 bg-stone-50 text-stone-600 rounded-full text-xs font-bold border border-stone-100">{c.duration}</span>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <div className="flex items-center">
-                                                    <div className="w-5 h-5 bg-[#5fa5ba] rounded-full flex items-center justify-center text-white text-[10px] shadow-sm"><span className="material-symbols-outlined text-xs">check</span></div>
-                                                    <div className="w-6 h-0.5 bg-[#5fa5ba]"></div>
-                                                    <div className="w-5 h-5 bg-[#5fa5ba] rounded-full flex items-center justify-center text-white text-[10px] shadow-sm"><span className="material-symbols-outlined text-xs">check</span></div>
-                                                    <div className="w-6 h-0.5 bg-[#5fa5ba]"></div>
-                                                    <div className="w-5 h-5 bg-[#5fa5ba] rounded-full flex items-center justify-center text-white text-[10px] shadow-sm"><span className="material-symbols-outlined text-xs">check</span></div>
-                                                </div>
-                                                <span className="ml-4 text-[10px] font-black text-[#5fa5ba] tracking-tighter uppercase border border-[#B2EBF2] px-2 py-0.5 rounded-md bg-[#E0F2F1]">{c.status}</span>
-                                            </div>
+                                {contracts.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="5" className="px-8 py-12 text-center text-stone-400">
+                                            <span className="material-symbols-outlined text-4xl mb-2 block">folder_open</span>
+                                            No contracts found
                                         </td>
                                     </tr>
-                                ))}
+                                ) : contracts.map((c) => {
+                                    const duration = c.startDate && c.endDate
+                                        ? `${new Date(c.startDate).toLocaleDateString()} - ${new Date(c.endDate).toLocaleDateString()}`
+                                        : 'Ongoing';
+                                    return (
+                                        <tr key={c.id} className="hover:bg-[#E0F2F1]/30 transition-colors group cursor-pointer">
+                                            <td className="px-8 py-6 font-bold flex items-center gap-3">
+                                                <div className="w-1.5 h-8 bg-[#5fa5ba] rounded-full mr-2 group-hover:h-10 transition-all"></div>
+                                                <span className="text-stone-900">{c.patientName || c.patient?.name || 'Patient'}</span>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-[#5fa5ba] text-white flex items-center justify-center text-xs font-bold border border-stone-100 shadow-sm">
+                                                        {c.caregiverName?.charAt(0) || c.caregiver?.name?.charAt(0) || 'C'}
+                                                    </div>
+                                                    <span className="font-bold text-stone-600 text-sm">{c.caregiverName || c.caregiver?.name || 'Pending Assignment'}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-6 font-medium text-stone-500 text-sm">{c.serviceName || c.service?.name || 'Care Service'}</td>
+                                            <td className="px-8 py-6">
+                                                <span className="px-4 py-1.5 bg-stone-50 text-stone-600 rounded-full text-xs font-bold border border-stone-100">{duration}</span>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <span className={`text-[10px] font-black tracking-tighter uppercase px-3 py-1 rounded-md ${c.status === 'Active' || c.status === 'Approved' ? 'text-[#5fa5ba] border border-[#B2EBF2] bg-[#E0F2F1]' : c.status === 'Pending' ? 'text-orange-500 border border-orange-200 bg-orange-50' : 'text-stone-500 border border-stone-200 bg-stone-50'}`}>{c.status}</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -133,50 +197,36 @@ const FamilyContract = () => {
             </ScrollAnimation>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-4">
-                {/* Weekly shifts teaser */}
+                {/* Schedule Link */}
                 <ScrollAnimation animation="fade-up" delay={0.5}>
-                    <div className="bg-white p-10 rounded-[2.5rem] border border-stone-100 shadow-sm relative overflow-hidden h-full hover:border-[#B2EBF2] transition-colors">
-                        <div className="flex items-center justify-between mb-8">
-                            <div>
-                                <h3 className="text-xl font-bold text-stone-900">Weekly Care Schedule</h3>
-                                <p className="text-stone-400 font-medium text-sm">Recurring shifts for John Doe</p>
-                            </div>
-                            <button className="text-[#5fa5ba] font-bold text-xs flex items-center gap-2 bg-[#E0F2F1] px-4 py-2 rounded-full">
-                                <span className="material-symbols-outlined text-sm">calendar_view_week</span>
-                                View All Shifts
-                            </button>
-                        </div>
-                        <div className="flex gap-4">
-                            {['MON', 'WED', 'FRI', 'TUE/THU'].map((d, i) => (
-                                <div key={d} className={`flex-1 p-4 rounded-2xl text-center border ${i === 1 ? 'bg-[#E0F2F1] border-[#B2EBF2]' : 'bg-stone-50/50 border-stone-100'}`}>
-                                    <p className="text-[10px] font-bold text-stone-400 mb-2">{d}</p>
-                                    <p className={`font-bold text-sm ${i === 3 ? 'text-stone-300' : 'text-stone-800'}`}>{i === 3 ? 'Off' : '08:00 - 12:00'}</p>
+                    <Link to="/family/schedule" className="block text-inherit no-underline h-full">
+                        <div className="bg-white p-10 rounded-[2.5rem] border border-stone-100 shadow-sm relative overflow-hidden h-full hover:border-[#B2EBF2] transition-colors group cursor-pointer">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="w-12 h-12 bg-[#E0F2F1] rounded-2xl flex items-center justify-center text-[#00695C] group-hover:scale-110 transition-transform">
+                                    <span className="material-symbols-outlined text-2xl">calendar_month</span>
                                 </div>
-                            ))}
+                                <span className="material-symbols-outlined text-stone-300 group-hover:text-[#5fa5ba] transition-colors">arrow_forward</span>
+                            </div>
+                            <h3 className="text-xl font-bold text-stone-900 mb-2">My Care Schedule</h3>
+                            <p className="text-stone-400 font-medium text-sm">View upcoming shifts and caregiver assignments.</p>
                         </div>
-                    </div>
+                    </Link>
                 </ScrollAnimation>
 
-                {/* Payment Teaser */}
+                {/* Payment Link */}
                 <ScrollAnimation animation="fade-up" delay={0.6}>
-                    <div className="bg-white p-10 rounded-[2.5rem] border border-stone-100 shadow-sm h-full hover:border-[#B2EBF2] transition-colors">
-                        <h3 className="text-xl font-bold text-stone-900 mb-6">Payment Status</h3>
-                        <div className="bg-[#E0F2F1] p-6 rounded-3xl flex items-center justify-between mb-6 border border-[#B2EBF2]">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#00695C] shadow-sm">
-                                    <span className="material-symbols-outlined fill">verified</span>
+                    <Link to="/family/payments" className="block text-inherit no-underline h-full">
+                        <div className="bg-white p-10 rounded-[2.5rem] border border-stone-100 shadow-sm h-full hover:border-[#B2EBF2] transition-colors group cursor-pointer">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center text-green-600 group-hover:scale-110 transition-transform">
+                                    <span className="material-symbols-outlined text-2xl">payments</span>
                                 </div>
-                                <div>
-                                    <p className="font-bold text-[#00695C]">Paid</p>
-                                    <p className="text-[10px] font-bold text-[#004D40]/60 uppercase">AUG 2023 INVOICE</p>
-                                </div>
+                                <span className="material-symbols-outlined text-stone-300 group-hover:text-green-600 transition-colors">arrow_forward</span>
                             </div>
-                            <span className="text-2xl font-black text-[#00695C]">$1,240.00</span>
+                            <h3 className="text-xl font-bold text-stone-900 mb-2">Payment History</h3>
+                            <p className="text-stone-400 font-medium text-sm">Review invoices and track payment status.</p>
                         </div>
-                        <button className="w-full mt-2 py-4 border border-[#5fa5ba] text-[#5fa5ba] rounded-2xl font-bold text-sm hover:bg-[#5fa5ba] hover:text-white transition-all shadow-sm">
-                            Request Contract Change
-                        </button>
-                    </div>
+                    </Link>
                 </ScrollAnimation>
             </div>
         </div>

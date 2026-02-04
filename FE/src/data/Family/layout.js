@@ -7,4 +7,5 @@ export const navItems = [
     { path: '/family/contracts', label: 'Contracts', icon: 'description' },
     { path: '/family/payments', label: 'Payments', icon: 'payments' },
     { path: '/family/reports', label: 'Health Report', icon: 'health_metrics' },
+    { path: '/family/feedback', label: 'Feedback', icon: 'star' },
 ];

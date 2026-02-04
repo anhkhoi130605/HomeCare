@@ -23,6 +23,8 @@ import OurCaregivers from "./pages/Public/OurCaregivers";
 import Contact from "./pages/Public/Contact";
 import Login from "./pages/Auth/Login";
 import Register from "./pages/Auth/Register";
+import ForgotPassword from "./pages/Auth/ForgotPassword";
+import ResetPassword from "./pages/Auth/ResetPassword";
 import NotFound from "./pages/Public/NotFound";
 
 // Caregiver Pages
@@ -39,6 +41,7 @@ const IncidentDetail = lazy(() => import("./pages/Caregivers/IncidentDetail"));
 
 // Admin Pages (Lazy Loaded)
 const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
+const Users = lazy(() => import("./pages/Admin/Users"));
 const Patients = lazy(() => import("./pages/admin/Patients"));
 const Caregivers = lazy(() => import("./pages/admin/Caregivers"));
 const Requests = lazy(() => import("./pages/admin/Requests"));
@@ -46,6 +49,8 @@ const Schedule = lazy(() => import("./pages/admin/Schedule"));
 const Reports = lazy(() => import("./pages/admin/Reports"));
 const CareLogDetail = lazy(() => import("./pages/admin/CareLogDetail"));
 const Payments = lazy(() => import("./pages/admin/Payments"));
+const AdminIncidents = lazy(() => import("./pages/Admin/Incidents"));
+const AdminContracts = lazy(() => import("./pages/Admin/Contracts"));
 
 // Family Pages (Lazy Loaded)
 const FamilyLayout = lazy(() => import("./components/layout/FamilyLayout"));
@@ -62,9 +67,11 @@ const FamilyPatientDetail = lazy(() => import("./pages/Family/PatientDetail"));
 const FamilyShiftDetail = lazy(() => import("./pages/Family/ShiftDetail"));
 const FamilyHealthReportDetail = lazy(() => import("./pages/Family/HealthReportDetail"));
 const FamilyCreateRequest = lazy(() => import("./pages/Family/CreateRequest"));
+const FamilyRequestDetail = lazy(() => import("./pages/Family/RequestDetail"));
 const FamilyCreateContract = lazy(() => import("./pages/Family/CreateContract"));
 const FamilyProfile = lazy(() => import("./pages/Family/FamilyProfile"));
 const FamilyCareLogDetail = lazy(() => import("./pages/Family/CareLogDetail"));
+const FamilyFeedback = lazy(() => import("./pages/Family/Feedback"));
 
 const queryClient = new QueryClient();
 
@@ -91,10 +98,14 @@ const App = () => (
               {/* Auth Routes */}
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/auth/reset-password" element={<ResetPassword />} />
 
               {/* Admin Routes */}
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<Dashboard />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="users" element={<Users />} />
                 <Route path="patients" element={<Patients />} />
                 <Route path="caregivers" element={<Caregivers />} />
                 <Route path="requests" element={<Requests />} />
@@ -102,6 +113,8 @@ const App = () => (
                 <Route path="reports" element={<Reports />} />
                 <Route path="reports/care-log/:id" element={<CareLogDetail />} />
                 <Route path="payments" element={<Payments />} />
+                <Route path="incidents" element={<AdminIncidents />} />
+                <Route path="contracts" element={<AdminContracts />} />
               </Route>
 
               {/* Family Routes */}
@@ -120,13 +133,16 @@ const App = () => (
                 <Route path="reports/detail/:id" element={<FamilyHealthReportDetail />} />
                 <Route path="care-logs/:id" element={<FamilyCareLogDetail />} />
                 <Route path="requests/new" element={<FamilyCreateRequest />} />
+                <Route path="requests/:id" element={<FamilyRequestDetail />} />
                 <Route path="contracts/new" element={<FamilyCreateContract />} />
                 <Route path="profile" element={<FamilyProfile />} />
+                <Route path="feedback" element={<FamilyFeedback />} />
               </Route>
 
               {/* Caregiver Routes - FIXED: Added path and fixed nesting */}
               <Route path="/caregiver" element={<CaregiverLayout />}>
                 <Route index element={<CaregiverDashboard />} />
+                <Route path="dashboard" element={<CaregiverDashboard />} />
                 <Route path="active-shift" element={<ActiveShift />} />
                 <Route path="care-logs" element={<CareLogs />} />
                 <Route path="care-logs/:id" element={<CareLogDetails />} />

@@ -1,69 +1,151 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import ScrollAnimation from "@/components/ui/scroll-animation";
-import { SCHEDULE_DATA } from '../../data/Caregiver/MySchedule';
-import { CAREGIVER_INFO } from '../../data/Caregiver/CareLogs';
-import { FAMILY_MEMBERS } from '../../data/Family/patients';
+import { caregiverApi } from '@/lib/api';
 
 const MySchedule = () => {
-    const [viewMode, setViewMode] = useState('month'); // 'month' or 'week'
-    const [selectedDay, setSelectedDay] = useState(24); // Default to today mock
+    const [viewMode, setViewMode] = useState('week');
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [schedules, setSchedules] = useState([]);
     const [selectedShift, setSelectedShift] = useState(null);
-
-    // Generate days based on view mode
-    const days = viewMode === 'month'
-        ? Array.from({ length: 31 }, (_, i) => i + 1)
-        : Array.from({ length: 7 }, (_, i) => i + 20); // Mock week: May 20 - May 26
+    const [loading, setLoading] = useState(true);
+    const [profile, setProfile] = useState(null);
 
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-    // Initial load logic
     useEffect(() => {
-        const todayShift = SCHEDULE_DATA.shifts.find(s => s.day === 24);
-        if (todayShift && todayShift.events) {
-            const active = todayShift.events.find(e => e.type === 'active');
-            if (active) {
-                handleEventClick(active, 24);
+        fetchData();
+    }, [selectedDate, viewMode]);
+
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+            const profileData = await caregiverApi.getProfile();
+            setProfile(profileData);
+
+            // Calculate date range based on view mode
+            let from, to;
+            if (viewMode === 'week') {
+                const startOfWeek = new Date(selectedDate);
+                startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay());
+                const endOfWeek = new Date(startOfWeek);
+                endOfWeek.setDate(startOfWeek.getDate() + 6);
+                from = startOfWeek.toISOString().split('T')[0];
+                to = endOfWeek.toISOString().split('T')[0];
+            } else {
+                const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+                const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+                from = startOfMonth.toISOString().split('T')[0];
+                to = endOfMonth.toISOString().split('T')[0];
             }
+
+            const schedulesData = await caregiverApi.getSchedules(from, to);
+            setSchedules(schedulesData);
+
+            // Auto-select first schedule of today
+            const today = new Date().toISOString().split('T')[0];
+            const todaySchedule = schedulesData.find(s => s.date.split('T')[0] === today);
+            if (todaySchedule) {
+                setSelectedShift(todaySchedule);
+            }
+        } catch (err) {
+            console.error('Failed to fetch schedules:', err);
+        } finally {
+            setLoading(false);
         }
-    }, []);
-
-    const handleEventClick = (event, day, e) => {
-        if (e) e.stopPropagation(); // Prevent parent click if any
-        setSelectedDay(day);
-
-        // Find patient in shared data shared data
-        // event.patient gives a string name (e.g. "Eleanor")
-        const member = FAMILY_MEMBERS.find(m => event.patient.includes(m.name) || m.name.includes(event.patient)) || FAMILY_MEMBERS[0];
-
-        setSelectedShift({
-            ...event,
-            fullTime: event.time === "09:00" ? "09:00 AM - 01:00 PM" : "02:30 PM - 06:30 PM",
-            patientName: member.name,
-            address: member.address,
-            requirements: member.name.includes("Thompson") || member.name.includes("Eleanor")
-                ? ["Blood pressure monitoring", "Assistance with meal prep", "Light mobility exercise"]
-                : ["Post-Op Support", "Medication Admin"],
-            isCurrent: event.type === 'active',
-            status: event.type // 'active', 'standard' (assumed upcoming), or 'completed'
-        });
     };
 
-    // Helper to determine style based on status
-    const getEventStyle = (type, isSelected) => {
-        // Color coding logic
-        // Active -> Blue
-        // Completed -> Gray
-        // Upcoming ("standard") -> Green/Emerald
+    const getDaysInView = () => {
+        if (viewMode === 'week') {
+            const startOfWeek = new Date(selectedDate);
+            startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay());
+            return Array.from({ length: 7 }, (_, i) => {
+                const day = new Date(startOfWeek);
+                day.setDate(startOfWeek.getDate() + i);
+                return day;
+            });
+        } else {
+            const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+            const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+            const startPadding = startOfMonth.getDay();
+            const days = [];
 
-        if (type === 'active') { // In Progress
+            // Add padding for start of month
+            for (let i = startPadding - 1; i >= 0; i--) {
+                const day = new Date(startOfMonth);
+                day.setDate(-i);
+                days.push({ date: day, isCurrentMonth: false });
+            }
+
+            // Add days of month
+            for (let i = 1; i <= endOfMonth.getDate(); i++) {
+                days.push({
+                    date: new Date(selectedDate.getFullYear(), selectedDate.getMonth(), i),
+                    isCurrentMonth: true
+                });
+            }
+
+            return days;
+        }
+    };
+
+    const getSchedulesForDay = (date) => {
+        const dateStr = date.toISOString().split('T')[0];
+        return schedules.filter(s => s.date.split('T')[0] === dateStr);
+    };
+
+    const formatTime = (timeStr) => {
+        if (!timeStr) return '';
+        const parts = timeStr.split(':');
+        const hours = parseInt(parts[0]);
+        const minutes = parts[1];
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 || 12;
+        return `${displayHours}:${minutes} ${ampm}`;
+    };
+
+    const isToday = (date) => {
+        const today = new Date();
+        return date.toDateString() === today.toDateString();
+    };
+
+    const getEventStyle = (status) => {
+        if (status === 'InProgress') {
             return "bg-[#5fa5ba] text-white shadow-[#5fa5ba]/30";
-        } else if (type === 'completed') { // Completed
+        } else if (status === 'Completed') {
             return "bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-300";
-        } else { // Standard/Upcoming
+        } else {
             return "bg-emerald-50 text-emerald-700 border-l-4 border-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-300";
         }
     };
+
+    const navigateDate = (direction) => {
+        const newDate = new Date(selectedDate);
+        if (viewMode === 'week') {
+            newDate.setDate(newDate.getDate() + (direction * 7));
+        } else {
+            newDate.setMonth(newDate.getMonth() + direction);
+        }
+        setSelectedDate(newDate);
+    };
+
+    const goToToday = () => {
+        setSelectedDate(new Date());
+    };
+
+    if (loading) {
+        return (
+            <div className="flex-1 flex items-center justify-center bg-background-light dark:bg-stone-950">
+                <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-[#5fa5ba] border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="mt-4 text-stone-500 dark:text-stone-400">Loading schedule...</p>
+                </div>
+            </div>
+        );
+    }
+
+    const days = getDaysInView();
 
     return (
         <div className="flex-1 flex flex-col overflow-hidden bg-background-light dark:bg-stone-950 font-manrope">
@@ -94,7 +176,7 @@ const MySchedule = () => {
                                 <img
                                     alt="Caregiver profile"
                                     className="w-12 h-12 rounded-2xl object-cover shadow-sm border-2 border-white dark:border-stone-800 group-hover:border-[#5fa5ba] transition-all"
-                                    src={CAREGIVER_INFO.profileImage}
+                                    src={profile?.imageUrl || "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=100&h=100&fit=crop"}
                                 />
                             </Link>
                         </div>
@@ -109,18 +191,26 @@ const MySchedule = () => {
                         <div className="bg-white dark:bg-stone-800 rounded-[2.5rem] border border-stone-100 dark:border-stone-800 shadow-xl overflow-hidden flex flex-col min-h-[700px]">
                             <div className="flex items-center justify-between p-8 border-b border-stone-100 dark:border-stone-800">
                                 <div className="flex items-center gap-6">
-                                    <h2 className="text-3xl font-extrabold text-stone-800 dark:text-white tracking-tight">{SCHEDULE_DATA.currentMonth}</h2>
+                                    <h2 className="text-3xl font-extrabold text-stone-800 dark:text-white tracking-tight">
+                                        {monthNames[selectedDate.getMonth()]} {selectedDate.getFullYear()}
+                                    </h2>
                                     <div className="flex gap-2 text-stone-400 dark:text-stone-400">
-                                        <button className="w-10 h-10 flex items-center justify-center border border-stone-200 rounded-full hover:bg-stone-50 hover:text-stone-800 transition-all">
+                                        <button
+                                            onClick={() => navigateDate(-1)}
+                                            className="w-10 h-10 flex items-center justify-center border border-stone-200 rounded-full hover:bg-stone-50 hover:text-stone-800 transition-all"
+                                        >
                                             <span className="material-symbols-outlined">chevron_left</span>
                                         </button>
-                                        <button className="w-10 h-10 flex items-center justify-center border border-stone-200 rounded-full hover:bg-stone-50 hover:text-stone-800 transition-all">
+                                        <button
+                                            onClick={() => navigateDate(1)}
+                                            className="w-10 h-10 flex items-center justify-center border border-stone-200 rounded-full hover:bg-stone-50 hover:text-stone-800 transition-all"
+                                        >
                                             <span className="material-symbols-outlined">chevron_right</span>
                                         </button>
                                     </div>
                                 </div>
                                 <button
-                                    onClick={() => { setSelectedDay(24); }}
+                                    onClick={goToToday}
                                     className="text-sm font-black text-[#5fa5ba] hover:underline uppercase tracking-wider">
                                     Today
                                 </button>
@@ -133,49 +223,36 @@ const MySchedule = () => {
                             </div>
 
                             <div className={`grid grid-cols-7 divide-x divide-y divide-stone-100 dark:divide-stone-800 flex-1 ${viewMode === 'week' ? 'auto-rows-[minmax(500px,1fr)]' : ''}`}>
-                                {/* Mock padding for Month view only */}
-                                {viewMode === 'month' && [...Array(3)].map((_, i) => (
-                                    <div key={`empty-${i}`} className="p-2 bg-stone-50/50 dark:bg-stone-900/30"></div>
-                                ))}
-
-                                {days.map(day => {
-                                    const shift = SCHEDULE_DATA.shifts.find(s => s.day === day);
-                                    const isToday = day === 24;
+                                {days.map((dayItem, index) => {
+                                    const date = viewMode === 'week' ? dayItem : dayItem.date;
+                                    const daySchedules = getSchedulesForDay(date);
+                                    const isTodayDate = isToday(date);
+                                    const isCurrentMonth = viewMode === 'week' ? true : dayItem.isCurrentMonth;
 
                                     return (
                                         <div
-                                            key={day}
+                                            key={index}
                                             className={`min-h-[140px] p-4 group transition-colors 
                                                 hover:bg-stone-50 dark:hover:bg-stone-700/20
-                                                ${isToday ? 'ring-2 ring-[#5fa5ba] ring-inset bg-[#5fa5ba]/5' : ''}
+                                                ${isTodayDate ? 'ring-2 ring-[#5fa5ba] ring-inset bg-[#5fa5ba]/5' : ''}
+                                                ${!isCurrentMonth ? 'bg-stone-50/50 dark:bg-stone-900/30' : ''}
                                             `}
                                         >
-                                            <span className={`text-sm font-bold ${isToday ? 'text-[#5fa5ba]' : 'text-stone-400 dark:text-stone-500'}`}>{day}</span>
+                                            <span className={`text-sm font-bold ${isTodayDate ? 'text-[#5fa5ba]' : isCurrentMonth ? 'text-stone-400 dark:text-stone-500' : 'text-stone-300 dark:text-stone-600'}`}>
+                                                {date.getDate()}
+                                            </span>
 
-                                            {shift && (
+                                            {daySchedules.length > 0 && (
                                                 <div className="mt-3 space-y-2">
-                                                    {shift.events ? (
-                                                        shift.events.map((event, idx) => (
-                                                            <div
-                                                                key={idx}
-                                                                onClick={(e) => handleEventClick(event, day, e)}
-                                                                className={`p-2 rounded-xl text-[10px] font-bold truncate shadow-sm transition-transform hover:scale-105 cursor-pointer ${getEventStyle(event.type)}`}
-                                                            >
-                                                                {event.time} - {event.patient}
-                                                            </div>
-                                                        ))
-                                                    ) : (
+                                                    {daySchedules.map((schedule) => (
                                                         <div
-                                                            onClick={(e) => handleEventClick({
-                                                                time: shift.title.split(' - ')[0],
-                                                                patient: shift.title.split(' - ')[1],
-                                                                type: shift.type || 'standard'
-                                                            }, day, e)}
-                                                            className={`p-2 rounded-xl text-[10px] font-bold truncate shadow-sm transition-transform hover:scale-105 cursor-pointer ${getEventStyle(shift.type || 'standard')}`}
+                                                            key={schedule.id}
+                                                            onClick={() => setSelectedShift(schedule)}
+                                                            className={`p-2 rounded-xl text-[10px] font-bold truncate shadow-sm transition-transform hover:scale-105 cursor-pointer ${getEventStyle(schedule.status)}`}
                                                         >
-                                                            {shift.title}
+                                                            {formatTime(schedule.startTime)} - {schedule.patientName}
                                                         </div>
-                                                    )}
+                                                    ))}
                                                 </div>
                                             )}
                                         </div>
@@ -190,44 +267,46 @@ const MySchedule = () => {
                 <ScrollAnimation animation="fade-left" delay={0.3} className="flex-shrink-0">
                     <aside className="w-[420px] h-full bg-white dark:bg-stone-800 border-l border-stone-100 dark:border-stone-800 overflow-y-auto custom-scrollbar p-8">
                         <div className="mb-8">
-                            <span className="text-[10px] font-black text-[#5fa5ba] uppercase tracking-widest">Selected Date</span>
+                            <span className="text-[10px] font-black text-[#5fa5ba] uppercase tracking-widest">Selected Shift</span>
                             <h3 className="text-3xl font-extrabold mt-1 text-stone-800 dark:text-white tracking-tight">
-                                {selectedDay === 24 ? "Friday, May 24" : `May ${selectedDay}, 2024`}
+                                {selectedShift ? new Date(selectedShift.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : 'No shift selected'}
                             </h3>
                         </div>
 
                         <div className="space-y-6">
-                            {/* Selected Shift Card */}
                             {selectedShift ? (
                                 <div className="bg-[#5fa5ba]/5 dark:bg-[#5fa5ba]/10 rounded-[2rem] p-8 border border-[#5fa5ba]/20 dark:border-[#5fa5ba]/30 relative overflow-hidden group">
                                     <div className="flex items-center justify-between mb-6">
-                                        <span className={`text-[10px] px-3 py-1.5 rounded-lg font-black uppercase tracking-wider ${selectedShift.isCurrent
-                                            ? 'bg-[#5fa5ba] text-white'
-                                            : 'bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-300'
+                                        <span className={`text-[10px] px-3 py-1.5 rounded-lg font-black uppercase tracking-wider ${selectedShift.status === 'InProgress'
+                                                ? 'bg-[#5fa5ba] text-white'
+                                                : selectedShift.status === 'Completed'
+                                                    ? 'bg-stone-200 text-stone-600'
+                                                    : 'bg-emerald-100 text-emerald-700'
                                             }`}>
-                                            {selectedShift.isCurrent ? "Current" : (selectedShift.type === 'completed' ? "Completed" : "Upcoming")}
+                                            {selectedShift.status === 'InProgress' ? 'In Progress' : selectedShift.status}
                                         </span>
-                                        <span className="text-xs text-stone-500 font-bold dark:text-stone-400">{selectedShift.fullTime}</span>
+                                        <span className="text-xs text-stone-500 font-bold dark:text-stone-400">
+                                            {formatTime(selectedShift.startTime)} - {formatTime(selectedShift.endTime)}
+                                        </span>
                                     </div>
                                     <h4 className="font-extrabold text-stone-800 dark:text-white text-2xl">{selectedShift.patientName}</h4>
                                     <div className="mt-6 space-y-5">
                                         <div className="flex items-start gap-4">
                                             <span className="material-symbols-outlined text-[#5fa5ba] text-2xl">location_on</span>
-                                            <p className="text-sm text-stone-600 dark:text-stone-300 font-medium leading-relaxed">{selectedShift.address}</p>
+                                            <p className="text-sm text-stone-600 dark:text-stone-300 font-medium leading-relaxed">
+                                                {selectedShift.patientAddress || 'Address not provided'}
+                                            </p>
                                         </div>
-                                        <div className="flex items-start gap-4">
-                                            <span className="material-symbols-outlined text-[#5fa5ba] text-2xl">assignment</span>
-                                            <div className="space-y-2">
-                                                <p className="text-sm font-bold text-stone-700 dark:text-stone-100 uppercase tracking-wide">Care Requirements</p>
-                                                <ul className="text-xs text-stone-500 dark:text-stone-400 space-y-2 font-medium">
-                                                    {selectedShift.requirements && selectedShift.requirements.map((req, i) => (
-                                                        <li key={i} className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[#5fa5ba]"></span>{req}</li>
-                                                    ))}
-                                                </ul>
+                                        {selectedShift.notes && (
+                                            <div className="flex items-start gap-4">
+                                                <span className="material-symbols-outlined text-[#5fa5ba] text-2xl">notes</span>
+                                                <p className="text-sm text-stone-600 dark:text-stone-300 font-medium leading-relaxed">
+                                                    {selectedShift.notes}
+                                                </p>
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
-                                    {selectedShift.isCurrent && (
+                                    {selectedShift.status === 'Scheduled' && (
                                         <Link to="/caregiver/active-shift" className="w-full mt-8 bg-[#5fa5ba] hover:bg-[#4d8ca0] text-white py-5 rounded-2xl font-bold text-sm shadow-xl shadow-[#5fa5ba]/20 transition-all flex items-center justify-center gap-2 group hover:scale-[1.02]">
                                             <span className="material-symbols-outlined text-xl group-hover:translate-x-1 transition-transform">login</span>
                                             QUICK CHECK-IN
@@ -258,13 +337,6 @@ const MySchedule = () => {
                                         <div className="w-3 h-3 rounded-full bg-stone-300"></div>
                                         <span className="text-xs font-bold text-stone-600 dark:text-stone-300">Completed</span>
                                     </div>
-                                </div>
-                            </div>
-
-                            <div className="mt-8 p-6 bg-stone-50 dark:bg-stone-900 rounded-[2rem] border border-dashed border-stone-200 dark:border-stone-700">
-                                <div className="flex items-start gap-4 text-stone-500">
-                                    <span className="material-symbols-outlined text-2xl text-[#5fa5ba]">help</span>
-                                    <p className="text-xs leading-relaxed font-medium">Need to request a shift change? Contact your supervisor or use the <strong className="text-[#5fa5ba]">Reports</strong> section related to scheduling.</p>
                                 </div>
                             </div>
                         </div>

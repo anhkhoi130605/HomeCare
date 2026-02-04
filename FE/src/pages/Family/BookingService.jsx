@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { SERVICES } from '../../data/Family/booking';
+import React, { useState, useEffect } from 'react';
+import { serviceApi } from '@/lib/api';
 import ServiceBookingModal from './ServiceBookingModal';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 
@@ -9,11 +9,60 @@ const BookingService = () => {
     const [activeTab, setActiveTab] = useState('Daily Care');
     const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
     const [selectedService, setSelectedService] = useState(null);
+    const [services, setServices] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        const fetchServices = async () => {
+            try {
+                setLoading(true);
+                const data = await serviceApi.getAll();
+                // Map API response to component format
+                const mappedServices = data.map(s => ({
+                    id: s.id,
+                    name: s.name,
+                    category: s.category || 'Daily Care',
+                    price: s.basePrice || s.price || 0,
+                    unit: s.unit || 'session',
+                    features: s.features || s.description?.split('.').filter(Boolean) || [],
+                    image: s.image || 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=200',
+                    recommended: s.isPopular || s.recommended || false
+                }));
+                setServices(mappedServices);
+            } catch (err) {
+                console.error('Failed to fetch services:', err);
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchServices();
+    }, []);
 
     const handleBookService = (service) => {
         setSelectedService(service);
         setIsBookingModalOpen(true);
     };
+
+    if (loading) {
+        return (
+            <div className="space-y-8 animate-pulse pb-12 pt-4 font-['Public_Sans']">
+                <div className="bg-stone-200 rounded-2xl h-24"></div>
+                <div className="bg-stone-200 rounded-[2rem] h-[400px]"></div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+                <span className="material-symbols-outlined text-4xl text-red-400 mb-4">error</span>
+                <p className="text-red-600 font-medium">Failed to load services</p>
+                <p className="text-stone-500 text-sm">{error}</p>
+            </div>
+        );
+    }
 
     return (
         <div className="font-['Public_Sans'] space-y-8 pb-12 pt-4 bg-transparent animate-fade-in-up">
@@ -87,7 +136,7 @@ const BookingService = () => {
 
                         {/* Services List Items */}
                         <div className="divide-y divide-story-100">
-                            {SERVICES.filter(service => service.category === activeTab).map((service, index) => (
+                            {services.filter(service => service.category === activeTab).map((service, index) => (
                                 <div key={service.id} className="p-6 md:p-8 flex flex-col md:flex-row gap-6 items-start md:items-center hover:bg-stone-50 transition-colors group relative">
                                     {/* Thumbnail - Compact */}
                                     <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-stone-200 shrink-0 overflow-hidden relative shadow-inner">

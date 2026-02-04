@@ -1,109 +1,166 @@
-import { AlertTriangle, Clock, Users, UserPlus, Check, ChevronLeft, ChevronRight, MoreVertical, AlertCircle, CheckCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { AlertTriangle, Clock, Users, UserPlus, Check, ChevronLeft, ChevronRight, MoreVertical, AlertCircle, CheckCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import AdminHeader from "@/components/layout/AdminHeader";
+import { adminApi, careRequestApi, scheduleApi } from "@/lib/api";
 
-const statsCards = [
-  { label: "URGENT REQUESTS", value: "04", icon: AlertTriangle, color: "bg-red-50", iconColor: "text-red-500" },
-  { label: "AVERAGE WAIT TIME", value: "1.2 Hours", icon: Clock, color: "bg-amber-50", iconColor: "text-amber-500" },
-  { label: "AVAILABLE CAREGIVERS", value: "18 Available", icon: Users, color: "bg-teal-50", iconColor: "text-teal-500" },
-];
-
-const requests = [
-  {
-    id: "#RQ-7721",
-    patient: {
-      name: "Wade Warren",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100",
-    },
-    service: "Post-Op Recovery",
-    description: "Surgical incision care, mobility support",
-    date: "Oct 26, 2023",
-    time: "09:00 AM - 05:00 PM",
-    urgency: "URGENT",
-    status: "PENDING",
-  },
-  {
-    id: "#RQ-7698",
-    patient: {
-      name: "Jane Cooper",
-      avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100",
-    },
-    service: "Elderly Companionship",
-    description: "Daily walks, meal prep, medication reminders",
-    date: "Oct 28, 2023",
-    time: "Flexible Time",
-    urgency: "STANDARD",
-    status: "REVIEWING",
-  },
-  {
-    id: "#RQ-7690",
-    patient: {
-      name: "Robert Fox",
-      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100",
-    },
-    service: "Physical Therapy Assist",
-    description: "Post-stroke rehabilitation exercises",
-    date: "Oct 27, 2023",
-    time: "02:00 PM - 04:00 PM",
-    urgency: "PRIORITY",
-    status: "PENDING",
-  },
-];
-
-const activeCaregivers = [
-  {
-    name: "Esther Howard",
-    role: "RN Nurse",
-    rating: 5.0,
-    distance: "2km away",
-    status: "AVAILABLE",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100",
-  },
-  {
-    name: "Leslie Alexander",
-    role: "Therapist",
-    rating: 4.9,
-    distance: "5km away",
-    status: "AVAILABLE",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100",
-  },
-];
-
-const systemAlerts = [
-  {
-    type: "urgent",
-    title: "New Urgent Request",
-    description: "Patient 'Wade Warren' requested immediate assistance for Post-Op care.",
-    icon: AlertTriangle,
-  },
-  {
-    type: "success",
-    title: "Assignment Successful",
-    description: "Caregiver assigned to patient successfully.",
-    icon: CheckCircle,
-  },
-];
-
-const getUrgencyClass = (urgency) => {
-  switch (urgency) {
-    case "URGENT":
-      return "urgency-urgent";
-    case "PRIORITY":
-      return "urgency-priority";
+const getStatusClass = (status) => {
+  switch (status?.toLowerCase()) {
+    case "pending":
+      return "bg-amber-100 text-amber-700";
+    case "approved":
+      return "bg-green-100 text-green-700";
+    case "rejected":
+      return "bg-red-100 text-red-700";
+    case "completed":
+      return "bg-blue-100 text-blue-700";
     default:
-      return "urgency-standard";
+      return "bg-gray-100 text-gray-700";
   }
 };
 
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
 const Requests = () => {
+  const [requests, setRequests] = useState([]);
+  const [caregivers, setCaregivers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("pending");
+  const [processing, setProcessing] = useState(null);
+
+  // Assign modal state
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [selectedCaregiver, setSelectedCaregiver] = useState('');
+  const [conflict, setConflict] = useState(false);
+  const [checkingConflict, setCheckingConflict] = useState(false);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [requestsData, caregiversData] = await Promise.all([
+        careRequestApi.getAll(),
+        adminApi.getCaregivers()
+      ]);
+      setRequests(requestsData || []);
+      setCaregivers(caregiversData?.filter(c => c.isAvailable) || []);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApprove = async (requestId) => {
+    try {
+      setProcessing(requestId);
+      await careRequestApi.updateStatus(requestId, { status: 1 }); // 1 = Approved
+      await fetchData();
+    } catch (error) {
+      console.error("Failed to approve:", error);
+      alert("Failed to approve request: " + error.message);
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleReject = async (requestId) => {
+    if (!confirm("Are you sure you want to reject this request?")) return;
+    try {
+      setProcessing(requestId);
+      await careRequestApi.updateStatus(requestId, { status: 2 }); // 2 = Rejected
+      await fetchData();
+    } catch (error) {
+      console.error("Failed to reject:", error);
+      alert("Failed to reject request: " + error.message);
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleAssign = async () => {
+    if (!selectedRequest || !selectedCaregiver) return;
+    try {
+      setProcessing(selectedRequest.id);
+      await careRequestApi.assignCaregiver(selectedRequest.id, parseInt(selectedCaregiver));
+      await fetchData();
+      setShowAssignModal(false);
+      setSelectedRequest(null);
+      setSelectedCaregiver('');
+    } catch (error) {
+      console.error("Failed to assign:", error);
+      alert("Failed to assign caregiver: " + error.message);
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const openAssignModal = (request) => {
+    setSelectedRequest(request);
+    setSelectedCaregiver('');
+    setConflict(false);
+    setShowAssignModal(true);
+  };
+
+  const handleCaregiverChange = async (caregiverId) => {
+    setSelectedCaregiver(caregiverId);
+    if (!caregiverId || !selectedRequest) {
+      setConflict(false);
+      return;
+    }
+
+    try {
+      setCheckingConflict(true);
+      const result = await scheduleApi.checkRequestConflict(selectedRequest.id, parseInt(caregiverId));
+      setConflict(result.hasConflict);
+    } catch (error) {
+      console.error("Failed to check conflict:", error);
+    } finally {
+      setCheckingConflict(false);
+    }
+  };
+
+  const filteredRequests = requests.filter(r => {
+    if (activeTab === 'pending') return r.status === 'Pending';
+    if (activeTab === 'approved') return r.status === 'Approved';
+    if (activeTab === 'rejected') return r.status === 'Rejected';
+    return true;
+  });
+
+  const stats = {
+    pending: requests.filter(r => r.status === 'Pending').length,
+    approved: requests.filter(r => r.status === 'Approved').length,
+    available: caregivers.length
+  };
+
+  const statsCards = [
+    { label: "PENDING REQUESTS", value: stats.pending.toString().padStart(2, '0'), icon: AlertTriangle, color: "bg-red-50", iconColor: "text-red-500" },
+    { label: "APPROVED TODAY", value: stats.approved.toString(), icon: CheckCircle, color: "bg-green-50", iconColor: "text-green-500" },
+    { label: "AVAILABLE CAREGIVERS", value: `${stats.available} Available`, icon: Users, color: "bg-teal-50", iconColor: "text-teal-500" },
+  ];
+
   return (
     <div>
-      <AdminHeader 
-        breadcrumb="SERVICE REQUESTS" 
+      <AdminHeader
+        breadcrumb="SERVICE REQUESTS"
         searchPlaceholder="Search requests by patient or service..."
       />
 
@@ -114,16 +171,20 @@ const Requests = () => {
             <h1 className="text-2xl font-bold">Service Request Approval Hub</h1>
             <p className="text-muted-foreground">Review and process new care requests from families.</p>
           </div>
-          <Tabs defaultValue="pending">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
               <TabsTrigger value="pending" className="gap-1">
-                Pending (12)
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                Pending ({stats.pending})
               </TabsTrigger>
-              <TabsTrigger value="reviewing" className="gap-1">
-                Reviewing (5)
+              <TabsTrigger value="approved" className="gap-1">
+                Approved ({stats.approved})
               </TabsTrigger>
-              <TabsTrigger value="completed">
-                Completed
+              <TabsTrigger value="rejected">
+                Rejected
+              </TabsTrigger>
+              <TabsTrigger value="all">
+                All
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -139,7 +200,7 @@ const Requests = () => {
                 </div>
                 <div>
                   <p className="text-xs text-primary font-medium uppercase tracking-wider">{stat.label}</p>
-                  <p className="text-2xl font-bold">{stat.value}</p>
+                  <p className="text-2xl font-bold">{loading ? "..." : stat.value}</p>
                 </div>
               </CardContent>
             </Card>
@@ -149,72 +210,127 @@ const Requests = () => {
         {/* Requests Table */}
         <Card className="border-0 shadow-sm">
           <CardContent className="p-0">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Patient Details</th>
-                  <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Service Requested</th>
-                  <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Preferred Schedule</th>
-                  <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Status & Urgency</th>
-                  <th className="text-right p-4 text-xs font-medium text-primary uppercase tracking-wider">Approval Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {requests.map((request) => (
-                  <tr key={request.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarImage src={request.patient.avatar} />
-                          <AvatarFallback>{request.patient.name[0]}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{request.patient.name}</p>
-                          <p className="text-sm text-primary">ID: {request.id}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <p className="font-medium">{request.service}</p>
-                      <p className="text-sm text-primary">{request.description}</p>
-                    </td>
-                    <td className="p-4">
-                      <p className="font-medium">{request.date}</p>
-                      <p className="text-sm text-primary">{request.time}</p>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex flex-col gap-1">
-                        <Badge className={`status-badge ${getUrgencyClass(request.urgency)} w-fit`}>
-                          {request.urgency}
-                        </Badge>
-                        <Badge variant="outline" className="w-fit text-xs">
-                          {request.status}
-                        </Badge>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button variant="outline" size="sm" className="gap-1">
-                          <UserPlus className="w-3 h-3" />
-                          Assign
-                        </Button>
-                        <Button size="sm" className="gap-1">
-                          <Check className="w-3 h-3" />
-                          Approve
-                        </Button>
-                        <Button variant="ghost" size="icon" className="w-8 h-8">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </td>
+            {loading ? (
+              <div className="p-8 text-center">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                <p className="text-muted-foreground">Loading requests...</p>
+              </div>
+            ) : filteredRequests.length === 0 ? (
+              <div className="p-8 text-center">
+                <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
+                <p className="text-muted-foreground">No requests found</p>
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Patient Details</th>
+                    <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Family</th>
+                    <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Service</th>
+                    <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Schedule</th>
+                    <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Status</th>
+                    <th className="text-right p-4 text-xs font-medium text-primary uppercase tracking-wider">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredRequests.map((request) => (
+                    <tr key={request.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarFallback>{request.patientName?.[0] || 'P'}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{request.patientName}</p>
+                            <p className="text-sm text-muted-foreground">ID: #RQ-{request.id}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <p className="text-sm">{request.familyName}</p>
+                      </td>
+                      <td className="p-4">
+                        <p className="font-medium">{request.serviceName}</p>
+                        <p className="text-sm text-muted-foreground">{request.type}</p>
+                      </td>
+                      <td className="p-4">
+                        <p className="font-medium">{formatDate(request.requestedDate)}</p>
+                        <p className="text-sm text-muted-foreground">{request.startTime} - {request.endTime}</p>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col gap-1">
+                          <Badge className={getStatusClass(request.status)}>
+                            {request.status}
+                          </Badge>
+                          {request.assignedCaregiverName && (
+                            <span className="text-xs text-muted-foreground">
+                              Assigned: {request.assignedCaregiverName}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center justify-end gap-2">
+                          {request.status === 'Pending' && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => openAssignModal(request)}
+                                disabled={processing === request.id}
+                              >
+                                <UserPlus className="w-3 h-3" />
+                                Assign
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="gap-1 bg-green-500 hover:bg-green-600"
+                                onClick={() => handleApprove(request.id)}
+                                disabled={processing === request.id}
+                              >
+                                {processing === request.id ? (
+                                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                  <Check className="w-3 h-3" />
+                                )}
+                                Approve
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => handleReject(request.id)}
+                                disabled={processing === request.id}
+                              >
+                                <X className="w-3 h-3" />
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                          {request.status === 'Approved' && !request.assignedCaregiverName && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1"
+                              onClick={() => openAssignModal(request)}
+                              disabled={processing === request.id}
+                            >
+                              <UserPlus className="w-3 h-3" />
+                              Assign Caregiver
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
             {/* Pagination */}
             <div className="p-4 border-t border-border flex items-center justify-between">
-              <p className="text-sm text-primary">Showing 3 of 12 pending requests</p>
+              <p className="text-sm text-muted-foreground">Showing {filteredRequests.length} of {requests.length} requests</p>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="icon" className="w-8 h-8">
                   <ChevronLeft className="w-4 h-4" />
@@ -229,63 +345,123 @@ const Requests = () => {
 
         {/* Bottom Section */}
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Active Caregivers */}
+          {/* Available Caregivers */}
           <Card className="border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-lg">Active Caregivers</CardTitle>
-              <Button variant="link" className="text-primary p-0 h-auto">FULL ROSTER</Button>
+              <CardTitle className="text-lg">Available Caregivers</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {activeCaregivers.map((caregiver) => (
-                <div key={caregiver.name} className="flex items-center justify-between">
+              {caregivers.slice(0, 5).map((caregiver) => (
+                <div key={caregiver.id} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Avatar>
-                      <AvatarImage src={caregiver.avatar} />
-                      <AvatarFallback>{caregiver.name[0]}</AvatarFallback>
+                      <AvatarImage src={caregiver.imageUrl} />
+                      <AvatarFallback>{caregiver.fullName?.[0]}</AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium">{caregiver.name}</p>
+                      <p className="font-medium">{caregiver.fullName}</p>
                       <p className="text-sm text-muted-foreground">
-                        {caregiver.role} • {caregiver.rating} ⭐ • {caregiver.distance}
+                        {caregiver.specialization} • {caregiver.rating?.toFixed(1) || '0.0'} ⭐
                       </p>
                     </div>
                   </div>
                   <Badge variant="secondary" className="text-green-600 bg-green-50">
-                    {caregiver.status}
+                    Available
                   </Badge>
                 </div>
               ))}
+              {caregivers.length === 0 && (
+                <p className="text-muted-foreground text-sm">No available caregivers</p>
+              )}
             </CardContent>
           </Card>
 
-          {/* System Alerts */}
+          {/* Quick Stats */}
           <Card className="border-0 shadow-sm bg-gradient-to-br from-slate-800 to-slate-900 text-white">
             <CardHeader>
-              <CardTitle className="text-lg text-white">System Alerts</CardTitle>
+              <CardTitle className="text-lg text-white">Request Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {systemAlerts.map((alert, index) => (
-                <div 
-                  key={index} 
-                  className={`p-4 rounded-lg ${
-                    alert.type === "urgent" ? "bg-red-500/20" : "bg-green-500/20"
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <alert.icon className={`w-5 h-5 mt-0.5 ${
-                      alert.type === "urgent" ? "text-red-400" : "text-green-400"
-                    }`} />
-                    <div>
-                      <p className="font-medium">{alert.title}</p>
-                      <p className="text-sm text-white/70">{alert.description}</p>
-                    </div>
+              <div className="p-4 rounded-lg bg-amber-500/20">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 mt-0.5 text-amber-400" />
+                  <div>
+                    <p className="font-medium">{stats.pending} Pending Requests</p>
+                    <p className="text-sm text-white/70">Awaiting your approval</p>
                   </div>
                 </div>
-              ))}
+              </div>
+              <div className="p-4 rounded-lg bg-green-500/20">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 mt-0.5 text-green-400" />
+                  <div>
+                    <p className="font-medium">{stats.approved} Approved</p>
+                    <p className="text-sm text-white/70">Ready for scheduling</p>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Assign Caregiver Modal */}
+      <Dialog open={showAssignModal} onOpenChange={setShowAssignModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign Caregiver</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            {selectedRequest && (
+              <div className="mb-4 p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Request for:</p>
+                <p className="font-medium">{selectedRequest.patientName}</p>
+                <p className="text-sm">{selectedRequest.serviceName}</p>
+              </div>
+            )}
+            <label className="text-sm font-medium mb-2 block">Select Caregiver</label>
+            <select
+              value={selectedCaregiver}
+              onChange={(e) => handleCaregiverChange(e.target.value)}
+              className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${conflict ? 'border-amber-500 bg-amber-50' : 'border-border'
+                }`}
+            >
+              <option value="">Choose a caregiver...</option>
+              {caregivers.map((cg) => (
+                <option key={cg.id} value={cg.id}>
+                  {cg.fullName} - {cg.specialization} ({cg.rating?.toFixed(1) || '0.0'} ⭐)
+                </option>
+              ))}
+            </select>
+            {checkingConflict && (
+              <p className="text-xs text-muted-foreground mt-1 animate-pulse">Checking availability...</p>
+            )}
+            {conflict && (
+              <div className="mt-3 p-3 bg-amber-100 border border-amber-200 rounded-lg flex items-start gap-2 text-amber-800">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <p className="text-xs">
+                  <strong>Schedule Conflict:</strong> This caregiver already has a shift that overlaps with this request's time.
+                </p>
+              </div>
+            )}
+            {caregivers.length === 0 && (
+              <p className="text-sm text-muted-foreground mt-2">No available caregivers</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAssignModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAssign}
+              disabled={!selectedCaregiver || processing}
+              className="bg-primary"
+            >
+              {processing ? "Assigning..." : "Assign Caregiver"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

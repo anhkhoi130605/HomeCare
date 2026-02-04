@@ -1,8 +1,174 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import ScrollAnimation from "@/components/ui/scroll-animation";
+import { familyApi, serviceApi, caregiverApi, contractApi, paymentApi } from '@/lib/api';
+import AddMemberModal from './AddMemberModal';
+import { toast } from 'sonner';
 
 const CreateContract = () => {
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+
+    // Data
+    const [patients, setPatients] = useState([]);
+    const [packages, setPackages] = useState([]);
+    const [caregivers, setCaregivers] = useState([]);
+
+    // Selections
+    const [selectedPatientId, setSelectedPatientId] = useState('');
+    const [selectedPackageId, setSelectedPackageId] = useState('');
+    const [selectedCaregiverId, setSelectedCaregiverId] = useState('');
+
+    // Schedule Configuration
+    const [days, setDays] = useState(['MON', 'TUE', 'WED', 'THU', 'FRI']);
+    const [startTime, setStartTime] = useState('09:00');
+    const [endTime, setEndTime] = useState('17:00');
+    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [endDate, setEndDate] = useState(new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0]);
+
+    // Modal
+    const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const [patientsData, packagesData, caregiversData] = await Promise.all([
+                    familyApi.getPatients(),
+                    serviceApi.getAll(true),
+                    caregiverApi.getAll(true) // Fetch available caregivers
+                ]);
+
+                setPatients(patientsData || []);
+                setPackages(packagesData || []);
+                setCaregivers(caregiversData || []);
+
+                // Pre-select if available
+                if (patientsData?.length > 0) setSelectedPatientId(patientsData[0].id);
+
+                const urlPackageId = searchParams.get('packageId');
+                if (urlPackageId) {
+                    setSelectedPackageId(urlPackageId);
+                } else if (packagesData?.length > 0) {
+                    setSelectedPackageId(packagesData[0].id);
+                }
+
+            } catch (error) {
+                console.error("Failed to load data:", error);
+                toast.error("Failed to load preliminary data");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [searchParams]);
+
+    // Derived values
+    const selectedPackage = packages.find(p => p.id === parseInt(selectedPackageId));
+    const selectedCaregiver = caregivers.find(c => c.id === parseInt(selectedCaregiverId));
+
+    // Cost Calculation
+    const calculateTotal = () => {
+        if (!selectedPackage) return 0;
+
+        const start = new Date(`2000-01-01T${startTime}`);
+        const end = new Date(`2000-01-01T${endTime}`);
+        let hoursPerDay = (end - start) / (1000 * 60 * 60);
+        if (hoursPerDay <= 0) hoursPerDay = 8; // Default fallback
+
+        const startD = new Date(startDate);
+        const endD = new Date(endDate);
+        const dayCount = days.length;
+        const totalDays = (endD - startD) / (1000 * 60 * 60 * 24);
+        const weeks = Math.ceil(totalDays / 7);
+
+        // Simple approximation
+        const totalHours = hoursPerDay * dayCount * weeks;
+        const price = selectedPackage.pricePerHour ?? selectedPackage.PricePerHour ?? 0;
+        return (totalHours * price).toFixed(2);
+    };
+
+    const handleDayToggle = (day) => {
+        const newDays = days.includes(day)
+            ? days.filter(d => d !== day)
+            : [...days, day];
+        setDays(newDays);
+    };
+
+    const handlePatientChange = (e) => {
+        if (e.target.value === 'add-new') {
+            setIsAddMemberModalOpen(true);
+        } else {
+            setSelectedPatientId(e.target.value);
+        }
+    };
+
+    const handleProceed = async () => {
+        if (!selectedPatientId || !selectedPackageId || !startDate || !endDate || days.length === 0) {
+            toast.error("Please fill in all required fields (Patient, Package, Schedule)");
+            return;
+        }
+
+        try {
+            setSubmitting(true);
+
+            // 1. Create Contract
+            const scheduleData = {
+                Days: days,
+                StartTime: startTime,
+                EndTime: endTime
+            };
+
+            const contractData = {
+                PatientId: parseInt(selectedPatientId),
+                ServiceId: parseInt(selectedPackageId),
+                AssignedCaregiverId: selectedCaregiverId ? parseInt(selectedCaregiverId) : null,
+                StartDate: startDate,
+                EndDate: endDate,
+                WeeklySchedule: JSON.stringify(scheduleData)
+            };
+
+            const contract = await contractApi.create(contractData);
+
+            // 2. Create Payment Logic (Create Payment Record -> Get VNPay URL)
+            const paymentData = {
+                ContractId: contract.id,
+                Amount: contract.totalAmount, // Use amount from backend response
+                PaymentMethod: 'VNPay',
+                OrderInfo: `Payment for Contract #${contract.id}`
+            };
+
+            const payment = await paymentApi.create(paymentData);
+
+            if (payment && payment.paymentId) {
+                // Get VNPay URL
+                const { paymentUrl } = await paymentApi.getVnPayUrl(payment.paymentId);
+                if (paymentUrl) {
+                    window.location.href = paymentUrl;
+                } else {
+                    toast.error("Failed to generate payment URL");
+                }
+            } else {
+                toast.error("Failed to create payment record");
+            }
+
+        } catch (error) {
+            console.error("Submission failed:", error);
+            toast.error(error.message || "Failed to submit contract");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const getPackageImage = (name) => {
+        if (name.includes('Basic')) return "https://lh3.googleusercontent.com/aida-public/AB6AXuChghb6TOUbuaLclIMauhzBL0IIm9vBg8J-Y64vaYiogF-pNPuA--5uQH5whw1tLgb7Gb1geLsywbrLPV314vs11Ucmy_zQptjR8VQqR7E41jusmHuuug8Er01BAJh3_7MazDnKlU-eQjEIZDj5-sXPj-opm2Cm1nTIm9fpqTDYdCqAsIG6x31Y4m-qAHuXiMKTuQ9Rv7QNE65lMQSY0X82S4Tjw_CNFMNKc-arQufSxBXdEtcYSkJkHop4clnzkqwiwNY9ho0cuJWL";
+        if (name.includes('Intensive')) return "https://lh3.googleusercontent.com/aida-public/AB6AXuAc6Jb1JhErh_9a6p8vNbSjwiLl3104mBulsi1Z0wqeApesz111etbxrVLD-r9lbdKtRrGM2W7mHJEQN06nbDG_9KOQNhakeCCFti-fzkkQsISxPTXSkJiXEkw-n9KqcSKgvqXMshADZbVz-qMskuy1fV7QVyCyTeTfgnrp2482IX69JULHr7g0Fg02DtcETbmPxM8BkAg7babDrLa6pz8viaxkxBHuLyITHOPu3jE348wsZaMpS6wmvSFRxNxpjlBkSTkToOIrPt6U";
+        return "https://lh3.googleusercontent.com/aida-public/AB6AXuBgNQtZblyIzvW3oq7RphakqOQlaCAY0p8-r_uhSJACQrU6LpEwZ0kUkuU6i21NtAbUYuhfl4H7ieadwL_9qiKskLMRg8X0uG0Rx1L6CN6XAcp850dIwWMlsFr1H05pVK15q-qgpOoIqt6dLZyqoMyH6xLyLf75F3TYMOjd2w2CjgcfG4NQaZXE4C83AccCfxOVay7SnfTPVxDnzTHAZbpVZVx7iVdhK-dGabRhVKGwGwyP3xj67-C-yyW6mcWs7Q05DiCqEF1wK5Y1";
+    };
+
+    if (loading) return <div className="h-screen flex items-center justify-center"><span className="material-symbols-outlined animate-spin text-4xl text-[#5fa5ba]">progress_activity</span></div>;
+
     return (
         <div className="max-w-[1200px] mx-auto w-full pb-12 animate-fade-in-up font-['Public_Sans']">
             {/* Steps Indicator */}
@@ -49,10 +215,16 @@ const CreateContract = () => {
                     </ScrollAnimation>
                     <ScrollAnimation animation="fade-up">
                         <div className="relative max-w-3xl">
-                            <select className="appearance-none w-full bg-white border-2 border-stone-100 hover:border-[#99C5D3] rounded-[2rem] px-10 py-8 text-xl font-bold focus:ring-4 focus:ring-[#99C5D3]/20 focus:border-[#5fa5ba] outline-none transition-all cursor-pointer shadow-sm text-stone-700">
-                                <option>Martha Stewart (Grandmother)</option>
-                                <option>James Stewart (Father)</option>
-                                <option>+ Add New Family Member</option>
+                            <select
+                                className="appearance-none w-full bg-white border-2 border-stone-100 hover:border-[#99C5D3] rounded-[2rem] px-10 py-8 text-xl font-bold focus:ring-4 focus:ring-[#99C5D3]/20 focus:border-[#5fa5ba] outline-none transition-all cursor-pointer shadow-sm text-stone-700"
+                                value={selectedPatientId}
+                                onChange={handlePatientChange}
+                            >
+                                <option value="" disabled>Select a patient</option>
+                                {patients.map(p => (
+                                    <option key={p.id} value={p.id}>{p.fullName} ({p.relation})</option>
+                                ))}
+                                <option value="add-new">+ Add New Family Member</option>
                             </select>
                             <span className="material-symbols-outlined absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none text-[#5fa5ba] text-4xl font-bold">expand_more</span>
                         </div>
@@ -73,80 +245,31 @@ const CreateContract = () => {
                         </div>
                     </ScrollAnimation>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        {/* Basic Care */}
-                        <ScrollAnimation animation="fade-up" delay={0.1} className="h-full">
-                            <label className="relative cursor-pointer group h-full block">
-                                <input className="peer sr-only" name="package" type="radio" />
-                                <div className="h-full bg-white border-2 border-transparent rounded-[2.5rem] p-8 transition-all duration-300 shadow-sm hover:shadow-xl peer-checked:border-[#5fa5ba] peer-checked:bg-[#E0F2F1]/30 peer-checked:shadow-lg flex flex-col gap-6 ring-1 ring-stone-100 peer-checked:ring-0">
-                                    <div className="aspect-[4/3] rounded-[2rem] bg-cover bg-center grayscale-[20%] group-hover:grayscale-0 transition-all shadow-md" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuChghb6TOUbuaLclIMauhzBL0IIm9vBg8J-Y64vaYiogF-pNPuA--5uQH5whw1tLgb7Gb1geLsywbrLPV314vs11Ucmy_zQptjR8VQqR7E41jusmHuuug8Er01BAJh3_7MazDnKlU-eQjEIZDj5-sXPj-opm2Cm1nTIm9fpqTDYdCqAsIG6x31Y4m-qAHuXiMKTuQ9Rv7QNE65lMQSY0X82S4Tjw_CNFMNKc-arQufSxBXdEtcYSkJkHop4clnzkqwiwNY9ho0cuJWL")' }}></div>
-                                    <div className="space-y-2">
-                                        <h3 className="font-bold text-2xl text-stone-900 group-peer-checked:text-[#00695C]">Basic Care</h3>
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-4xl font-black text-[#5fa5ba]">$20</span>
-                                            <span className="text-stone-400 font-bold text-sm">/hr</span>
+                        {packages.map((pkg, idx) => (
+                            <ScrollAnimation key={pkg.id} animation="fade-up" delay={idx * 0.1} className="h-full">
+                                <label className="relative cursor-pointer group h-full block">
+                                    <input
+                                        className="peer sr-only"
+                                        name="package"
+                                        type="radio"
+                                        value={pkg.id}
+                                        checked={selectedPackageId == pkg.id}
+                                        onChange={() => setSelectedPackageId(pkg.id)}
+                                    />
+                                    <div className="h-full bg-white border-2 border-transparent rounded-[2.5rem] p-8 transition-all duration-300 shadow-sm hover:shadow-xl peer-checked:border-[#5fa5ba] peer-checked:bg-[#E0F2F1]/30 peer-checked:shadow-lg flex flex-col gap-6 ring-1 ring-stone-100 peer-checked:ring-0">
+                                        <div className="aspect-[4/3] rounded-[2rem] bg-cover bg-center grayscale-[20%] group-hover:grayscale-0 transition-all shadow-md" style={{ backgroundImage: `url("${getPackageImage(pkg.name)}")` }}></div>
+                                        <div className="space-y-2">
+                                            <h3 className="font-bold text-2xl text-stone-900 group-peer-checked:text-[#00695C]">{pkg.name}</h3>
+                                            <div className="flex items-baseline gap-1">
+                                                <span className="text-4xl font-black text-[#5fa5ba]">${pkg.pricePerHour ?? pkg.PricePerHour ?? 0}</span>
+                                                <span className="text-stone-400 font-bold text-sm">/hr</span>
+                                            </div>
+                                            <p className="text-stone-500 text-sm mt-2">{pkg.description}</p>
                                         </div>
-                                        <ul className="space-y-3 pt-4 border-t border-stone-100 mt-4">
-                                            <li className="flex items-center gap-3 text-sm font-bold text-stone-500">
-                                                <span className="material-symbols-outlined text-[#5fa5ba] text-lg font-bold">check_circle</span> Companion services
-                                            </li>
-                                            <li className="flex items-center gap-3 text-sm font-bold text-stone-500">
-                                                <span className="material-symbols-outlined text-[#5fa5ba] text-lg font-bold">check_circle</span> Daily check-ins
-                                            </li>
-                                        </ul>
                                     </div>
-                                </div>
-                            </label>
-                        </ScrollAnimation>
-
-                        {/* Standard */}
-                        <ScrollAnimation animation="fade-up" delay={0.2} className="h-full">
-                            <label className="relative cursor-pointer group h-full block">
-                                <input defaultChecked className="peer sr-only" name="package" type="radio" />
-                                <div className="h-full bg-white border-2 border-transparent rounded-[2.5rem] p-8 transition-all duration-300 shadow-sm hover:shadow-xl peer-checked:border-[#5fa5ba] peer-checked:bg-[#E0F2F1]/30 peer-checked:shadow-lg flex flex-col gap-6 ring-1 ring-stone-100 peer-checked:ring-0">
-                                    <div className="aspect-[4/3] rounded-[2rem] bg-cover bg-center grayscale-[20%] group-hover:grayscale-0 transition-all shadow-md" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuBgNQtZblyIzvW3oq7RphakqOQlaCAY0p8-r_uhSJACQrU6LpEwZ0kUkuU6i21NtAbUYuhfl4H7ieadwL_9qiKskLMRg8X0uG0Rx1L6CN6XAcp850dIwWMlsFr1H05pVK15q-qgpOoIqt6dLZyqoMyH6xLyLf75F3TYMOjd2w2CjgcfG4NQaZXE4C83AccCfxOVay7SnfTPVxDnzTHAZbpVZVx7iVdhK-dGabRhVKGwGwyP3xj67-C-yyW6mcWs7Q05DiCqEF1wK5Y1")' }}></div>
-                                    <div className="space-y-2">
-                                        <h3 className="font-bold text-2xl text-stone-900 group-peer-checked:text-[#00695C]">Standard</h3>
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-4xl font-black text-[#5fa5ba]">$35</span>
-                                            <span className="text-stone-400 font-bold text-sm">/hr</span>
-                                        </div>
-                                        <ul className="space-y-3 pt-4 border-t border-stone-100 mt-4">
-                                            <li className="flex items-center gap-3 text-sm font-bold text-stone-500">
-                                                <span className="material-symbols-outlined text-[#5fa5ba] text-lg font-bold">check_circle</span> Medical assistance
-                                            </li>
-                                            <li className="flex items-center gap-3 text-sm font-bold text-stone-500">
-                                                <span className="material-symbols-outlined text-[#5fa5ba] text-lg font-bold">check_circle</span> Meal prep
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </label>
-                        </ScrollAnimation>
-
-                        {/* Intensive */}
-                        <ScrollAnimation animation="fade-up" delay={0.3} className="h-full">
-                            <label className="relative cursor-pointer group h-full block">
-                                <input className="peer sr-only" name="package" type="radio" />
-                                <div className="h-full bg-white border-2 border-transparent rounded-[2.5rem] p-8 transition-all duration-300 shadow-sm hover:shadow-xl peer-checked:border-[#5fa5ba] peer-checked:bg-[#E0F2F1]/30 peer-checked:shadow-lg flex flex-col gap-6 ring-1 ring-stone-100 peer-checked:ring-0">
-                                    <div className="aspect-[4/3] rounded-[2rem] bg-cover bg-center grayscale-[20%] group-hover:grayscale-0 transition-all shadow-md" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuAc6Jb1JhErh_9a6p8vNbSjwiLl3104mBulsi1Z0wqeApesz111etbxrVLD-r9lbdKtRrGM2W7mHJEQN06nbDG_9KOQNhakeCCFti-fzkkQsISxPTXSkJiXEkw-n9KqcSKgvqXMshADZbVz-qMskuy1fV7QVyCyTeTfgnrp2482IX69JULHr7g0Fg02DtcETbmPxM8BkAg7babDrLa6pz8viaxkxBHuLyITHOPu3jE348wsZaMpS6wmvSFRxNxpjlBkSTkToOIrPt6U")' }}></div>
-                                    <div className="space-y-2">
-                                        <h3 className="font-bold text-2xl text-stone-900 group-peer-checked:text-[#00695C]">Intensive</h3>
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-4xl font-black text-[#5fa5ba]">$55</span>
-                                            <span className="text-stone-400 font-bold text-sm">/hr</span>
-                                        </div>
-                                        <ul className="space-y-3 pt-4 border-t border-stone-100 mt-4">
-                                            <li className="flex items-center gap-3 text-sm font-bold text-stone-500">
-                                                <span className="material-symbols-outlined text-[#5fa5ba] text-lg font-bold">check_circle</span> 24/7 Monitoring
-                                            </li>
-                                            <li className="flex items-center gap-3 text-sm font-bold text-stone-500">
-                                                <span className="material-symbols-outlined text-[#5fa5ba] text-lg font-bold">check_circle</span> Specialized therapy
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </label>
-                        </ScrollAnimation>
+                                </label>
+                            </ScrollAnimation>
+                        ))}
                     </div>
                 </section>
 
@@ -158,55 +281,36 @@ const CreateContract = () => {
                                 <span className="material-symbols-outlined font-bold text-3xl">groups</span>
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-stone-900">Select Fixed Caregiver</h2>
+                                <h2 className="text-2xl font-bold text-stone-900">Select Fixed Caregiver (Optional)</h2>
                                 <p className="text-stone-500 font-medium">Choose your dedicated professional for consistent care</p>
                             </div>
                         </div>
                     </ScrollAnimation>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                        <ScrollAnimation animation="fade-up" delay={0.1}>
-                            <div className="bg-white p-8 rounded-[2.5rem] border border-stone-100 flex items-center gap-6 group hover:border-[#5fa5ba] transition-all shadow-sm hover:shadow-lg">
-                                <div className="w-28 h-28 rounded-[2rem] bg-cover bg-center flex-shrink-0 shadow-md" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuD0eu2SOqdxFgfEmhiWSDi2ivJWrT-WIcPinXh46oi13jltBdzCEl_OsUDSi48jFnJerxGBQr2RsbcIfjZi90yS9tRmgucGq01KIoWwemuCcdx7a2n_MO5FEA13lv67XgMoW2pZsBynf83VLA9l5zctKpaKf8kli5MBVLMRsM2A3f0u7sXqRuLului-fhGRd6zuk9mX_wWBriD0PoHQIA1IjrLr7AwMRaLhCnY5XviPMfAZbRRwzv4z-fIAJl-pueWd-RIz1DwjIGLK")' }}></div>
-                                <div className="flex-1">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <h4 className="font-bold text-xl text-stone-900">Sarah Wilson, RN</h4>
-                                            <p className="text-xs font-bold text-[#5fa5ba] mt-0.5 uppercase tracking-wide">Dementia Specialist</p>
+                        {caregivers.slice(0, 4).map((cg, idx) => (
+                            <ScrollAnimation key={cg.id} animation="fade-up" delay={idx * 0.1}>
+                                <div className={`bg-white p-8 rounded-[2.5rem] border ${selectedCaregiverId == cg.id ? 'border-[#5fa5ba] ring-4 ring-[#E0F2F1]' : 'border-stone-100'} flex items-center gap-6 group hover:border-[#5fa5ba] transition-all shadow-sm hover:shadow-lg cursor-pointer`} onClick={() => setSelectedCaregiverId(cg.id)}>
+                                    <div className="w-28 h-28 rounded-[2rem] bg-cover bg-center flex-shrink-0 shadow-md" style={{ backgroundImage: `url("${cg.image || 'https://via.placeholder.com/150'}")` }}></div>
+                                    <div className="flex-1">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h4 className="font-bold text-xl text-stone-900">{cg.fullName}</h4>
+                                                <p className="text-xs font-bold text-[#5fa5ba] mt-0.5 uppercase tracking-wide">{cg.specialization || 'General Care'}</p>
+                                            </div>
+                                            <div className="flex items-center gap-1 bg-[#E0F2F1] px-2 py-1 rounded-lg">
+                                                <span className="material-symbols-outlined text-[#00695C] text-xs font-bold">star</span>
+                                                <span className="text-xs font-black text-[#00695C]">4.9</span>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-1 bg-[#E0F2F1] px-2 py-1 rounded-lg">
-                                            <span className="material-symbols-outlined text-[#00695C] text-xs font-bold">star</span>
-                                            <span className="text-xs font-black text-[#00695C]">4.9</span>
+                                        <div className="mt-6 flex items-center justify-between gap-4">
+                                            <button className={`flex-1 px-6 py-3 rounded-full font-bold text-xs transition-all uppercase tracking-wider ${selectedCaregiverId == cg.id ? 'bg-[#5fa5ba] text-white shadow-lg' : 'border border-[#5fa5ba] text-[#5fa5ba] hover:bg-[#E0F2F1]'}`}>
+                                                {selectedCaregiverId == cg.id ? 'Selected' : 'Select'}
+                                            </button>
                                         </div>
-                                    </div>
-                                    <div className="mt-6 flex items-center justify-between gap-4">
-                                        <span className="text-[9px] font-black text-[#00695C] bg-[#E0F2F1] px-3 py-1.5 rounded-full border border-[#B2EBF2] uppercase tracking-widest hidden sm:inline-block">Available</span>
-                                        <button className="flex-1 px-6 py-3 rounded-full bg-[#5fa5ba] text-white font-bold text-xs hover:bg-[#4d8ca0] shadow-lg shadow-[#5fa5ba]/20 transition-all uppercase tracking-wider">Select</button>
                                     </div>
                                 </div>
-                            </div>
-                        </ScrollAnimation>
-
-                        <ScrollAnimation animation="fade-up" delay={0.2}>
-                            <div className="bg-white p-8 rounded-[2.5rem] border border-stone-100 flex items-center gap-6 group hover:border-[#5fa5ba] transition-all shadow-sm hover:shadow-lg">
-                                <div className="w-28 h-28 rounded-[2rem] bg-cover bg-center flex-shrink-0 shadow-md" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuAT5oC237fH2jwfw1zY5cPleRmNkWzis6Z1nvSvGo30ymPgOt6TTATNcCeazVJMFpqJBN3DalL677gLMZQySlPciY_5QWyvH6tmooBaWiyDOBaUN5u2qfJfMH06KYUl1CzJveTZZcJuzIqetkxZVBNEtPERFGpvmvvrU2R0UyYJAzCcOIEqHsL4DJeHYZ2XPi4dJIUpeibsXvWSNVldFDL7YkQrAK_0cXedPmxXdC5o9G_o7GoP0z5lUX30Mg1t8p5evMe4eWWwb_JB")' }}></div>
-                                <div className="flex-1">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <h4 className="font-bold text-xl text-stone-900">David Miller</h4>
-                                            <p className="text-xs font-bold text-[#5fa5ba] mt-0.5 uppercase tracking-wide">Physical Therapist</p>
-                                        </div>
-                                        <div className="flex items-center gap-1 bg-[#E0F2F1] px-2 py-1 rounded-lg">
-                                            <span className="material-symbols-outlined text-[#00695C] text-xs font-bold">star</span>
-                                            <span className="text-xs font-black text-[#00695C]">4.7</span>
-                                        </div>
-                                    </div>
-                                    <div className="mt-6 flex items-center justify-between gap-4">
-                                        <span className="text-[9px] font-black text-[#00695C] bg-[#E0F2F1] px-3 py-1.5 rounded-full border border-[#B2EBF2] uppercase tracking-widest hidden sm:inline-block">Available</span>
-                                        <button className="flex-1 px-6 py-3 rounded-full border border-[#5fa5ba] text-[#5fa5ba] font-bold text-xs hover:bg-[#E0F2F1] transition-all uppercase tracking-wider">Select</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </ScrollAnimation>
+                            </ScrollAnimation>
+                        ))}
                     </div>
                 </section>
 
@@ -225,12 +329,41 @@ const CreateContract = () => {
                     </ScrollAnimation>
                     <ScrollAnimation animation="fade-up">
                         <div className="bg-white p-8 md:p-12 rounded-[2.5rem] border border-stone-100 shadow-sm relative overflow-hidden">
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-10 pb-10 border-b border-stone-100">
+                                <div className="space-y-4">
+                                    <label className="text-xs font-bold text-[#5fa5ba] uppercase tracking-widest">Start Date</label>
+                                    <input
+                                        className="w-full bg-[#E0F2F1]/50 border-none hover:bg-[#E0F2F1] rounded-[1.5rem] px-8 py-6 text-xl font-bold text-[#00695C] focus:ring-0 transition-all cursor-pointer outline-none"
+                                        type="date"
+                                        value={startDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                        min={new Date().toISOString().split('T')[0]}
+                                    />
+                                </div>
+                                <div className="space-y-4">
+                                    <label className="text-xs font-bold text-[#5fa5ba] uppercase tracking-widest">End Date</label>
+                                    <input
+                                        className="w-full bg-[#E0F2F1]/50 border-none hover:bg-[#E0F2F1] rounded-[1.5rem] px-8 py-6 text-xl font-bold text-[#00695C] focus:ring-0 transition-all cursor-pointer outline-none"
+                                        type="date"
+                                        value={endDate}
+                                        onChange={(e) => setEndDate(e.target.value)}
+                                        min={startDate}
+                                    />
+                                </div>
+                            </div>
+
                             <p className="text-lg font-bold text-stone-900 mb-8">Preferred Days</p>
                             <div className="flex flex-wrap gap-4 mb-14">
-                                {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day, idx) => (
+                                {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day) => (
                                     <label key={day} className="cursor-pointer group flex-1 min-w-[80px]">
-                                        <input defaultChecked={idx < 5} className="peer sr-only" type="checkbox" />
-                                        <div className={`w-full py-4 rounded-2xl border-2 border-stone-100 peer-checked:bg-[#5fa5ba] peer-checked:text-white peer-checked:border-[#5fa5ba] transition-all font-bold text-sm text-center text-stone-400 hover:border-[#99C5D3] ${idx >= 5 ? 'opacity-50 hover:opacity-100' : ''}`}>{day}</div>
+                                        <input
+                                            checked={days.includes(day)}
+                                            onChange={() => handleDayToggle(day)}
+                                            className="peer sr-only"
+                                            type="checkbox"
+                                        />
+                                        <div className={`w-full py-4 rounded-2xl border-2 border-stone-100 peer-checked:bg-[#5fa5ba] peer-checked:text-white peer-checked:border-[#5fa5ba] transition-all font-bold text-sm text-center text-stone-400 hover:border-[#99C5D3]`}>{day}</div>
                                     </label>
                                 ))}
                             </div>
@@ -239,13 +372,23 @@ const CreateContract = () => {
                                     <label className="text-xs font-bold text-[#5fa5ba] uppercase tracking-widest flex items-center gap-2">
                                         <span className="material-symbols-outlined text-xl">schedule</span> Start Time
                                     </label>
-                                    <input className="w-full bg-[#E0F2F1]/50 border-none hover:bg-[#E0F2F1] rounded-[1.5rem] px-8 py-6 text-3xl font-black text-[#00695C] focus:ring-0 transition-all cursor-pointer outline-none" type="time" defaultValue="09:00" />
+                                    <input
+                                        className="w-full bg-[#E0F2F1]/50 border-none hover:bg-[#E0F2F1] rounded-[1.5rem] px-8 py-6 text-3xl font-black text-[#00695C] focus:ring-0 transition-all cursor-pointer outline-none"
+                                        type="time"
+                                        value={startTime}
+                                        onChange={(e) => setStartTime(e.target.value)}
+                                    />
                                 </div>
                                 <div className="space-y-4">
                                     <label className="text-xs font-bold text-[#5fa5ba] uppercase tracking-widest flex items-center gap-2">
                                         <span className="material-symbols-outlined text-xl">hourglass_bottom</span> End Time
                                     </label>
-                                    <input className="w-full bg-[#E0F2F1]/50 border-none hover:bg-[#E0F2F1] rounded-[1.5rem] px-8 py-6 text-3xl font-black text-[#00695C] focus:ring-0 transition-all cursor-pointer outline-none" type="time" defaultValue="17:00" />
+                                    <input
+                                        className="w-full bg-[#E0F2F1]/50 border-none hover:bg-[#E0F2F1] rounded-[1.5rem] px-8 py-6 text-3xl font-black text-[#00695C] focus:ring-0 transition-all cursor-pointer outline-none"
+                                        type="time"
+                                        value={endTime}
+                                        onChange={(e) => setEndTime(e.target.value)}
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -271,37 +414,31 @@ const CreateContract = () => {
                             <div className="space-y-8 relative z-10 text-white">
                                 <div className="flex justify-between items-center pb-8 border-b border-white/20">
                                     <span className="text-white/80 font-bold text-lg md:text-xl">Selected Package</span>
-                                    <span className="font-bold text-2xl md:text-3xl tracking-tight">Standard Support Plan</span>
+                                    <span className="font-bold text-2xl md:text-3xl tracking-tight">{selectedPackage ? selectedPackage.name : 'None Selected'}</span>
                                 </div>
                                 <div className="flex justify-between items-center py-1">
                                     <span className="text-white/80 font-bold text-lg">Hourly Rate</span>
-                                    <span className="font-bold text-xl">$35.00</span>
+                                    <span className="font-bold text-xl">${selectedPackage ? (selectedPackage.pricePerHour ?? selectedPackage.PricePerHour) : 0}</span>
                                 </div>
                                 <div className="flex justify-between items-center py-1">
-                                    <span className="text-white/80 font-bold text-lg">Weekly Intensity</span>
-                                    <span className="font-bold text-xl">40 Hours (Mon - Fri)</span>
+                                    <span className="text-white/80 font-bold text-lg">Schedule</span>
+                                    <span className="font-bold text-xl">{days.length} Days/Week ({startTime} - {endTime})</span>
                                 </div>
-                                <div className="mt-8 p-6 bg-white/10 backdrop-blur-sm rounded-[2rem] border border-white/20 flex items-start gap-5">
-                                    <div className="w-12 h-12 rounded-2xl bg-white text-[#5fa5ba] flex items-center justify-center flex-shrink-0 shadow-sm">
-                                        <span className="material-symbols-outlined text-2xl font-bold">verified_user</span>
-                                    </div>
-                                    <div>
-                                        <p className="text-lg font-bold text-white">Priority Guaranteed</p>
-                                        <p className="text-base text-white/80 mt-1 leading-relaxed font-medium">
-                                            Once you proceed to payment and receive Admin Approval, your schedule with <span className="text-white font-bold">Sarah Wilson</span> is fixed and prioritized over new requests.
-                                        </p>
-                                    </div>
-                                </div>
+
                                 <div className="pt-10 mt-6 border-t border-white/10 flex flex-col lg:flex-row justify-between items-center gap-10">
                                     <div className="text-center lg:text-left">
-                                        <p className="text-white/70 font-bold uppercase tracking-[0.2em] text-xs mb-2">Total Monthly Commitment</p>
-                                        <p className="text-6xl md:text-7xl font-bold tracking-tight">$5,600.00</p>
+                                        <p className="text-white/70 font-bold uppercase tracking-[0.2em] text-xs mb-2">Estimated Total</p>
+                                        <p className="text-6xl md:text-7xl font-bold tracking-tight">${calculateTotal()}</p>
                                     </div>
                                     <div className="w-full lg:w-auto">
-                                        <Link to="#" className="w-full px-12 py-6 rounded-full bg-white text-[#5fa5ba] font-bold text-xl hover:scale-105 active:scale-95 shadow-xl transition-all flex items-center justify-center gap-4">
-                                            Proceed to Payment
-                                            <span className="material-symbols-outlined font-black text-2xl">arrow_forward</span>
-                                        </Link>
+                                        <button
+                                            onClick={handleProceed}
+                                            disabled={submitting}
+                                            className="w-full px-12 py-6 rounded-full bg-white text-[#5fa5ba] font-bold text-xl hover:scale-105 active:scale-95 shadow-xl transition-all flex items-center justify-center gap-4 disabled:opacity-70 disabled:cursor-not-allowed"
+                                        >
+                                            {submitting ? 'Processing...' : 'Proceed to Payment'}
+                                            {!submitting && <span className="material-symbols-outlined font-black text-2xl">arrow_forward</span>}
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -309,6 +446,17 @@ const CreateContract = () => {
                     </ScrollAnimation>
                 </section>
             </div>
+
+            <AddMemberModal
+                isOpen={isAddMemberModalOpen}
+                onClose={() => setIsAddMemberModalOpen(false)}
+                onPatientAdded={async () => {
+                    const data = await familyApi.getPatients();
+                    setPatients(data);
+                    if (data.length > 0) setSelectedPatientId(data[data.length - 1].id);
+                    setIsAddMemberModalOpen(false);
+                }}
+            />
         </div>
     );
 };

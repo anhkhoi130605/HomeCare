@@ -1,8 +1,64 @@
-import React from 'react';
-import { PAYMENT_HISTORY } from '../../data/Family/payment';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import ScrollAnimation from "@/components/ui/scroll-animation";
+import { paymentApi } from '@/lib/api';
+import { toast } from 'sonner';
 
 const FamilyPayment = () => {
+    const [payments, setPayments] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [filter, setFilter] = useState('All');
+
+    useEffect(() => {
+        const fetchPayments = async () => {
+            try {
+                const data = await paymentApi.getMyPayments();
+                setPayments(data || []);
+            } catch (error) {
+                console.error("Failed to fetch payments:", error);
+                toast.error("Failed to load payment history");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchPayments();
+
+        // Check for return status from VNPay
+        const status = searchParams.get('status');
+        const paymentId = searchParams.get('paymentId');
+
+        if (status) {
+            if (status === 'completed' || status === 'active') { // 'active' might be contract status, 'completed' is payment
+                toast.success("Payment Successful! Contract is now Active.");
+            } else if (status === 'failed' || status === 'error') {
+                toast.error("Payment Failed or Cancelled.");
+            } else {
+                toast.info(`Payment Status: ${status}`);
+            }
+
+            // Clean up URL params without reloading
+            setSearchParams({});
+        }
+    }, []);
+
+    // Helper for Total Spent
+    const totalSpent = payments
+        .filter(p => p.status === 'Completed')
+        .reduce((sum, p) => sum + p.amount, 0);
+
+    const pendingAmount = payments
+        .filter(p => p.status === 'Pending')
+        .reduce((sum, p) => sum + p.amount, 0);
+
+    const filteredPayments = payments.filter(p => {
+        if (filter === 'All') return true;
+        if (filter === 'Completed') return p.status === 'Completed';
+        if (filter === 'Pending') return p.status === 'Pending';
+        return true;
+    });
+
     return (
         <div className="space-y-10 animate-fade-in-up pb-12 font-['Public_Sans']">
             {/* Blue Header Banner */}
@@ -23,12 +79,12 @@ const FamilyPayment = () => {
                         <div className="bg-white/10 backdrop-blur-md p-6 rounded-[2rem] border border-white/20 flex gap-8 shadow-sm">
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Total Spent</p>
-                                <p className="text-3xl font-black text-white">$12,450</p>
+                                <p className="text-3xl font-black text-white">${totalSpent.toLocaleString()}</p>
                             </div>
                             <div className="w-px bg-white/20"></div>
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Pending</p>
-                                <p className="text-3xl font-black text-[#5fa5ba] bg-white px-3 rounded-lg shadow-sm">$0</p>
+                                <p className="text-3xl font-black text-[#5fa5ba] bg-white px-3 rounded-lg shadow-sm">${pendingAmount.toLocaleString()}</p>
                             </div>
                         </div>
                     </div>
@@ -37,9 +93,13 @@ const FamilyPayment = () => {
 
             {/* Filter Tabs */}
             <div className="flex flex-wrap items-center gap-4">
-                {['All Transactions', 'Invoices', 'Refunds'].map((tab, i) => (
-                    <button key={tab} className={`px-6 py-3 rounded-full font-bold text-sm transition-all border ${i === 0 ? 'bg-[#5fa5ba] text-white border-[#5fa5ba] shadow-lg shadow-[#5fa5ba]/20' : 'bg-white text-stone-500 border-stone-200 hover:border-[#99C5D3] hover:text-[#5fa5ba]'}`}>
-                        {tab}
+                {['All', 'Completed', 'Pending'].map((tab) => (
+                    <button
+                        key={tab}
+                        onClick={() => setFilter(tab)}
+                        className={`px-6 py-3 rounded-full font-bold text-sm transition-all border ${filter === tab ? 'bg-[#5fa5ba] text-white border-[#5fa5ba] shadow-lg shadow-[#5fa5ba]/20' : 'bg-white text-stone-500 border-stone-200 hover:border-[#99C5D3] hover:text-[#5fa5ba]'}`}
+                    >
+                        {tab === 'All' ? 'All Transactions' : tab}
                     </button>
                 ))}
 
@@ -50,52 +110,59 @@ const FamilyPayment = () => {
             </div>
 
             {/* Transactions List */}
-            <div className="space-y-4">
-                {PAYMENT_HISTORY.map((item, idx) => {
-                    // Overwrite one item to demonstrate Overdue status
-                    const status = idx === 1 ? 'Overdue' : item.status;
+            {loading ? (
+                <div className="text-center py-10 text-stone-400">Loading payments...</div>
+            ) : filteredPayments.length === 0 ? (
+                <div className="text-center py-10 text-stone-400 bg-white rounded-[2rem] border border-stone-100">No payment records found.</div>
+            ) : (
+                <div className="space-y-4">
+                    {filteredPayments.map((item, idx) => {
+                        const status = item.status; // 'Completed', 'Pending', 'Failed'
 
-                    return (
-                        <ScrollAnimation animation="fade-up" delay={idx * 0.05} key={item.id}>
-                            <div className={`bg-white p-6 rounded-[2rem] border shadow-sm hover:shadow-lg transition-all flex flex-col md:flex-row items-center gap-6 group hover:-translate-y-0.5 ${status === 'Overdue' ? 'border-red-100 ring-1 ring-red-50' : 'border-stone-100 hover:border-stone-300'
-                                }`}>
-                                <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-2xl shadow-sm ${status === 'Paid' ? 'bg-[#E0F2F1] text-[#00695C]' :
-                                        status === 'Overdue' ? 'bg-red-50 text-red-600' :
-                                            'bg-orange-50 text-orange-600'
+                        return (
+                            <ScrollAnimation animation="fade-up" delay={idx * 0.05} key={item.id}>
+                                <div className={`bg-white p-6 rounded-[2rem] border shadow-sm hover:shadow-lg transition-all flex flex-col md:flex-row items-center gap-6 group hover:-translate-y-0.5 ${status === 'Failed' ? 'border-red-100 ring-1 ring-red-50' : 'border-stone-100 hover:border-stone-300'
                                     }`}>
-                                    <span className="material-symbols-outlined font-bold">
-                                        {status === 'Paid' ? 'check_circle' : status === 'Overdue' ? 'warning' : 'pending'}
-                                    </span>
-                                </div>
-
-                                <div className="flex-1 text-center md:text-left">
-                                    <h4 className={`font-black text-lg group-hover:text-stone-600 transition-colors ${status === 'Overdue' ? 'text-red-700' : 'text-stone-900'}`}>{item.service}</h4>
-                                    <div className="flex items-center justify-center md:justify-start gap-4 mt-1 text-sm font-medium text-stone-500">
-                                        <span>{item.date}</span>
-                                        <span className="w-1 h-1 rounded-full bg-stone-300"></span>
-                                        <span>Inv: <span className="font-bold text-stone-700">#{item.id}</span></span>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-8 w-full md:w-auto justify-between md:justify-start px-4 md:px-0">
-                                    <div className="text-right">
-                                        <p className="font-black text-xl text-stone-900">${item.amount}</p>
-                                        <span className={`text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border ${status === 'Paid' ? 'bg-white text-[#00695C] border-[#B2EBF2]' :
-                                                status === 'Overdue' ? 'bg-red-600 text-white border-red-600 shadow-md shadow-red-200' :
-                                                    'bg-white text-orange-600 border-orange-200'
-                                            }`}>
-                                            {status}
+                                    <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-2xl shadow-sm ${status === 'Completed' ? 'bg-[#E0F2F1] text-[#00695C]' :
+                                            status === 'Failed' ? 'bg-red-50 text-red-600' :
+                                                'bg-orange-50 text-orange-600'
+                                        }`}>
+                                        <span className="material-symbols-outlined font-bold">
+                                            {status === 'Completed' ? 'check_circle' : status === 'Failed' ? 'error' : 'pending'}
                                         </span>
                                     </div>
-                                    <button className="w-12 h-12 rounded-full border-2 border-stone-100 flex items-center justify-center text-stone-400 hover:text-stone-900 hover:border-stone-900 hover:bg-stone-50 transition-all">
-                                        <span className="material-symbols-outlined">download</span>
-                                    </button>
+
+                                    <div className="flex-1 text-center md:text-left">
+                                        <h4 className={`font-black text-lg group-hover:text-stone-600 transition-colors ${status === 'Failed' ? 'text-red-700' : 'text-stone-900'}`}>
+                                            {item.description || `Payment #${item.id}`}
+                                        </h4>
+                                        <div className="flex items-center justify-center md:justify-start gap-4 mt-1 text-sm font-medium text-stone-500">
+                                            <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                                            <span className="w-1 h-1 rounded-full bg-stone-300"></span>
+                                            <span>Method: <span className="font-bold text-stone-700">{item.method}</span></span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-8 w-full md:w-auto justify-between md:justify-start px-4 md:px-0">
+                                        <div className="text-right">
+                                            <p className="font-black text-xl text-stone-900">${item.amount.toLocaleString()}</p>
+                                            <span className={`text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border ${status === 'Completed' ? 'bg-white text-[#00695C] border-[#B2EBF2]' :
+                                                    status === 'Failed' ? 'bg-red-600 text-white border-red-600 shadow-md shadow-red-200' :
+                                                        'bg-white text-orange-600 border-orange-200'
+                                                }`}>
+                                                {status}
+                                            </span>
+                                        </div>
+                                        <button className="w-12 h-12 rounded-full border-2 border-stone-100 flex items-center justify-center text-stone-400 hover:text-stone-900 hover:border-stone-900 hover:bg-stone-50 transition-all">
+                                            <span className="material-symbols-outlined">download</span>
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        </ScrollAnimation>
-                    );
-                })}
-            </div>
+                            </ScrollAnimation>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 };

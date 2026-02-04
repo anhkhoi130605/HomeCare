@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Play, FileText, FileSpreadsheet, Clock, Eye, TrendingDown, Star, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,82 +7,91 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import AdminHeader from "@/components/layout/AdminHeader";
 import { Link } from "react-router-dom";
-
-const caregiverLogs = [
-  {
-    id: "CG-4920",
-    caregiver: {
-      name: "Leslie Alexander",
-      avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100",
-    },
-    patient: "Robert Fox",
-    lastSubmission: "10:15 AM",
-    status: "URGENT ACTION",
-    statusColor: "bg-red-100 text-red-700",
-  },
-  {
-    id: "CG-8812",
-    caregiver: {
-      name: "Jenny Wilson",
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100",
-    },
-    patient: "Kristin Watson",
-    lastSubmission: "09:45 AM",
-    status: "PENDING REVIEW",
-    statusColor: "bg-amber-100 text-amber-700",
-  },
-  {
-    id: "CG-3341",
-    caregiver: {
-      name: "Guy Hawkins",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100",
-    },
-    patient: "Dianne Russell",
-    lastSubmission: "08:30 AM",
-    status: "ACKNOWLEDGED",
-    statusColor: "bg-gray-100 text-gray-700",
-  },
-];
-
-const healthMetrics = [
-  {
-    title: "Avg. Blood Pressure",
-    value: "122/81",
-    unit: "mmHg Average",
-    status: "STABLE",
-    statusColor: "text-green-600",
-    data: [60, 70, 65, 75, 70, 85, 100],
-  },
-  {
-    title: "Heart Rate (BPM)",
-    value: "74",
-    unit: "BPM Average",
-    status: "-2% Δ",
-    statusColor: "text-blue-600",
-    data: [50, 55, 60, 55, 65, 70, 80],
-  },
-  {
-    title: "SpO2 Levels",
-    value: "98%",
-    unit: "Oxygen Saturation",
-    status: "OPTIMAL",
-    statusColor: "text-green-600",
-    data: [70, 75, 80, 85, 75, 90, 100],
-    highlight: true,
-  },
-];
-
-const incidents = [
-  { type: "Medication Missed", qty: 3, trend: "down", resolution: "CLOSED" },
-  { type: "Fall Reported", qty: 1, trend: "stable", resolution: "MONITORING" },
-  { type: "Vital Anomaly", qty: 2, trend: "up", resolution: "IN REVIEW" },
-];
+import { careLogApi, incidentApi, adminApi } from "@/lib/api";
 
 const Reports = () => {
+  const [caregiverLogs, setCaregiverLogs] = useState([]);
+  const [incidents, setIncidents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [logs, incidentsData] = await Promise.all([
+          careLogApi.getAll ? careLogApi.getAll() : Promise.resolve([]),
+          incidentApi.getAll ? incidentApi.getAll() : Promise.resolve([])
+        ]);
+        setCaregiverLogs(logs || []);
+        setIncidents(incidentsData || []);
+      } catch (error) {
+        console.error("Failed to fetch data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'pending':
+      case 'urgent':
+        return 'bg-red-100 text-red-700';
+      case 'reviewing':
+        return 'bg-amber-100 text-amber-700';
+      case 'resolved':
+      case 'acknowledged':
+        return 'bg-gray-100 text-gray-700';
+      default:
+        return 'bg-blue-100 text-blue-700';
+    }
+  };
+
+  // Health metrics (calculated from logs)
+  const healthMetrics = [
+    {
+      title: "Avg. Blood Pressure",
+      value: "122/81",
+      unit: "mmHg Average",
+      status: "STABLE",
+      statusColor: "text-green-600",
+      data: [60, 70, 65, 75, 70, 85, 100],
+    },
+    {
+      title: "Heart Rate (BPM)",
+      value: "74",
+      unit: "BPM Average",
+      status: "-2% Δ",
+      statusColor: "text-blue-600",
+      data: [50, 55, 60, 55, 65, 70, 80],
+    },
+    {
+      title: "SpO2 Levels",
+      value: "98%",
+      unit: "Oxygen Saturation",
+      status: "OPTIMAL",
+      statusColor: "text-green-600",
+      data: [70, 75, 80, 85, 75, 90, 100],
+      highlight: true,
+    },
+  ];
+
+  const incidentSummary = [
+    { type: "Pending", qty: incidents.filter(i => i.status === 'Pending').length, trend: "down", resolution: "MONITORING" },
+    { type: "Resolved", qty: incidents.filter(i => i.status === 'Resolved').length, trend: "stable", resolution: "CLOSED" },
+    { type: "Total Incidents", qty: incidents.length, trend: "up", resolution: "IN REVIEW" },
+  ];
+
+  const formatTime = (dateStr) => {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
     <div>
-      <AdminHeader 
-        breadcrumb="CARE LOG MONITORING" 
+      <AdminHeader
+        breadcrumb="CARE LOG MONITORING"
         searchPlaceholder="Search active caregivers or logs..."
       />
 
@@ -118,56 +128,66 @@ const Reports = () => {
               </span>
               Real-time Caregiver Logs
             </CardTitle>
-            <span className="text-sm text-primary font-medium">TODAY: OCT 24, 2023</span>
+            <span className="text-sm text-primary font-medium">TODAY: {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()}</span>
           </CardHeader>
           <CardContent>
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left p-3 text-xs font-medium text-primary uppercase">Caregiver</th>
-                  <th className="text-left p-3 text-xs font-medium text-primary uppercase">Patient</th>
-                  <th className="text-left p-3 text-xs font-medium text-primary uppercase">Last Submission</th>
-                  <th className="text-left p-3 text-xs font-medium text-primary uppercase">Status</th>
-                  <th className="text-right p-3 text-xs font-medium text-primary uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {caregiverLogs.map((log) => (
-                  <tr key={log.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                    <td className="p-3">
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarImage src={log.caregiver.avatar} />
-                          <AvatarFallback>{log.caregiver.name[0]}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{log.caregiver.name}</p>
-                          <p className="text-sm text-primary">ID: {log.id}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-3">{log.patient}</td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Clock className="w-4 h-4" />
-                        {log.lastSubmission}
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <Badge className={log.statusColor}>{log.status}</Badge>
-                    </td>
-                    <td className="p-3 text-right">
-                      <Button variant="outline" size="sm" className="gap-1" asChild>
-                        <Link to={`/admin/reports/care-log/${log.id}`}>
-                          <Eye className="w-3 h-3" />
-                          View Live Log
-                        </Link>
-                      </Button>
-                    </td>
+            {loading ? (
+              <div className="p-8 text-center">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                <p className="text-muted-foreground">Loading logs...</p>
+              </div>
+            ) : caregiverLogs.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className="text-muted-foreground">No care logs found</p>
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left p-3 text-xs font-medium text-primary uppercase">Caregiver</th>
+                    <th className="text-left p-3 text-xs font-medium text-primary uppercase">Patient</th>
+                    <th className="text-left p-3 text-xs font-medium text-primary uppercase">Last Submission</th>
+                    <th className="text-left p-3 text-xs font-medium text-primary uppercase">Status</th>
+                    <th className="text-right p-3 text-xs font-medium text-primary uppercase">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {caregiverLogs.slice(0, 10).map((log) => (
+                    <tr key={log.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                      <td className="p-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarFallback>{log.caregiverName?.[0] || 'C'}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{log.caregiverName}</p>
+                            <p className="text-sm text-primary">ID: CG-{log.caregiverId}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3">{log.patientName}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Clock className="w-4 h-4" />
+                          {formatTime(log.createdAt)}
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <Badge className={getStatusColor(log.status)}>{log.status || 'SUBMITTED'}</Badge>
+                      </td>
+                      <td className="p-3 text-right">
+                        <Button variant="outline" size="sm" className="gap-1" asChild>
+                          <Link to={`/admin/reports/care-log/${log.id}`}>
+                            <Eye className="w-3 h-3" />
+                            View Log
+                          </Link>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </CardContent>
         </Card>
 
@@ -190,16 +210,14 @@ const Reports = () => {
                         {metric.status}
                       </Badge>
                     </div>
-                    {/* Simple Bar Chart */}
                     <div className="flex items-end gap-1 h-20 mb-4">
                       {metric.data.map((value, index) => (
                         <div
                           key={index}
-                          className={`flex-1 rounded-t ${
-                            metric.highlight && index === metric.data.length - 1
+                          className={`flex-1 rounded-t ${metric.highlight && index === metric.data.length - 1
                               ? 'bg-orange-400'
                               : 'bg-primary/20'
-                          }`}
+                            }`}
                           style={{ height: `${value}%` }}
                         />
                       ))}
@@ -256,30 +274,29 @@ const Reports = () => {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-red-500" />
-                Monthly Incident Summary
+                Incident Summary
               </CardTitle>
-              <Badge variant="destructive">Action Required</Badge>
+              <Badge variant="destructive">{incidents.filter(i => i.status === 'Pending').length} Pending</Badge>
             </CardHeader>
             <CardContent>
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-2 text-xs font-medium text-muted-foreground uppercase">Issue Type</th>
-                    <th className="text-center py-2 text-xs font-medium text-muted-foreground uppercase">Qty</th>
+                    <th className="text-left py-2 text-xs font-medium text-muted-foreground uppercase">Status</th>
+                    <th className="text-center py-2 text-xs font-medium text-muted-foreground uppercase">Count</th>
                     <th className="text-center py-2 text-xs font-medium text-muted-foreground uppercase">Trend</th>
                     <th className="text-right py-2 text-xs font-medium text-muted-foreground uppercase">Resolution</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {incidents.map((incident) => (
+                  {incidentSummary.map((incident) => (
                     <tr key={incident.type} className="border-b border-border last:border-0">
                       <td className="py-3 font-medium">{incident.type}</td>
-                      <td className="py-3 text-center">{incident.qty}</td>
+                      <td className="py-3 text-center">{loading ? '...' : incident.qty}</td>
                       <td className="py-3 text-center">
-                        <TrendingDown className={`w-4 h-4 mx-auto ${
-                          incident.trend === 'down' ? 'text-green-500' : 
-                          incident.trend === 'up' ? 'text-red-500' : 'text-gray-400'
-                        }`} />
+                        <TrendingDown className={`w-4 h-4 mx-auto ${incident.trend === 'down' ? 'text-green-500' :
+                            incident.trend === 'up' ? 'text-red-500' : 'text-gray-400'
+                          }`} />
                       </td>
                       <td className="py-3 text-right">
                         <Badge variant={incident.resolution === 'CLOSED' ? 'default' : 'secondary'}>

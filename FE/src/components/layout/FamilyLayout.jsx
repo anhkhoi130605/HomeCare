@@ -1,12 +1,24 @@
-import React, { useState } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { navItems } from '../../data/Family/layout';
+import { authApi } from '../../lib/api';
+import NotificationBell from '../shared/NotificationBell';
 
 const FamilyLayout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const location = useLocation();
-    const [profileImage, setProfileImage] = useState("https://lh3.googleusercontent.com/aida-public/AB6AXuCbGJnVqywB1647H8ch8MCLHmzqx5NkrdcOcOAB9z1mQUQ9-7_JJXrJyyjHEH2Yads21_tvcaBw6s7g5la6ZK9deMqARuPgIPnGAyHWr8dULaenGZrRZVuQcnHlJQlNK4RueYveHk6yUr0Gb1oIgWlD4GOdK40-PNCA8X0afkQXlyvj3B-VF9WhBH_RH3meA-zWOdvW5jNIaNFLMJ0zLmTlmNRTr9djHq17b3RfVlWOko886WLtnNMIgO7yx_-cbCI0HcXYw0COWPGm");
+    const navigate = useNavigate();
 
+    // Get user from localStorage
+    const [user, setUser] = useState(() => authApi.getCurrentUser());
+    const [profileImage, setProfileImage] = useState(
+        user?.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.fullName || 'User')}&background=5fa5ba&color=fff&size=128`
+    );
+
+    const handleLogout = () => {
+        authApi.logout();
+        navigate('/login');
+    };
 
     const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
@@ -75,6 +87,7 @@ const FamilyLayout = () => {
                         </button>
                     </div>
                     <div className="flex items-center gap-6">
+                        <NotificationBell />
                         <button
                             className="w-10 h-10 flex items-center justify-center text-stone-400 hover:text-primary bg-white dark:bg-stone-800 rounded-full shadow-sm border border-stone-100/50 transition-all"
                             onClick={() => document.documentElement.classList.toggle('dark')}
@@ -83,7 +96,7 @@ const FamilyLayout = () => {
                         </button>
                         <Link to="/family/profile" className="flex items-center gap-3.5 ml-2 border-l pl-6 border-stone-100 dark:border-stone-800 hover:opacity-80 transition-opacity group">
                             <div className="text-right hidden sm:block">
-                                <p className="text-sm font-bold text-stone-900 leading-tight group-hover:text-[#5fa5ba] transition-colors">Sarah Jenkins</p>
+                                <p className="text-sm font-bold text-stone-900 leading-tight group-hover:text-[#5fa5ba] transition-colors">{user?.fullName || 'User'}</p>
                                 <p className="text-xs text-primary font-black uppercase tracking-wider mt-0.5">Family Manager</p>
                             </div>
                             <div className="relative">
@@ -95,6 +108,13 @@ const FamilyLayout = () => {
                                 <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></div>
                             </div>
                         </Link>
+                        <button
+                            onClick={handleLogout}
+                            className="ml-2 p-2.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                            title="Logout"
+                        >
+                            <span className="material-symbols-outlined text-xl">logout</span>
+                        </button>
                     </div>
                 </nav>
                 <div className="px-6 py-4 md:px-12 md:py-6 w-full">

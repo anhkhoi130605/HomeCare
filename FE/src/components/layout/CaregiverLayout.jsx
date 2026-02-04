@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { authApi } from '../../lib/api';
 
 const CaregiverLayout = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -19,7 +20,7 @@ const CaregiverLayout = () => {
     ];
 
     const handleLogout = () => {
-        // Add logout logic here (clear tokens, etc.)
+        authApi.logout();
         navigate('/login');
     };
 

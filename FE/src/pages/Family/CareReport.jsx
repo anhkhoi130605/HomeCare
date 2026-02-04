@@ -1,53 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import ScrollAnimation from "@/components/ui/scroll-animation";
+import ApiErrorDisplay from "@/components/ui/ApiErrorDisplay";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import { healthReportApi } from '../../lib/api';
 
-const REPORTS_DATA = [
-    {
-        id: 1,
-        name: "Robert Jenkins",
-        type: "Weekly Vital Summary",
-        image: "https://lh3.googleusercontent.com/aida-public/AB6AXuACzNI-AJql1WfdghgRXth_vB8ICMd7_n-ThzQSDvR-mz-wciRS4bf-Uq8pObMhv11e1AxMNXqH1yAIfZeucNX__G4RjF5GqMt4pjZixJWytEtn6fiOz3ITMzwyhEQGMGr5-WxMT2D6WB2u6krSVkpWm4ufvcdoNdyuxmqegYAbZjqzA4PSsYpmYpY6sy426SDTB4fP-YjGuRmoJKQCuYRJintXdKAH9lM3VAIOj06iT0jl7H_Mmx7117nNvrDLMYC0-ARcPKEwAx-m",
-        period: "Oct 16 - Oct 23, 2023",
-        status: "Stable",
-        statusEmoji: "😊",
-        statusColor: "emerald",
-        score: 92,
-        curvePath: "M0,30 C20,25 40,5 60,15 S80,25 100,10",
-        curveColor: "#10b981",
-        sidestripColor: "bg-emerald-300"
-    },
-    {
-        id: 2,
-        name: "Eleanor Jenkins",
-        type: "Hypertension Log",
-        image: "https://lh3.googleusercontent.com/aida-public/AB6AXuDG2TcLFomEjFb5KddJkETS8rgrk0sXvCV1r-biHOlg_0OtstDtcFrYCiGjDQgPSA4C1GYaKvD6xLHqQ29ZxwKB2-qfTZt0R771pEk-Lp-Li3Y_HaGvjyLy5VASFVNN3fnb56OAQqrYgGzZGBXq4VKieQyl140B4dqnBeoCo7laKVr3VHVgVe2Jn2BsttftBZeA0NwPYrVkgTSf_Jq_2uKb6KwpjZ_7cg0pwYNFf1RSjyacTwYQHEzBn_PtRdiOzzdI3OZnNJnsTIfo",
-        period: "Oct 16 - Oct 23, 2023",
-        status: "Warning",
-        statusEmoji: "😐",
-        statusColor: "amber",
-        score: 78,
-        curvePath: "M0,10 C20,15 40,35 60,20 S80,10 100,25",
-        curveColor: "#f59e0b",
-        sidestripColor: "bg-amber-300"
-    },
-    {
-        id: 3,
-        name: "Robert Jenkins",
-        type: "Monthly Progress Report",
-        image: "https://lh3.googleusercontent.com/aida-public/AB6AXuACzNI-AJql1WfdghgRXth_vB8ICMd7_n-ThzQSDvR-mz-wciRS4bf-Uq8pObMhv11e1AxMNXqH1yAIfZeucNX__G4RjF5GqMt4pjZixJWytEtn6fiOz3ITMzwyhEQGMGr5-WxMT2D6WB2u6krSVkpWm4ufvcdoNdyuxmqegYAbZjqzA4PSsYpmYpY6sy426SDTB4fP-YjGuRmoJKQCuYRJintXdKAH9lM3VAIOj06iT0jl7H_Mmx7117nNvrDLMYC0-ARcPKEwAx-m",
-        period: "Oct 09 - Oct 15, 2023",
-        status: "Incident",
-        statusEmoji: "😟",
-        statusColor: "rose",
-        score: 45,
-        curvePath: "M0,5 C30,15 70,45 100,35",
-        curveColor: "#f43f5e",
-        sidestripColor: "bg-rose-300"
-    }
-];
+// Helper function to map API data to display format
+const mapReportToDisplay = (report) => {
+    const statusConfig = {
+        'Stable': { emoji: '😊', color: 'emerald', curvePath: 'M0,30 C20,25 40,5 60,15 S80,25 100,10', curveColor: '#10b981' },
+        'Improved': { emoji: '🎉', color: 'emerald', curvePath: 'M0,30 C20,25 40,5 60,15 S80,25 100,10', curveColor: '#10b981' },
+        'Warning': { emoji: '😐', color: 'amber', curvePath: 'M0,10 C20,15 40,35 60,20 S80,10 100,25', curveColor: '#f59e0b' },
+        'Incident': { emoji: '😟', color: 'rose', curvePath: 'M0,5 C30,15 70,45 100,35', curveColor: '#f43f5e' },
+    };
+
+    const config = statusConfig[report.status] || statusConfig['Stable'];
+
+    return {
+        id: report.id,
+        name: report.patientName,
+        type: report.reportType,
+        image: `https://ui-avatars.com/api/?name=${encodeURIComponent(report.patientName)}&background=5fa5ba&color=fff&size=128`,
+        period: report.period,
+        status: report.status,
+        statusEmoji: config.emoji,
+        statusColor: config.color,
+        score: report.healthScore,
+        curvePath: config.curvePath,
+        curveColor: config.curveColor,
+        sidestripColor: `bg-${config.color}-300`
+    };
+};
 
 const CareReport = () => {
+    const [reports, setReports] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    const fetchReports = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const data = await healthReportApi.getMy();
+            setReports(data.map(mapReportToDisplay));
+        } catch (err) {
+            console.error('Failed to fetch reports:', err);
+            setError(err);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchReports();
+    }, [fetchReports]);
+
+    if (loading) {
+        return <LoadingSpinner message="Đang tải báo cáo..." />;
+    }
+
+    if (error) {
+        return <ApiErrorDisplay error={error} onRetry={fetchReports} />;
+    }
+
     return (
         <div className="space-y-6 pb-12 font-manrope">
             {/* Header Section */}
@@ -95,7 +110,7 @@ const CareReport = () => {
 
             {/* Report Cards List */}
             <div className="space-y-6 mb-12">
-                {REPORTS_DATA.map((report, index) => (
+                {reports.map((report, index) => (
                     <ScrollAnimation key={report.id} animation="fade-in" delay={0.1 * (index + 1)}>
                         <div className="group bg-white dark:bg-stone-900 p-8 rounded-[2rem] border border-[#5fa5ba]/10 hover:border-[#5fa5ba]/30 transition-all shadow-sm flex flex-col lg:flex-row lg:items-center gap-8 cursor-pointer relative overflow-hidden">
                             <div className={`absolute top-0 left-0 w-2 h-full ${report.sidestripColor}`}></div>

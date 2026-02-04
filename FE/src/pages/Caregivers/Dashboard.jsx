@@ -1,24 +1,124 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-    CAREGIVER_INFO,
-    DASHBOARD_STATS,
-    UPCOMING_SHIFTS,
-    RECENT_LOGS_MINI
-} from '../../data/Caregiver/Dashboard';
-import { FAMILY_MEMBERS } from '../../data/Family/patients';
+import { caregiverApi } from '@/lib/api';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 
-const ACTIVE_PATIENT = FAMILY_MEMBERS[0];
-
 const Dashboard = () => {
+    const [profile, setProfile] = useState(null);
+    const [schedules, setSchedules] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [checkingIn, setCheckingIn] = useState(null);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                // Fetch caregiver profile
+                const profileData = await caregiverApi.getProfile();
+                setProfile(profileData);
+
+                // Fetch today's schedules
+                const today = new Date().toISOString().split('T')[0];
+                const schedulesData = await caregiverApi.getSchedules(today, today);
+                setSchedules(schedulesData);
+            } catch (err) {
+                console.error('Failed to fetch data:', err);
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    // Get current active shift
+    const now = new Date();
+    const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
+    const activeShift = schedules.find(s => {
+        const startParts = s.startTime.split(':').map(Number);
+        const endParts = s.endTime.split(':').map(Number);
+        const startMinutes = startParts[0] * 60 + startParts[1];
+        const endMinutes = endParts[0] * 60 + endParts[1];
+        return currentTimeMinutes >= startMinutes && currentTimeMinutes <= endMinutes && s.status !== 'Completed';
+    });
+
+    // Upcoming shifts (not yet started)
+    const upcomingShifts = schedules.filter(s => {
+        const startParts = s.startTime.split(':').map(Number);
+        const startMinutes = startParts[0] * 60 + startParts[1];
+        return currentTimeMinutes < startMinutes && s.status === 'Scheduled';
+    });
+
+    // Calculate stats
+    const completedToday = schedules.filter(s => s.status === 'Completed').length;
+    const totalHoursToday = schedules.reduce((acc, s) => {
+        const startParts = s.startTime.split(':').map(Number);
+        const endParts = s.endTime.split(':').map(Number);
+        const hours = (endParts[0] * 60 + endParts[1] - startParts[0] * 60 - startParts[1]) / 60;
+        return acc + hours;
+    }, 0);
+
+    const formatTime = (timeStr) => {
+        if (!timeStr) return '';
+        const parts = timeStr.split(':');
+        const hours = parseInt(parts[0]);
+        const minutes = parts[1];
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 || 12;
+        return `${displayHours}:${minutes} ${ampm}`;
+    };
+
+    const handleCheckIn = async (scheduleId) => {
+        try {
+            setCheckingIn(scheduleId);
+            await caregiverApi.checkIn(scheduleId);
+            // Update local state to reflect the change
+            setSchedules(prev => prev.map(s =>
+                s.id === scheduleId ? { ...s, status: 'InProgress', checkInTime: new Date().toISOString() } : s
+            ));
+            // Navigate to active shift page
+            window.location.href = '/caregiver/active-shift';
+        } catch (err) {
+            console.error('Check-in failed:', err);
+            alert('Check-in failed: ' + err.message);
+        } finally {
+            setCheckingIn(null);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex-1 flex items-center justify-center bg-background-light dark:bg-stone-950">
+                <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-[#5fa5ba] border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="mt-4 text-stone-500 dark:text-stone-400">Loading dashboard...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex-1 flex items-center justify-center bg-background-light dark:bg-stone-950">
+                <div className="text-center text-red-500">
+                    <p>Error loading dashboard: {error}</p>
+                    <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg">
+                        Retry
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="flex-1 overflow-y-auto bg-background-light dark:bg-stone-950 font-manrope">
             {/* Header */}
             <header className="sticky top-0 z-20 bg-white/80 dark:bg-stone-900/80 backdrop-blur-xl border-b border-stone-100 dark:border-stone-800 px-8 py-5 flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-extrabold text-stone-800 dark:text-white tracking-tight">Caregiver Dashboard</h1>
-                    <p className="text-sm font-medium text-stone-500 dark:text-stone-400 mt-1">Welcome back, {DASHBOARD_STATS.caregiverName}</p>
+                    <p className="text-sm font-medium text-stone-500 dark:text-stone-400 mt-1">Welcome back, {profile?.fullName || 'Caregiver'}</p>
                 </div>
                 <div className="flex items-center gap-5">
                     <button className="w-10 h-10 flex items-center justify-center text-stone-400 hover:text-[#5fa5ba] hover:bg-[#5fa5ba]/10 rounded-full transition-all relative">
@@ -30,7 +130,7 @@ const Dashboard = () => {
                             <img
                                 alt="Caregiver profile"
                                 className="w-10 h-10 rounded-full object-cover shadow-sm ring-2 ring-white dark:ring-stone-800 group-hover:ring-[#5fa5ba] transition-all cursor-pointer"
-                                src={CAREGIVER_INFO.profileImage}
+                                src={profile?.imageUrl || "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=100&h=100&fit=crop"}
                             />
                         </Link>
                     </div>
@@ -48,41 +148,61 @@ const Dashboard = () => {
 
                             <div className="flex-1 space-y-5 relative z-10 w-full text-center md:text-left">
                                 <div>
-                                    <span className="bg-white/20 backdrop-blur-md text-white px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-                                        Active Shift
-                                    </span>
-                                    <h2 className="text-3xl font-extrabold mt-3 tracking-tight">Current Appointment</h2>
+                                    {activeShift ? (
+                                        <>
+                                            <span className="bg-white/20 backdrop-blur-md text-white px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+                                                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                                                Active Shift
+                                            </span>
+                                            <h2 className="text-3xl font-extrabold mt-3 tracking-tight">Current Appointment</h2>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="bg-white/20 backdrop-blur-md text-white px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+                                                <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
+                                                No Active Shift
+                                            </span>
+                                            <h2 className="text-3xl font-extrabold mt-3 tracking-tight">
+                                                {upcomingShifts.length > 0 ? 'Next Appointment' : 'No Shifts Today'}
+                                            </h2>
+                                        </>
+                                    )}
                                 </div>
-                                <div className="space-y-3">
-                                    <div className="flex items-center gap-3 justify-center md:justify-start">
-                                        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                                            <span className="material-symbols-outlined text-sm">person</span>
+                                {(activeShift || upcomingShifts[0]) && (
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-3 justify-center md:justify-start">
+                                            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                                                <span className="material-symbols-outlined text-sm">person</span>
+                                            </div>
+                                            <span className="text-lg font-bold">{(activeShift || upcomingShifts[0])?.patientName}</span>
                                         </div>
-                                        <span className="text-lg font-bold">Mrs. {ACTIVE_PATIENT.name}</span>
-                                    </div>
-                                    <div className="flex items-center gap-3 justify-center md:justify-start">
-                                        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                                            <span className="material-symbols-outlined text-sm">schedule</span>
+                                        <div className="flex items-center gap-3 justify-center md:justify-start">
+                                            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                                                <span className="material-symbols-outlined text-sm">schedule</span>
+                                            </div>
+                                            <span className="font-medium text-blue-50">
+                                                {formatTime((activeShift || upcomingShifts[0])?.startTime)} - {formatTime((activeShift || upcomingShifts[0])?.endTime)}
+                                            </span>
                                         </div>
-                                        <span className="font-medium text-blue-50">09:00 AM - 01:00 PM (4 hours)</span>
-                                    </div>
-                                    <div className="flex items-center gap-3 justify-center md:justify-start">
-                                        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                                            <span className="material-symbols-outlined text-sm">location_on</span>
+                                        <div className="flex items-center gap-3 justify-center md:justify-start">
+                                            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                                                <span className="material-symbols-outlined text-sm">location_on</span>
+                                            </div>
+                                            <span className="font-medium text-blue-50">{(activeShift || upcomingShifts[0])?.patientAddress || 'Address not provided'}</span>
                                         </div>
-                                        <span className="font-medium text-blue-50">{ACTIVE_PATIENT.address}</span>
                                     </div>
-                                </div>
+                                )}
                             </div>
 
-                            <div className="flex-shrink-0 relative z-10 flex flex-col items-center">
-                                <Link to="/caregiver/active-shift" className="bg-white text-[#5fa5ba] hover:bg-blue-50 px-8 py-5 rounded-2xl font-black text-lg shadow-lg flex items-center gap-3 transition-all hover:scale-105 active:scale-95 group/btn">
-                                    <span className="material-symbols-outlined text-2xl group-hover/btn:rotate-12 transition-transform">login</span>
-                                    QUICK CHECK-IN
-                                </Link>
-                                <p className="text-white/80 text-xs mt-3 text-center italic font-medium">Arrived at location? Tap to start log.</p>
-                            </div>
+                            {(activeShift || upcomingShifts[0]) && (
+                                <div className="flex-shrink-0 relative z-10 flex flex-col items-center">
+                                    <Link to="/caregiver/active-shift" className="bg-white text-[#5fa5ba] hover:bg-blue-50 px-8 py-5 rounded-2xl font-black text-lg shadow-lg flex items-center gap-3 transition-all hover:scale-105 active:scale-95 group/btn">
+                                        <span className="material-symbols-outlined text-2xl group-hover/btn:rotate-12 transition-transform">login</span>
+                                        QUICK CHECK-IN
+                                    </Link>
+                                    <p className="text-white/80 text-xs mt-3 text-center italic font-medium">Arrived at location? Tap to start log.</p>
+                                </div>
+                            )}
                         </div>
 
                         {/* Today's Overview */}
@@ -96,15 +216,15 @@ const Dashboard = () => {
                             <div className="space-y-4 flex-1">
                                 <div className="flex justify-between items-center p-4 bg-stone-50 dark:bg-stone-800/50 rounded-2xl border border-stone-100 dark:border-stone-800">
                                     <span className="text-stone-500 dark:text-stone-400 font-bold text-xs uppercase tracking-wider">Total Hours</span>
-                                    <span className="font-black text-xl text-stone-800 dark:text-white">{DASHBOARD_STATS.totalHours}</span>
+                                    <span className="font-black text-xl text-stone-800 dark:text-white">{totalHoursToday.toFixed(1)}h</span>
                                 </div>
                                 <div className="flex justify-between items-center p-4 bg-stone-50 dark:bg-stone-800/50 rounded-2xl border border-stone-100 dark:border-stone-800">
                                     <span className="text-stone-500 dark:text-stone-400 font-bold text-xs uppercase tracking-wider">Completed Shifts</span>
-                                    <span className="font-black text-xl text-stone-800 dark:text-white">{DASHBOARD_STATS.completedShifts}</span>
+                                    <span className="font-black text-xl text-stone-800 dark:text-white">{completedToday}</span>
                                 </div>
                                 <div className="flex justify-between items-center p-4 bg-stone-50 dark:bg-stone-800/50 rounded-2xl border border-stone-100 dark:border-stone-800">
-                                    <span className="text-stone-500 dark:text-stone-400 font-bold text-xs uppercase tracking-wider">Incidents</span>
-                                    <span className="font-black text-xl text-emerald-500">{DASHBOARD_STATS.incidents}</span>
+                                    <span className="text-stone-500 dark:text-stone-400 font-bold text-xs uppercase tracking-wider">Total Today</span>
+                                    <span className="font-black text-xl text-stone-800 dark:text-white">{schedules.length}</span>
                                 </div>
                             </div>
                             <Link to="/caregiver/my-schedule" className="w-full mt-6 py-3 text-[#5fa5ba] border-2 border-[#5fa5ba]/20 hover:bg-[#5fa5ba] hover:text-white rounded-xl transition-all font-bold text-sm text-center">
@@ -114,7 +234,7 @@ const Dashboard = () => {
                     </section>
                 </ScrollAnimation>
 
-                {/* Middle Section: Upcoming & Recent Logs */}
+                {/* Middle Section: Upcoming & Quick Stats */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Upcoming Today */}
                     <ScrollAnimation animation="fade-up" delay={0.2} className="h-full">
@@ -124,79 +244,99 @@ const Dashboard = () => {
                                     <span className="material-symbols-outlined text-[#5fa5ba]">event_note</span>
                                     Upcoming Today
                                 </h2>
-                                <span className="text-sm text-stone-400 font-bold uppercase tracking-wider">May 24, 2024</span>
+                                <span className="text-sm text-stone-400 font-bold uppercase tracking-wider">
+                                    {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </span>
                             </div>
                             <div className="space-y-4">
-                                {UPCOMING_SHIFTS.map((shift, index) => (
-                                    <div key={index} className="bg-white dark:bg-stone-900 p-6 rounded-[2rem] border border-stone-100 dark:border-stone-800 shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex items-center gap-5">
-                                                <div className="w-14 h-14 rounded-2xl bg-stone-100 dark:bg-stone-800 flex items-center justify-center text-stone-400 font-bold text-lg">
-                                                    {shift.name.split(' ').map(n => n[0]).join('')}
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-bold text-lg text-stone-800 dark:text-white">{shift.name}</h4>
-                                                    <p className="text-sm text-stone-500 dark:text-stone-400 flex items-center gap-1 font-medium mt-0.5">
-                                                        <span className="material-symbols-outlined text-sm">location_on</span>
-                                                        {shift.addr}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className="text-sm font-black text-[#5fa5ba] bg-[#5fa5ba]/10 px-3 py-1 rounded-lg block mb-1">{shift.time}</span>
-                                                <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Scheduled</p>
-                                            </div>
-                                        </div>
-                                        <div className="mt-5 flex gap-2">
-                                            {shift.tags.map((tag, i) => (
-                                                <span key={i} className="px-4 py-1.5 bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl text-xs font-bold border border-stone-200 dark:border-stone-700">
-                                                    {tag}
-                                                </span>
-                                            ))}
-                                        </div>
+                                {upcomingShifts.length === 0 ? (
+                                    <div className="bg-white dark:bg-stone-900 p-8 rounded-[2rem] border border-stone-100 dark:border-stone-800 text-center">
+                                        <span className="material-symbols-outlined text-4xl text-stone-300 dark:text-stone-600">event_available</span>
+                                        <p className="text-stone-500 dark:text-stone-400 mt-2 font-medium">No more shifts scheduled for today</p>
                                     </div>
-                                ))}
+                                ) : (
+                                    upcomingShifts.map((shift) => (
+                                        <div key={shift.id} className="bg-white dark:bg-stone-900 p-6 rounded-[2rem] border border-stone-100 dark:border-stone-800 shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex items-center gap-5">
+                                                    <div className="w-14 h-14 rounded-2xl bg-stone-100 dark:bg-stone-800 flex items-center justify-center text-stone-400 font-bold text-lg">
+                                                        {shift.patientName?.split(' ').map(n => n[0]).join('') || '?'}
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-lg text-stone-800 dark:text-white">{shift.patientName}</h4>
+                                                        <p className="text-sm text-stone-500 dark:text-stone-400 flex items-center gap-1 font-medium mt-0.5">
+                                                            <span className="material-symbols-outlined text-sm">location_on</span>
+                                                            {shift.patientAddress || 'Address not provided'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right flex flex-col items-end gap-2">
+                                                    <span className="text-sm font-black text-[#5fa5ba] bg-[#5fa5ba]/10 px-3 py-1 rounded-lg block">
+                                                        {formatTime(shift.startTime)} - {formatTime(shift.endTime)}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => handleCheckIn(shift.id)}
+                                                        disabled={checkingIn === shift.id}
+                                                        className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    >
+                                                        {checkingIn === shift.id ? (
+                                                            <>
+                                                                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                                                Checking in...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span className="material-symbols-outlined text-sm">login</span>
+                                                                Check In
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         </section>
                     </ScrollAnimation>
 
-                    {/* Recent Care Logs */}
+                    {/* Profile Summary */}
                     <ScrollAnimation animation="fade-up" delay={0.3} className="h-full">
-                        <section className="space-y-5 h-full">
-                            <div className="flex items-center justify-between px-1">
-                                <h2 className="text-xl font-bold flex items-center gap-2 text-stone-800 dark:text-white">
-                                    <span className="material-symbols-outlined text-[#5fa5ba]">history_edu</span>
-                                    Recent Care Logs
-                                </h2>
-                                <Link to="/caregiver/care-logs" className="text-xs text-[#5fa5ba] font-black uppercase tracking-widest hover:underline">See all</Link>
-                            </div>
-                            <div className="bg-white dark:bg-stone-900 rounded-[2rem] border border-stone-100 dark:border-stone-800 overflow-hidden shadow-sm">
-                                <table className="w-full text-left">
-                                    <thead className="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-100 dark:border-stone-800">
-                                        <tr>
-                                            <th className="px-8 py-5 text-[10px] font-black text-stone-400 uppercase tracking-widest">Patient</th>
-                                            <th className="px-8 py-5 text-[10px] font-black text-stone-400 uppercase tracking-widest">Date/Time</th>
-                                            <th className="px-8 py-5 text-[10px] font-black text-stone-400 uppercase tracking-widest">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
-                                        {RECENT_LOGS_MINI.map((log, i) => (
-                                            <tr key={i} className="hover:bg-stone-50 dark:hover:bg-stone-800/30 transition-colors">
-                                                <td className="px-8 py-5 font-bold text-stone-800 dark:text-white">{log.p}</td>
-                                                <td className="px-8 py-5 text-sm font-medium text-stone-500 dark:text-stone-400">{log.dt}</td>
-                                                <td className="px-8 py-5">
-                                                    <span className={`inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${log.s === 'Submitted'
-                                                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                                                        }`}>
-                                                        {log.s}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                        <section className="bg-white dark:bg-stone-900 rounded-[2rem] border border-stone-100 dark:border-stone-800 overflow-hidden shadow-sm p-8 h-full">
+                            <h2 className="text-xl font-bold flex items-center gap-2 text-stone-800 dark:text-white mb-6">
+                                <span className="material-symbols-outlined text-[#5fa5ba]">person</span>
+                                Your Profile
+                            </h2>
+                            {profile && (
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-4">
+                                        <img
+                                            src={profile.imageUrl || "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=100&h=100&fit=crop"}
+                                            alt={profile.fullName}
+                                            className="w-16 h-16 rounded-full object-cover"
+                                        />
+                                        <div>
+                                            <h3 className="font-bold text-lg text-stone-800 dark:text-white">{profile.fullName}</h3>
+                                            <p className="text-sm text-stone-500 dark:text-stone-400">{profile.specialization || 'General Care'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 mt-4">
+                                        <div className="p-4 bg-stone-50 dark:bg-stone-800/50 rounded-xl">
+                                            <p className="text-xs text-stone-400 uppercase font-bold">Experience</p>
+                                            <p className="text-lg font-bold text-stone-800 dark:text-white">{profile.experienceYears} years</p>
+                                        </div>
+                                        <div className="p-4 bg-stone-50 dark:bg-stone-800/50 rounded-xl">
+                                            <p className="text-xs text-stone-400 uppercase font-bold">Status</p>
+                                            <p className={`text-lg font-bold ${profile.isAvailable ? 'text-green-500' : 'text-amber-500'}`}>
+                                                {profile.isAvailable ? 'Available' : 'Busy'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <Link to="/caregiver/profile" className="block w-full mt-4 py-3 text-center text-[#5fa5ba] border-2 border-[#5fa5ba]/20 hover:bg-[#5fa5ba] hover:text-white rounded-xl transition-all font-bold text-sm">
+                                        View Full Profile
+                                    </Link>
+                                </div>
+                            )}
                         </section>
                     </ScrollAnimation>
                 </div>

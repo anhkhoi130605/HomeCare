@@ -1,29 +1,70 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { INCIDENTS_DATA } from '../../data/Caregiver/Incidents';
+import { incidentApi } from '@/lib/api';
 
 const IncidentDetail = () => {
     const navigate = useNavigate();
     const { id } = useParams();
     const [incident, setIncident] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
-        // ID is passed as index or id. Since links are `/caregiver/incidents/detail/${i}`, it is the index.
-        const found = INCIDENTS_DATA[id];
-        if (found) {
-            setIncident(found);
-        } else {
-            // Callback to list if not found or handle error
-            // navigate('/caregiver/incidents');
-        }
+        const fetchIncident = async () => {
+            try {
+                setLoading(true);
+                const data = await incidentApi.getById(id);
+                // Map API response to component format
+                setIncident({
+                    id: data.id,
+                    name: data.patientName || data.patient?.name || 'Patient',
+                    initials: (data.patientName || data.patient?.name || 'P').slice(0, 2).toUpperCase(),
+                    date: data.incidentDate ? new Date(data.incidentDate).toLocaleDateString() : new Date(data.createdAt).toLocaleDateString(),
+                    time: data.incidentTime || new Date(data.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    status: data.status || 'Under Review',
+                    color: data.status === 'Resolved' ? 'text-green-600' : data.status === 'Pending' ? 'text-amber-600' : 'text-blue-600',
+                    location: data.location || 'Patient Residence',
+                    witnesses: data.witnesses || 'N/A',
+                    description: data.description || 'No description provided.',
+                    actions: data.actionsTaken ? data.actionsTaken.split('\n').filter(Boolean) : []
+                });
+            } catch (err) {
+                console.error('Failed to fetch incident:', err);
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchIncident();
     }, [id]);
 
     const handlePrint = () => {
         window.print();
     };
 
-    if (!incident) {
-        return <div className="p-8 text-center text-stone-500">Loading incident details...</div>;
+    if (loading) {
+        return (
+            <div className="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-slate-900 font-inter animate-pulse p-8">
+                <div className="bg-slate-200 h-16 rounded-xl mb-8"></div>
+                <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2 space-y-8">
+                        <div className="bg-slate-200 rounded-[20px] h-64"></div>
+                        <div className="bg-slate-200 rounded-[20px] h-48"></div>
+                    </div>
+                    <div className="bg-slate-200 rounded-[20px] h-96"></div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error || !incident) {
+        return (
+            <div className="flex-1 flex flex-col items-center justify-center h-64 text-center bg-slate-50 dark:bg-slate-900">
+                <span className="material-symbols-outlined text-4xl text-red-400 mb-4">error</span>
+                <p className="text-red-600 font-medium">{error || 'Incident not found'}</p>
+                <Link to="/caregiver/incidents" className="mt-4 text-[#0d9488] hover:underline">Back to Incidents</Link>
+            </div>
+        );
     }
 
     return (

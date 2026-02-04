@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScrollAnimation from "@/components/ui/scroll-animation";
-import { MEDICATION_LIST, CARE_PLAN_TASKS, EMERGENCY_CONTACT } from '../../data/Caregiver/CareLogs';
-import { FAMILY_MEMBERS } from '../../data/Family/patients'; // Import Family Members
-import { addCareLog } from '../../data/mockDataStore';
+import { caregiverApi, careLogApi } from '@/lib/api';
+
+
 
 const ActiveShift = () => {
     const navigate = useNavigate();
@@ -13,12 +13,138 @@ const ActiveShift = () => {
     const [startTime, setStartTime] = useState(null);
     const [endTime, setEndTime] = useState(null);
     const [showSaveNotify, setShowSaveNotify] = useState(false);
+    const [isCheckedIn, setIsCheckedIn] = useState(false);
 
+    // API-based patient data
+    const [patients, setPatients] = useState([]);
+    const [selectedPatientId, setSelectedPatientId] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [currentSchedule, setCurrentSchedule] = useState(null);
+    const [medications, setMedications] = useState([]);
+    const [emergencyContact, setEmergencyContact] = useState(null);
 
-    const [selectedPatientId, setSelectedPatientId] = useState(FAMILY_MEMBERS[0].id);
-    const currentPatient = FAMILY_MEMBERS.find(p => p.id === selectedPatientId) || FAMILY_MEMBERS[0];
+    useEffect(() => {
+        const fetchPatientDetails = async () => {
+            if (selectedPatientId && selectedPatientId !== 'demo') {
+                try {
+                    const data = await caregiverApi.getPatient(selectedPatientId);
+                    setEmergencyContact({
+                        name: data.emergencyContactName || 'N/A',
+                        phone: data.emergencyContactPhone || 'N/A',
+                        relationship: 'Primary Contact'
+                    });
+                    // Future: Fetch medications from API
+                    setMedications([]);
+                } catch (err) {
+                    console.error('Failed to fetch patient details:', err);
+                }
+            } else if (selectedPatientId === 'demo') {
+                // Demo Data
+                setMedications([
+                    { name: 'Lisinopril', dosage: '10mg', time: '8:00 AM', desc: 'Blood pressure management' },
+                    { name: 'Metformin', dosage: '500mg', time: '8:00 AM', desc: 'Diabetes management' },
+                    { name: 'Vitamin D3', dosage: '1000 IU', time: '12:00 PM', desc: 'Nutritional supplement' }
+                ]);
+                setEmergencyContact({
+                    name: 'Maria Johnson',
+                    phone: '(555) 123-4567',
+                    relationship: 'Daughter'
+                });
+            }
+        };
+        fetchPatientDetails();
+    }, [selectedPatientId]);
 
-    // Now data is fully populated in FAMILY_MEMBERS
+    // Fetch caregiver's schedule to get patients and auto check-in
+    useEffect(() => {
+        const fetchScheduleData = async () => {
+            try {
+                setLoading(true);
+                // Get today's schedules for the caregiver
+                const today = new Date().toISOString().split('T')[0];
+                const schedules = await caregiverApi.getSchedules(today, today);
+
+                if (schedules && schedules.length > 0) {
+                    // Find a schedule that's not completed or cancelled
+                    const activeSchedule = schedules.find(s =>
+                        s.status === 'Scheduled' || s.status === 'InProgress'
+                    ) || schedules[0];
+
+                    // Extract unique patients from schedules
+                    const patientMap = new Map();
+                    schedules.forEach(s => {
+                        // Use patientId and patientName from ScheduleDto
+                        if (s.patientId && !patientMap.has(s.patientId)) {
+                            patientMap.set(s.patientId, {
+                                id: s.patientId,
+                                name: s.patientName || 'Patient',
+                                image: 'https://images.unsplash.com/photo-1566616213894-2d4e1baee5d8?w=200',
+                                address: s.patientAddress || 'Patient Address',
+                                coordinates: '40.7128, -74.0060',
+                                locationImage: 'https://maps.googleapis.com/maps/api/staticmap?center=40.7128,-74.0060&zoom=15&size=400x200&key=demo'
+                            });
+                        }
+                    });
+                    const patientsArray = Array.from(patientMap.values());
+                    setPatients(patientsArray);
+                    if (patientsArray.length > 0) {
+                        setSelectedPatientId(patientsArray[0].id);
+                    }
+                    setCurrentSchedule(activeSchedule);
+
+                    // Auto check-in if schedule is still 'Scheduled'
+                    if (activeSchedule.status === 'Scheduled') {
+                        try {
+                            await caregiverApi.checkIn(activeSchedule.id);
+                            setIsCheckedIn(true);
+                            console.log('Checked in successfully for schedule:', activeSchedule.id);
+                        } catch (checkInErr) {
+                            console.error('Check-in failed:', checkInErr);
+                        }
+                    } else if (activeSchedule.status === 'InProgress') {
+                        setIsCheckedIn(true);
+                    }
+                } else {
+                    // Fallback: no schedules today
+                    setPatients([{
+                        id: 'demo',
+                        name: 'Demo Patient',
+                        image: 'https://images.unsplash.com/photo-1566616213894-2d4e1baee5d8?w=200',
+                        address: 'No active shift',
+                        coordinates: 'N/A',
+                        locationImage: 'https://maps.googleapis.com/maps/api/staticmap?center=40.7128,-74.0060&zoom=15&size=400x200&key=demo'
+                    }]);
+                    setSelectedPatientId('demo');
+                }
+            } catch (err) {
+                console.error('Failed to fetch schedules:', err);
+                setError(err.message);
+                // Fallback patient
+                setPatients([{
+                    id: 'demo',
+                    name: 'Demo Patient',
+                    image: 'https://images.unsplash.com/photo-1566616213894-2d4e1baee5d8?w=200',
+                    address: 'Demo Address',
+                    coordinates: 'N/A',
+                    locationImage: ''
+                }]);
+                setSelectedPatientId('demo');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchScheduleData();
+    }, []);
+
+    const currentPatient = patients.find(p => p.id === selectedPatientId) || patients[0] || {
+        id: 'demo',
+        name: 'Loading...',
+        image: '',
+        address: '',
+        coordinates: '',
+        locationImage: ''
+    };
     const patientDetails = currentPatient;
 
     // Form States
@@ -78,51 +204,65 @@ const ActiveShift = () => {
         return count || 0; // Default to 0 if empty
     };
 
-    const handleCompleteSession = () => {
+    const handleCompleteSession = async () => {
         setIsActive(false);
         setEndTime(new Date());
+
+        // Call check-out API if we have a valid schedule
+        if (currentSchedule?.id && currentSchedule.id !== 'demo') {
+            try {
+                await caregiverApi.checkOut(currentSchedule.id);
+                console.log('Checked out successfully for schedule:', currentSchedule.id);
+            } catch (checkOutErr) {
+                console.error('Check-out failed:', checkOutErr);
+            }
+        }
+
         setIsCompleted(true);
         setShowSaveNotify(true);
         setTimeout(() => setShowSaveNotify(false), 3000);
     };
 
-    const handleSaveLog = () => {
-        // 1. Construct the Log Object
-        const administeredMeds = MEDICATION_LIST.filter((_, i) => checkedMeds[i]).map(med => ({
+    const handleSaveLog = async () => {
+        // 1. Construct the Log Object for API
+        const administeredMeds = medications.filter((_, i) => checkedMeds[i]).map(med => ({
             name: med.name,
             desc: med.dosage,
             time: med.time
         }));
 
-        const newLogEntry = {
-            id: `log-${Date.now()}`,
-            patientId: currentPatient.id,
-            patientName: currentPatient.name,
-            patientImage: currentPatient.image,
-            timeRange: `${startTime ? startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '08:00 AM'} - ${endTime ? endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'} `,
-            duration: formatTime(timer) + " (Recorded)",
+        const careLogData = {
+            scheduleId: currentSchedule?.id,
+            patientId: currentPatient.id !== 'demo' ? currentPatient.id : null,
+            notes: careNotes || "Routine care provided. Patient stable.",
             vitals: {
-                heartRate: vitals.heartRate || "N/A",
-                temperature: vitals.temperature || "N/A",
-                bloodPressure: vitals.bloodPressure || "N/A"
+                heartRate: vitals.heartRate || null,
+                temperature: vitals.temperature || null,
+                bloodPressure: vitals.bloodPressure || null
             },
-            medications: administeredMeds,
-            nutrition: {
-                meal: nutrition.mealDescription || "No meals recorded",
-                hydration: `${nutrition.hydration * 0.25} L` // Assuming each click is 250ml/0.25L
-            },
-            notes: careNotes || "Routine care provided. Patient stable."
+            medicationsAdministered: administeredMeds.map(m => m.name).join(', '),
+            mealDescription: nutrition.mealDescription || null,
+            hydrationMl: nutrition.hydration * 250 // Convert glasses to ml
         };
 
-        // 2. Add to Shared Store
-        addCareLog(newLogEntry);
-        console.log("Log saved to shared store:", newLogEntry);
+        try {
+            // 2. Submit to API
+            if (currentSchedule?.id) {
+                await careLogApi.create(careLogData);
+                console.log("Log saved to API:", careLogData);
+            } else {
+                console.log("Demo mode - log not saved:", careLogData);
+            }
 
-        // 3. UI Notification
-        setShowSaveNotify(true);
-        setTimeout(() => {
-            setShowSaveNotify(false);
-        }, 3000);
+            // 3. UI Notification
+            setShowSaveNotify(true);
+            setTimeout(() => {
+                setShowSaveNotify(false);
+            }, 3000);
+        } catch (err) {
+            console.error('Failed to save care log:', err);
+            alert('Failed to save care log: ' + err.message);
+        }
     };
 
     // Render "Session Completed" Summary View with User's Custom Design
@@ -235,8 +375,8 @@ const ActiveShift = () => {
                                             <h3 className="font-bold">Medications Administered</h3>
                                         </div>
                                         <div className="space-y-3">
-                                            {MEDICATION_LIST.filter((_, i) => checkedMeds[i]).length > 0 ? (
-                                                MEDICATION_LIST.filter((_, i) => checkedMeds[i]).map((med, i) => (
+                                            {medications.filter((_, i) => checkedMeds[i]).length > 0 ? (
+                                                medications.filter((_, i) => checkedMeds[i]).map((med, i) => (
                                                     <div key={i} className="flex items-center gap-4 p-4 rounded-2xl bg-stone-50 dark:bg-stone-900/50 border border-stone-100 dark:border-stone-800">
                                                         <span className="material-symbols-outlined text-[#0d9488]">check_circle</span>
                                                         <div className="flex-1">
@@ -303,7 +443,7 @@ const ActiveShift = () => {
                                     onChange={(e) => setSelectedPatientId(e.target.value)}
                                     className="appearance-none bg-transparent text-3xl font-extrabold text-stone-800 dark:text-white leading-none tracking-tight border-b-2 border-transparent hover:border-[#5fa5ba] cursor-pointer transition-all pr-8 focus:outline-none"
                                 >
-                                    {FAMILY_MEMBERS.map(member => (
+                                    {patients.map(member => (
                                         <option key={member.id} value={member.id}>{member.name}</option>
                                     ))}
                                 </select>
@@ -421,25 +561,32 @@ const ActiveShift = () => {
                                             <h3 className="font-bold text-xl">Medication Checklist</h3>
                                         </div>
                                         <div className="space-y-4 bg-stone-50 dark:bg-stone-900/50 p-6 rounded-[2rem] border border-stone-100 dark:border-stone-800">
-                                            {MEDICATION_LIST.map((med, i) => (
-                                                <label key={i} className={`flex items-center gap-4 p-5 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200/50 dark:border-stone-700 cursor-pointer hover:border-[#5fa5ba] hover:shadow-md transition-all group ${med.opacity || ''} `}>
-                                                    <div className="relative flex items-center justify-center">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={!!checkedMeds[i]}
-                                                            onChange={() => handleMedCheck(i)}
-                                                            className="peer appearance-none w-7 h-7 rounded-lg border-2 border-stone-300 checked:bg-[#5fa5ba] checked:border-[#5fa5ba] transition-all"
-                                                        />
-                                                        <span className="material-symbols-outlined text-white text-lg absolute opacity-0 peer-checked:opacity-100 pointer-events-none transition-opacity">check</span>
-                                                    </div>
+                                            {medications.length > 0 ? (
+                                                medications.map((med, i) => (
+                                                    <label key={i} className={`flex items-center gap-4 p-5 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200/50 dark:border-stone-700 cursor-pointer hover:border-[#5fa5ba] hover:shadow-md transition-all group ${med.opacity || ''} `}>
+                                                        <div className="relative flex items-center justify-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={!!checkedMeds[i]}
+                                                                onChange={() => handleMedCheck(i)}
+                                                                className="peer appearance-none w-7 h-7 rounded-lg border-2 border-stone-300 checked:bg-[#5fa5ba] checked:border-[#5fa5ba] transition-all"
+                                                            />
+                                                            <span className="material-symbols-outlined text-white text-lg absolute opacity-0 peer-checked:opacity-100 pointer-events-none transition-opacity">check</span>
+                                                        </div>
 
-                                                    <div className="flex-1">
-                                                        <p className="font-bold text-stone-800 dark:text-white group-hover:text-[#5fa5ba] transition-colors">{med.name}</p>
-                                                        <p className="text-xs text-stone-500 font-medium">{med.desc}</p>
-                                                    </div>
-                                                    <span className="text-[10px] font-bold text-stone-400 bg-stone-100 dark:bg-stone-700 px-3 py-1.5 rounded-lg uppercase tracking-wide">{med.time}</span>
-                                                </label>
-                                            ))}
+                                                        <div className="flex-1">
+                                                            <p className="font-bold text-stone-800 dark:text-white group-hover:text-[#5fa5ba] transition-colors">{med.name}</p>
+                                                            <p className="text-xs text-stone-500 font-medium">{med.desc}</p>
+                                                        </div>
+                                                        <span className="text-[10px] font-bold text-stone-400 bg-stone-100 dark:bg-stone-700 px-3 py-1.5 rounded-lg uppercase tracking-wide">{med.time}</span>
+                                                    </label>
+                                                ))
+                                            ) : (
+                                                <div className="text-center py-8 text-stone-400">
+                                                    <span className="material-symbols-outlined text-3xl mb-2">medication_liquid</span>
+                                                    <p className="text-sm">No medications scheduled.</p>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
@@ -573,10 +720,10 @@ const ActiveShift = () => {
                             <div className="space-y-6">
                                 <div>
                                     <p className="text-[10px] font-bold text-rose-400 uppercase tracking-wider mb-2">Primary Contact</p>
-                                    <p className="font-extrabold text-stone-800 dark:text-white text-xl leading-time">{EMERGENCY_CONTACT.name}</p>
+                                    <p className="font-extrabold text-stone-800 dark:text-white text-xl leading-time">{emergencyContact?.name || '--'}</p>
                                     <p className="text-sm text-stone-600 dark:text-stone-400 font-medium mt-1 flex items-center gap-2">
                                         <span className="material-symbols-outlined text-sm">call</span>
-                                        {EMERGENCY_CONTACT.phone}
+                                        {emergencyContact?.phone || '--'}
                                     </p>
                                 </div>
 
