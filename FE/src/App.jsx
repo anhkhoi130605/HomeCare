@@ -72,6 +72,7 @@ const FamilyCreateContract = lazy(() => import("./pages/Family/CreateContract"))
 const FamilyProfile = lazy(() => import("./pages/Family/FamilyProfile"));
 const FamilyCareLogDetail = lazy(() => import("./pages/Family/CareLogDetail"));
 const FamilyFeedback = lazy(() => import("./pages/Family/Feedback"));
+const FamilyPaymentDetails = lazy(() => import("./pages/Family/PaymentDetails"));
 
 const queryClient = new QueryClient();
 
@@ -156,6 +157,7 @@ const App = () => (
 
               {/* Redirect /CaregiverDashboard to /caregiver to fix 404 */}
               <Route path="/CaregiverDashboard" element={<Navigate to="/caregiver" replace />} />
+              <Route path="/payment/:id" element={<FamilyPaymentDetails />} />
 
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />

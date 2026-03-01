@@ -19,16 +19,24 @@ const BookingService = () => {
                 setLoading(true);
                 const data = await serviceApi.getAll();
                 // Map API response to component format
-                const mappedServices = data.map(s => ({
+                const mappedServices = data && data.length > 0 ? data.map(s => ({
                     id: s.id,
                     name: s.name,
-                    category: s.category || 'Daily Care',
-                    price: s.basePrice || s.price || 0,
-                    unit: s.unit || 'session',
-                    features: s.features || s.description?.split('.').filter(Boolean) || [],
-                    image: s.image || 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=200',
-                    recommended: s.isPopular || s.recommended || false
-                }));
+                    category: s.category || (s.type === 'Specialized' ? 'Specialized Medical' : 'Daily Care'),
+                    price: s.pricePerHour || s.price || 15,
+                    unit: '/ hour',
+                    features: s.features || (s.description ? [s.description] : []),
+                    image: s.image || 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=400',
+                    skillLevel: s.skillLevel || (s.pricePerHour > 40 ? 'Expert' : s.pricePerHour > 20 ? 'Intermediate' : 'Basic'),
+                    durationAllowed: s.durationAllowed || (s.type === 'Specialized' ? '4h / 12h' : '2h / 4h')
+                })) : [
+                    // Mock data if API is empty
+                    { id: 1, name: 'Basic Home Care', category: 'Daily Care', price: 15, unit: '/ hour', skillLevel: 'Basic', durationAllowed: '2h / 4h', image: 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=400', features: [] },
+                    { id: 2, name: 'Premium Home Care', category: 'Daily Care', price: 25, unit: '/ hour', skillLevel: 'Intermediate', durationAllowed: '4h / 8h', image: 'https://images.unsplash.com/photo-1516733725897-1aa73b87c8e8?w=400', features: [], recommended: true },
+                    { id: 3, name: 'Post-Surgery Recovery', category: 'Specialized Medical', price: 45, unit: '/ hour', skillLevel: 'Expert', durationAllowed: '8h / 24h', image: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=400', features: [] },
+                    { id: 4, name: 'Dementia Care', category: 'Specialized Medical', price: 50, unit: '/ hour', skillLevel: 'Expert', durationAllowed: '4h / 12h', image: 'https://images.unsplash.com/photo-1581578731522-aa7c04ae596d?w=400', features: [] },
+                    { id: 5, name: 'Social Enrichment', category: 'Companionship', price: 20, unit: '/ hour', skillLevel: 'Basic', durationAllowed: '2h / 6h', image: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=400', features: [] }
+                ];
                 setServices(mappedServices);
             } catch (err) {
                 console.error('Failed to fetch services:', err);
@@ -152,43 +160,29 @@ const BookingService = () => {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-start justify-between mb-2">
                                             <div>
-                                                <h3 className="text-lg font-bold text-stone-900 group-hover:text-[#5fa5ba] transition-colors">{service.name}</h3>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-500 text-[10px] font-bold uppercase tracking-wide border border-stone-200">
-                                                        {service.unit}
-                                                    </span>
-                                                    {service.recommended && (
-                                                        <span className="flex items-center gap-1 text-[10px] font-bold text-orange-500">
-                                                            <span className="material-symbols-outlined text-[12px] fill-current">star</span>
-                                                            Top Rated
-                                                        </span>
-                                                    )}
+                                                <h3 className="text-xl font-bold text-stone-900 group-hover:text-[#5fa5ba] transition-colors">{service.name}</h3>
+                                                <div className="flex flex-col gap-1 mt-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm text-stone-400 font-medium whitespace-nowrap">Skill Level:</span>
+                                                        <span className="text-sm text-stone-500 font-bold opacity-60">{service.skillLevel}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm text-stone-400 font-medium whitespace-nowrap">Duration:</span>
+                                                        <span className="text-sm text-stone-600 font-bold">{service.durationAllowed}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="text-right md:hidden">
-                                                <p className="text-xl font-black text-stone-900">${service.price}</p>
+                                                <p className="text-2xl font-black text-stone-900">${service.price}<span className="text-sm font-medium text-stone-400"> / hour</span></p>
                                             </div>
-                                        </div>
-
-                                        {/* Tags/Features as Icons */}
-                                        <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3">
-                                            {service.features.slice(0, 3).map((feature, idx) => (
-                                                <div key={idx} className="flex items-center gap-1.5 text-xs text-stone-500 font-medium">
-                                                    <span className="material-symbols-outlined text-[#5fa5ba] text-[16px]">check_small</span>
-                                                    <span>{feature}</span>
-                                                </div>
-                                            ))}
-                                            {service.features.length > 3 && (
-                                                <span className="text-xs text-stone-400 font-medium self-center">+{service.features.length - 3} more</span>
-                                            )}
                                         </div>
                                     </div>
 
                                     {/* Action - Right Side */}
-                                    <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end mt-4 md:mt-0 pl-0 md:pl-6 md:border-l border-stone-100">
-                                        <div className="hidden md:block text-right">
-                                            <p className="text-2xl font-black text-stone-900 tracking-tight">${service.price}</p>
-                                            <p className="text-[10px] text-stone-400 font-bold uppercase">Per Session</p>
+                                    <div className="flex items-center gap-8 w-full md:w-auto justify-between md:justify-end mt-4 md:mt-0 pl-0 md:pl-8 md:border-l border-stone-100">
+                                        <div className="hidden md:block text-right min-w-[120px]">
+                                            <p className="text-3xl font-black text-stone-900 tracking-tight">${service.price}</p>
+                                            <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest mt-1">/ Hour</p>
                                         </div>
 
                                         <button

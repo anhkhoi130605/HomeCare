@@ -20,6 +20,9 @@ public class Service
     [Column(TypeName = "decimal(18,2)")]
     public decimal? ContractPricePerMonth { get; set; }
 
+    [MaxLength(50)]
+    public string Category { get; set; } = "Daily Care";
+
     public ServiceType Type { get; set; } = ServiceType.Basic;
 
     public bool IsActive { get; set; } = true;
