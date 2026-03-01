@@ -76,7 +76,7 @@ const Request = () => {
                         <p className="text-white/80 font-medium mt-1 max-w-lg">Request additional care sessions for your family members.</p>
                     </div>
                     <div className="flex items-center gap-4 relative z-10">
-                        <Link to="/family/requests/new" className="flex items-center gap-2 px-6 py-3 bg-white text-[#5fa5ba] rounded-full font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all">
+                        <Link to="/family/services" className="flex items-center gap-2 px-6 py-3 bg-white text-[#5fa5ba] rounded-full font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all">
                             <span className="material-symbols-outlined text-xl">add</span>
                             New Request
                         </Link>
@@ -179,7 +179,7 @@ const Request = () => {
                     </div>
                     <h3 className="text-xl font-bold text-stone-900 mb-2">Need additional care?</h3>
                     <p className="text-stone-400 font-medium max-w-sm mx-auto mb-6 text-sm">Request extra care sessions for doctor appointments, special occasions, or additional support.</p>
-                    <Link to="/family/requests/new" className="px-8 py-3 bg-[#5fa5ba] text-white rounded-full font-bold text-xs hover:bg-[#4d8ca0] transition-all uppercase tracking-widest inline-block shadow-lg shadow-[#5fa5ba]/20">
+                    <Link to="/family/services" className="px-8 py-3 bg-[#5fa5ba] text-white rounded-full font-bold text-xs hover:bg-[#4d8ca0] transition-all uppercase tracking-widest inline-block shadow-lg shadow-[#5fa5ba]/20">
                         Create New Request
                     </Link>
                 </div>

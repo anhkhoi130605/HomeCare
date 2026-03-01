@@ -215,7 +215,7 @@ const PatientDetail = () => {
                                     </div>
                                 )}
                             </div>
-                            <Link to="/family/requests/new" className="block w-full py-3 bg-white text-[#5fa5ba] rounded-xl font-bold text-sm mt-6 hover:bg-stone-50 transition-colors text-center">
+                            <Link to="/family/services" className="block w-full py-3 bg-white text-[#5fa5ba] rounded-xl font-bold text-sm mt-6 hover:bg-stone-50 transition-colors text-center">
                                 Tạo yêu cầu chăm sóc
                             </Link>
                         </div>

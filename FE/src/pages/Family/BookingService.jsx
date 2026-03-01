@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { serviceApi } from '@/lib/api';
-import ServiceBookingModal from './ServiceBookingModal';
+// import ServiceBookingModal from './ServiceBookingModal';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 
 const categories = ['Daily Care', 'Specialized Medical', 'Companionship'];
 
 const BookingService = () => {
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('Daily Care');
-    const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
-    const [selectedService, setSelectedService] = useState(null);
+    // const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+    // const [selectedService, setSelectedService] = useState(null);
     const [services, setServices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -49,8 +51,7 @@ const BookingService = () => {
     }, []);
 
     const handleBookService = (service) => {
-        setSelectedService(service);
-        setIsBookingModalOpen(true);
+        navigate(`/family/requests/create?service_id=${service.id}`);
     };
 
     if (loading) {
@@ -214,12 +215,13 @@ const BookingService = () => {
                 </div>
             </ScrollAnimation>
 
-            {/* Booking Modal */}
+            {/* 
             <ServiceBookingModal
                 isOpen={isBookingModalOpen}
                 onClose={() => setIsBookingModalOpen(false)}
                 service={selectedService}
-            />
+            /> 
+            */}
         </div>
     );
 };
