@@ -41,6 +41,9 @@ public class CareRequest
     public string? Notes { get; set; }
 
     [MaxLength(500)]
+    public string? Address { get; set; }
+
+    [MaxLength(500)]
     public string? AdminNotes { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

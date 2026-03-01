@@ -240,6 +240,7 @@ public class ApplicationDbContext : DbContext
             {
                 Id = 1,
                 Name = "Basic Home Care",
+                Category = "Daily Care",
                 Description = "Essential daily care including medication reminders, meal assistance, and basic health monitoring.",
                 PricePerHour = 150000,
                 ContractPricePerMonth = 12000000,
@@ -251,6 +252,7 @@ public class ApplicationDbContext : DbContext
             {
                 Id = 2,
                 Name = "Premium Home Care",
+                Category = "Daily Care",
                 Description = "Comprehensive care with specialized nursing, physical therapy assistance, and 24/7 monitoring.",
                 PricePerHour = 250000,
                 ContractPricePerMonth = 20000000,
@@ -262,6 +264,7 @@ public class ApplicationDbContext : DbContext
             {
                 Id = 3,
                 Name = "Specialized Care",
+                Category = "Specialized Medical",
                 Description = "Expert care for post-surgery recovery, chronic conditions, or specialized medical needs.",
                 PricePerHour = 350000,
                 ContractPricePerMonth = 28000000,

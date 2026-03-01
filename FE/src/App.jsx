@@ -72,6 +72,7 @@ const FamilyCreateContract = lazy(() => import("./pages/Family/CreateContract"))
 const FamilyProfile = lazy(() => import("./pages/Family/FamilyProfile"));
 const FamilyCareLogDetail = lazy(() => import("./pages/Family/CareLogDetail"));
 const FamilyFeedback = lazy(() => import("./pages/Family/Feedback"));
+const FamilyPaymentDetails = lazy(() => import("./pages/Family/PaymentDetails"));
 
 const queryClient = new QueryClient();
 
@@ -123,7 +124,7 @@ const App = () => (
                 <Route path="dashboard" element={<FamilyDashboard />} />
                 <Route path="patients" element={<FamilyPatientList />} />
                 <Route path="schedule" element={<FamilySchedule />} />
-                <Route path="book" element={<FamilyBooking />} />
+                <Route path="services" element={<FamilyBooking />} />
                 <Route path="requests" element={<FamilyRequests />} />
                 <Route path="contracts" element={<FamilyContract />} />
                 <Route path="payments" element={<FamilyPayment />} />
@@ -132,9 +133,9 @@ const App = () => (
                 <Route path="schedule/detail/:id" element={<FamilyShiftDetail />} />
                 <Route path="reports/detail/:id" element={<FamilyHealthReportDetail />} />
                 <Route path="care-logs/:id" element={<FamilyCareLogDetail />} />
-                <Route path="requests/new" element={<FamilyCreateRequest />} />
+                <Route path="requests/create" element={<FamilyCreateRequest />} />
                 <Route path="requests/:id" element={<FamilyRequestDetail />} />
-                <Route path="contracts/new" element={<FamilyCreateContract />} />
+                <Route path="contracts/create" element={<FamilyCreateContract />} />
                 <Route path="profile" element={<FamilyProfile />} />
                 <Route path="feedback" element={<FamilyFeedback />} />
               </Route>
@@ -156,6 +157,8 @@ const App = () => (
 
               {/* Redirect /CaregiverDashboard to /caregiver to fix 404 */}
               <Route path="/CaregiverDashboard" element={<Navigate to="/caregiver" replace />} />
+              <Route path="/payment/contract/:id" element={<FamilyPaymentDetails type="contract" />} />
+              <Route path="/payment/:id" element={<FamilyPaymentDetails />} />
 
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />

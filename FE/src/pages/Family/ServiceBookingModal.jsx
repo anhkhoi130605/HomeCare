@@ -1,12 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { familyApi, careRequestApi } from '@/lib/api';
+import { toast } from 'sonner';
 
 const ServiceBookingModal = ({ isOpen, onClose, service }) => {
+    const navigate = useNavigate();
+    const [patients, setPatients] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [formData, setFormData] = useState({
+        patient_id: '',
+        date: new Date().toISOString().split('T')[0],
+        start_time: '09:00',
+        duration: 2,
+        special_note: ''
+    });
+
+    useEffect(() => {
+        if (isOpen) {
+            const fetchPatients = async () => {
+                try {
+                    const data = await familyApi.getPatients();
+                    setPatients(data || []);
+                    if (data && data.length > 0) {
+                        setFormData(prev => ({ ...prev, patient_id: data[0].id }));
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch patients:", error);
+                }
+            };
+            fetchPatients();
+        }
+    }, [isOpen]);
+
     if (!isOpen) return null;
+
+    const totalEstimatedCost = (service?.price || 0) * (formData.duration || 0);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!formData.patient_id) {
+            toast.error("Please select a patient");
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const requestData = {
+                // CamelCase (Working in other pages)
+                serviceId: service.id,
+                patientId: parseInt(formData.patient_id),
+                requestedDate: formData.date,
+                startTime: `${formData.start_time}:00`, // Ensure HH:mm:ss format
+                duration: Number(formData.duration),
+                notes: formData.special_note,
+
+                // Snake_case (Requested by user, keeping for compatibility)
+                service_id: service.id,
+                patient_id: parseInt(formData.patient_id),
+                date: formData.date,
+                start_time: `${formData.start_time}:00`,
+                special_note: formData.special_note
+            };
+
+            const response = await careRequestApi.create(requestData);
+            toast.success("Request created! Redirecting to payment...");
+
+            // Step 4: BE returns id, navigate to payment/:id
+            const requestId = response.id || response.request_id || 123;
+            navigate(`/payment/${requestId}`);
+        } catch (error) {
+            console.error("Booking error:", error);
+            toast.error(error.message || "Failed to create request");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 backdrop-blur-sm p-4 animate-fade-in">
             {/* Modal Container */}
-            <div className="bg-white rounded-[2.5rem] w-full max-w-5xl max-h-[95vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row relative animate-scale-up font-['Public_Sans']">
+            <div className="bg-white rounded-[2.5rem] w-full max-w-5xl max-h-[95vh] shadow-2xl overflow-hidden flex flex-col lg:flex-row relative animate-scale-up font-['Public_Sans']">
 
                 {/* Close Button */}
                 <button
@@ -29,10 +102,10 @@ const ServiceBookingModal = ({ isOpen, onClose, service }) => {
                         <span className="bg-[#5fa5ba]/90 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-4 inline-block shadow-sm backdrop-blur-md border border-white/20">
                             {service?.category || 'Daily Care'}
                         </span>
-                        <h2 className="text-3xl font-extrabold mb-2 leading-tight">{service?.name || service?.title || 'Service Booking'}</h2>
+                        <h2 className="text-3xl font-extrabold mb-2 leading-tight">{service?.name || 'Service Booking'}</h2>
                         <div className="flex items-center gap-2 mt-4">
                             <span className="text-3xl font-black text-[#5fa5ba]">${service?.price || '0'}</span>
-                            <span className="text-white/80 text-sm font-medium">/ {service?.unit || 'session'}</span>
+                            <span className="text-white/80 text-sm font-medium">/ hour</span>
                         </div>
                     </div>
                 </div>
@@ -40,12 +113,30 @@ const ServiceBookingModal = ({ isOpen, onClose, service }) => {
                 {/* Right Panel: Booking Form */}
                 <div className="lg:w-7/12 p-8 lg:p-10 overflow-y-auto bg-white flex flex-col h-full">
                     <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
-                        <div className="mb-8 text-center lg:text-left">
-                            <h3 className="text-2xl font-extrabold text-stone-900 mb-2">Book Service</h3>
-                            <p className="text-stone-500 text-sm leading-relaxed">Customize your care request and confirm your secure payment below.</p>
+                        <div className="mb-6 bg-[#5fa5ba]/5 p-6 rounded-3xl border border-[#5fa5ba]/10">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h4 className="text-xl font-bold text-stone-900">{service?.name}</h4>
+                                    <p className="text-xs font-bold text-[#5fa5ba] uppercase tracking-widest mt-1">Package Summary</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-2xl font-black text-stone-900">${service?.price}</p>
+                                    <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">/ Hour</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[#5fa5ba]/10">
+                                <div>
+                                    <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">Skill Level</p>
+                                    <p className="text-sm font-bold text-stone-700 opacity-60">{service?.skillLevel || 'Basic'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">Duration Allowed</p>
+                                    <p className="text-sm font-bold text-stone-700">{service?.durationAllowed || '2h / 4h'}</p>
+                                </div>
+                            </div>
                         </div>
 
-                        <form className="space-y-6 flex-1" onSubmit={(e) => e.preventDefault()}>
+                        <form className="space-y-6 flex-1" onSubmit={handleSubmit}>
                             {/* Patient Select */}
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-stone-600 flex items-center gap-2">
@@ -53,28 +144,66 @@ const ServiceBookingModal = ({ isOpen, onClose, service }) => {
                                     Select Patient
                                 </label>
                                 <div className="relative">
-                                    <select className="w-full appearance-none bg-stone-50 border-none rounded-2xl py-4 pl-5 pr-12 focus:ring-2 focus:ring-[#5fa5ba]/50 text-stone-800 font-bold shadow-sm transition-all cursor-pointer hover:bg-stone-100">
-                                        <option>Grandpa Robert Jenkins</option>
-                                        <option>Aunt Mary Smith</option>
-                                        <option>Add New Patient...</option>
+                                    <select
+                                        className="w-full appearance-none bg-stone-50 border-none rounded-2xl py-4 pl-5 pr-12 focus:ring-2 focus:ring-[#5fa5ba]/50 text-stone-800 font-bold shadow-sm transition-all cursor-pointer hover:bg-stone-100"
+                                        value={formData.patient_id}
+                                        onChange={(e) => setFormData({ ...formData, patient_id: e.target.value })}
+                                    >
+                                        {patients.length > 0 ? (
+                                            patients.map(p => (
+                                                <option key={p.id} value={p.id}>{p.fullName || p.name}</option>
+                                            ))
+                                        ) : (
+                                            <option disabled value="">No patients found. Add one in Patient list.</option>
+                                        )}
                                     </select>
                                     <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-[#5fa5ba] pointer-events-none">expand_more</span>
                                 </div>
                             </div>
 
                             {/* Date & Time */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-stone-600 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-[#5fa5ba] text-lg">calendar_month</span>
+                                        Date
+                                    </label>
+                                    <input
+                                        className="w-full bg-stone-50 border-none rounded-2xl py-4 px-5 focus:ring-2 focus:ring-[#5fa5ba]/50 text-sm font-bold text-stone-800 shadow-sm"
+                                        type="date"
+                                        value={formData.date}
+                                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-stone-600 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-[#5fa5ba] text-lg">schedule</span>
+                                        Start Time
+                                    </label>
+                                    <input
+                                        className="w-full bg-stone-50 border-none rounded-2xl py-4 px-5 focus:ring-2 focus:ring-[#5fa5ba]/50 text-sm font-bold text-stone-800 shadow-sm"
+                                        type="time"
+                                        value={formData.start_time}
+                                        onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Duration */}
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-stone-600 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-[#5fa5ba] text-lg">calendar_month</span>
-                                    Select Date & Time
+                                    <span className="material-symbols-outlined text-[#5fa5ba] text-lg">timer</span>
+                                    Duration (Hours)
                                 </label>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="relative">
-                                        <input className="w-full bg-stone-50 border-none rounded-2xl py-4 px-5 focus:ring-2 focus:ring-[#5fa5ba]/50 text-sm font-bold text-stone-800 shadow-sm" type="date" defaultValue="2024-10-24" />
-                                    </div>
-                                    <div className="relative">
-                                        <input className="w-full bg-stone-50 border-none rounded-2xl py-4 px-5 focus:ring-2 focus:ring-[#5fa5ba]/50 text-sm font-bold text-stone-800 shadow-sm" type="time" defaultValue="09:00" />
-                                    </div>
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="24"
+                                        className="w-full bg-stone-50 border-none rounded-2xl py-4 px-5 focus:ring-2 focus:ring-[#5fa5ba]/50 text-sm font-bold text-stone-800 shadow-sm"
+                                        value={formData.duration}
+                                        onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                                    />
                                 </div>
                             </div>
 
@@ -86,57 +215,26 @@ const ServiceBookingModal = ({ isOpen, onClose, service }) => {
                                 </label>
                                 <textarea
                                     className="w-full bg-stone-50 border-none rounded-2xl py-4 px-5 focus:ring-2 focus:ring-[#5fa5ba]/50 text-sm font-medium shadow-sm placeholder:text-stone-400 min-h-[100px] resize-none"
-                                    placeholder="e.g. Please bring extra warm blankets and prefer soft-cooked meals..."
+                                    placeholder="e.g. Please bring extra warm blankets..."
+                                    value={formData.special_note}
+                                    onChange={(e) => setFormData({ ...formData, special_note: e.target.value })}
                                 />
                             </div>
 
-                            {/* Payment Section */}
-                            <div className="mt-8 pt-8 border-t border-stone-100">
-                                <div className="flex items-center justify-between mb-6">
-                                    <span className="text-sm font-bold text-stone-500">Total Estimated Cost</span>
-                                    <span className="text-2xl font-black text-[#5fa5ba]">${service?.price || '0'}</span>
-                                </div>
-
-                                <div className="space-y-4 mb-8">
-                                    <p className="text-xs font-black text-[#5fa5ba] uppercase tracking-widest">Payment Method</p>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <label className="cursor-pointer group">
-                                            <input type="radio" name="payment" className="hidden peer" defaultChecked />
-                                            <div className="flex items-center gap-3 p-4 rounded-2xl border-2 border-transparent bg-stone-50 peer-checked:border-[#A50064] peer-checked:bg-[#A50064]/5 transition-all h-full hover:bg-stone-100">
-                                                <div className="size-8 rounded-lg bg-[#A50064] flex items-center justify-center shrink-0 shadow-sm">
-                                                    <span className="material-symbols-outlined text-white text-lg">wallet</span>
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-bold text-stone-800 group-peer-checked:text-[#A50064]">MoMo</span>
-                                                    <span className="text-[10px] text-stone-400 font-bold">E-Wallet</span>
-                                                </div>
-                                            </div>
-                                        </label>
-                                        <label className="cursor-pointer group">
-                                            <input type="radio" name="payment" className="hidden peer" />
-                                            <div className="flex items-center gap-3 p-4 rounded-2xl border-2 border-transparent bg-stone-50 peer-checked:border-[#5fa5ba] peer-checked:bg-[#5fa5ba]/5 transition-all h-full hover:bg-stone-100">
-                                                <div className="size-8 rounded-lg bg-[#5fa5ba]/10 flex items-center justify-center shrink-0">
-                                                    <span className="material-symbols-outlined text-[#5fa5ba] text-lg">qr_code_2</span>
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-bold text-stone-800 group-peer-checked:text-[#5fa5ba]">Bank QR</span>
-                                                    <span className="text-[10px] text-stone-400 font-bold">VietQR Pay</span>
-                                                </div>
-                                            </div>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <button className="w-full bg-[#5fa5ba] hover:bg-[#4d8ca0] text-white font-bold py-4 rounded-full shadow-xl shadow-[#5fa5ba]/20 transform hover:-translate-y-1 transition-all flex items-center justify-center gap-3 text-lg">
-                                    <span>Pay & Confirm Booking</span>
-                                    <span className="material-symbols-outlined">lock</span>
-                                </button>
-
-                                <div className="mt-4 flex items-center justify-center gap-2 text-stone-400">
-                                    <span className="material-symbols-outlined text-sm">verified_user</span>
-                                    <span className="text-[10px] uppercase font-bold tracking-widest">Secure & Encrypted Payment</span>
-                                </div>
+                            {/* Cost Section */}
+                            <div className="mt-8 pt-6 border-t border-stone-100 flex items-center justify-between mb-8">
+                                <span className="text-sm font-bold text-stone-500">Total Estimated Cost</span>
+                                <span className="text-3xl font-black text-[#5fa5ba]">${totalEstimatedCost}</span>
                             </div>
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full bg-[#5fa5ba] hover:bg-[#4d8ca0] text-white font-bold py-4 rounded-full shadow-xl shadow-[#5fa5ba]/20 transform hover:-translate-y-1 transition-all flex items-center justify-center gap-3 text-lg disabled:opacity-70 disabled:cursor-not-allowed"
+                            >
+                                <span>{loading ? 'Creating request...' : 'Confirm & Proceed to Payment'}</span>
+                                {!loading && <span className="material-symbols-outlined">arrow_forward</span>}
+                            </button>
                         </form>
                     </div>
                 </div>

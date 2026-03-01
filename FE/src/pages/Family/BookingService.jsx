@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { serviceApi } from '@/lib/api';
-import ServiceBookingModal from './ServiceBookingModal';
+// import ServiceBookingModal from './ServiceBookingModal';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 
 const categories = ['Daily Care', 'Specialized Medical', 'Companionship'];
 
 const BookingService = () => {
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('Daily Care');
-    const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
-    const [selectedService, setSelectedService] = useState(null);
+    // const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+    // const [selectedService, setSelectedService] = useState(null);
     const [services, setServices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -19,16 +21,24 @@ const BookingService = () => {
                 setLoading(true);
                 const data = await serviceApi.getAll();
                 // Map API response to component format
-                const mappedServices = data.map(s => ({
+                const mappedServices = data && data.length > 0 ? data.map(s => ({
                     id: s.id,
                     name: s.name,
-                    category: s.category || 'Daily Care',
-                    price: s.basePrice || s.price || 0,
-                    unit: s.unit || 'session',
-                    features: s.features || s.description?.split('.').filter(Boolean) || [],
-                    image: s.image || 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=200',
-                    recommended: s.isPopular || s.recommended || false
-                }));
+                    category: s.category || (s.type === 'Specialized' ? 'Specialized Medical' : 'Daily Care'),
+                    price: s.pricePerHour || s.price || 15,
+                    unit: '/ hour',
+                    features: s.features || (s.description ? [s.description] : []),
+                    image: s.image || 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=400',
+                    skillLevel: s.skillLevel || (s.pricePerHour > 40 ? 'Expert' : s.pricePerHour > 20 ? 'Intermediate' : 'Basic'),
+                    durationAllowed: s.durationAllowed || (s.type === 'Specialized' ? '4h / 12h' : '2h / 4h')
+                })) : [
+                    // Mock data if API is empty
+                    { id: 1, name: 'Basic Home Care', category: 'Daily Care', price: 18, unit: '/ hour', skillLevel: 'Basic', durationAllowed: '2h / 4h', image: 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=400', features: [] },
+                    { id: 2, name: 'Premium Home Care', category: 'Daily Care', price: 32, unit: '/ hour', skillLevel: 'Intermediate', durationAllowed: '4h / 8h', image: 'https://images.unsplash.com/photo-1516733725897-1aa73b87c8e8?w=400', features: [], recommended: true },
+                    { id: 3, name: 'Post-Surgery Recovery', category: 'Specialized Medical', price: 55, unit: '/ hour', skillLevel: 'Expert', durationAllowed: '8h / 24h', image: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=400', features: [] },
+                    { id: 4, name: 'Dementia Care', category: 'Specialized Medical', price: 65, unit: '/ hour', skillLevel: 'Expert', durationAllowed: '4h / 12h', image: 'https://images.unsplash.com/photo-1581578731522-aa7c04ae596d?w=400', features: [] },
+                    { id: 5, name: 'Social Enrichment', category: 'Companionship', price: 22, unit: '/ hour', skillLevel: 'Basic', durationAllowed: '2h / 6h', image: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=400', features: [] }
+                ];
                 setServices(mappedServices);
             } catch (err) {
                 console.error('Failed to fetch services:', err);
@@ -40,9 +50,12 @@ const BookingService = () => {
         fetchServices();
     }, []);
 
-    const handleBookService = (service) => {
-        setSelectedService(service);
-        setIsBookingModalOpen(true);
+    const handleShortTerm = (service) => {
+        navigate(`/family/requests/create?service_id=${service.id}`);
+    };
+
+    const handleLongTerm = (service) => {
+        navigate(`/family/contracts/create?service_id=${service.id}`);
     };
 
     if (loading) {
@@ -152,51 +165,45 @@ const BookingService = () => {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-start justify-between mb-2">
                                             <div>
-                                                <h3 className="text-lg font-bold text-stone-900 group-hover:text-[#5fa5ba] transition-colors">{service.name}</h3>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-500 text-[10px] font-bold uppercase tracking-wide border border-stone-200">
-                                                        {service.unit}
-                                                    </span>
-                                                    {service.recommended && (
-                                                        <span className="flex items-center gap-1 text-[10px] font-bold text-orange-500">
-                                                            <span className="material-symbols-outlined text-[12px] fill-current">star</span>
-                                                            Top Rated
-                                                        </span>
-                                                    )}
+                                                <h3 className="text-xl font-bold text-stone-900 group-hover:text-[#5fa5ba] transition-colors">{service.name}</h3>
+                                                <div className="flex flex-col gap-1 mt-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm text-stone-400 font-medium whitespace-nowrap">Skill Level:</span>
+                                                        <span className="text-sm text-stone-500 font-bold opacity-60">{service.skillLevel}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm text-stone-400 font-medium whitespace-nowrap">Duration:</span>
+                                                        <span className="text-sm text-stone-600 font-bold">{service.durationAllowed}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="text-right md:hidden">
-                                                <p className="text-xl font-black text-stone-900">${service.price}</p>
+                                                <p className="text-2xl font-black text-stone-900">${service.price}<span className="text-sm font-medium text-stone-400"> / hour</span></p>
                                             </div>
-                                        </div>
-
-                                        {/* Tags/Features as Icons */}
-                                        <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3">
-                                            {service.features.slice(0, 3).map((feature, idx) => (
-                                                <div key={idx} className="flex items-center gap-1.5 text-xs text-stone-500 font-medium">
-                                                    <span className="material-symbols-outlined text-[#5fa5ba] text-[16px]">check_small</span>
-                                                    <span>{feature}</span>
-                                                </div>
-                                            ))}
-                                            {service.features.length > 3 && (
-                                                <span className="text-xs text-stone-400 font-medium self-center">+{service.features.length - 3} more</span>
-                                            )}
                                         </div>
                                     </div>
 
                                     {/* Action - Right Side */}
-                                    <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end mt-4 md:mt-0 pl-0 md:pl-6 md:border-l border-stone-100">
-                                        <div className="hidden md:block text-right">
-                                            <p className="text-2xl font-black text-stone-900 tracking-tight">${service.price}</p>
-                                            <p className="text-[10px] text-stone-400 font-bold uppercase">Per Session</p>
+                                    <div className="flex flex-col gap-3 w-full md:w-auto justify-center mt-4 md:mt-0 pl-0 md:pl-8 md:border-l border-stone-100 min-w-[180px]">
+                                        <div className="hidden md:block text-right mb-2">
+                                            <p className="text-3xl font-black text-stone-900 tracking-tight">${service.price}</p>
+                                            <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest mt-1">/ Hour</p>
                                         </div>
 
-                                        <button
-                                            onClick={() => handleBookService(service)}
-                                            className="h-12 w-12 rounded-full border-2 border-stone-200 flex items-center justify-center text-stone-400 hover:border-[#5fa5ba] hover:bg-[#5fa5ba] hover:text-white transition-all group/btn shadow-sm"
-                                        >
-                                            <span className="material-symbols-outlined group-hover/btn:scale-110 transition-transform">add</span>
-                                        </button>
+                                        <div className="flex flex-row md:flex-col gap-2 w-full">
+                                            <button
+                                                onClick={() => handleShortTerm(service)}
+                                                className="flex-1 px-4 py-2.5 bg-white border-2 border-[#5fa5ba] text-[#5fa5ba] rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-[#5fa5ba] hover:text-white transition-all shadow-sm active:scale-95 whitespace-nowrap"
+                                            >
+                                                One-Time
+                                            </button>
+                                            <button
+                                                onClick={() => handleLongTerm(service)}
+                                                className="flex-1 px-4 py-2.5 bg-stone-900 text-white border-2 border-stone-900 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-black hover:border-black transition-all shadow-md active:scale-95 whitespace-nowrap"
+                                            >
+                                                Long-Term Plan
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -220,12 +227,13 @@ const BookingService = () => {
                 </div>
             </ScrollAnimation>
 
-            {/* Booking Modal */}
+            {/* 
             <ServiceBookingModal
                 isOpen={isBookingModalOpen}
                 onClose={() => setIsBookingModalOpen(false)}
                 service={selectedService}
-            />
+            /> 
+            */}
         </div>
     );
 };

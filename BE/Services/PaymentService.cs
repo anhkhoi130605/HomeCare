@@ -6,8 +6,6 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 
-using System.Security.Cryptography;
-using System.Text;
 using BE.Services.Interfaces;
 
 namespace BE.Services;

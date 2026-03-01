@@ -31,10 +31,13 @@ public enum ServiceType
 
 public enum ContractStatus
 {
-    Pending,
-    Active,
-    Completed,
-    Cancelled
+    Pending,           // Just created, awaiting admin review
+    Approved,          // Admin approved, awaiting payment
+    Paid,              // User paid, awaiting start date or activation
+    Active,            // Care is currently ongoing
+    Completed,         // Care finished
+    Cancelled,         // Care cancelled
+    Rejected           // Admin rejected
 }
 
 public enum ScheduleStatus

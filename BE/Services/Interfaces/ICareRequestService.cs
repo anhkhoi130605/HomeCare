@@ -28,9 +28,10 @@ public class CareRequestDto
     public string Type { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public DateTime RequestedDate { get; set; }
-    public string StartTime { get; set; } = string.Empty;
-    public string EndTime { get; set; } = string.Empty;
+    public string? StartTime { get; set; } = string.Empty;
+    public string? EndTime { get; set; } = string.Empty;
     public string? Notes { get; set; }
+    public string? Address { get; set; }
     public string? AdminNotes { get; set; }
     public DateTime CreatedAt { get; set; }
 }
@@ -44,4 +45,5 @@ public class CreateCareRequestDto
     public string StartTime { get; set; } = string.Empty; // "HH:mm"
     public string EndTime { get; set; } = string.Empty;   // "HH:mm"
     public string? Notes { get; set; }
+    public string? Address { get; set; }
 }

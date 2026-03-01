@@ -33,6 +33,15 @@ public class Patient
     [MaxLength(500)]
     public string? Address { get; set; }
 
+    [MaxLength(100)]
+    public string? EmergencyContact { get; set; }
+
+    [MaxLength(20)]
+    public string? EmergencyPhone { get; set; }
+ 
+    [MaxLength(50)]
+    public string? Relation { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation properties

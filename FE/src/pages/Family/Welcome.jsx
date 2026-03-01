@@ -1,9 +1,11 @@
-import React, { useRef } from 'react';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { welcomeData } from '../../data/Family/welcome';
 import { Button } from "@/components/ui/button";
 import ScrollAnimation from "@/components/ui/scroll-animation";
 
 const Welcome = () => {
+    const navigate = useNavigate();
     return (
         <div className="font-['Public_Sans'] bg-white text-stone-900 min-h-screen relative overflow-x-hidden pb-12 animate-fade-in-up">
 
@@ -107,7 +109,10 @@ const Welcome = () => {
 
                             <ScrollAnimation animation="slide-right" delay={0.5}>
                                 <div className="flex flex-col sm:flex-row items-center gap-5">
-                                    <button className="bg-[#5fa5ba] text-white pl-6 pr-1.5 py-1.5 rounded-full font-bold text-xs hover:bg-[#4d8ca0] transition-colors flex items-center gap-4 group shadow-lg shadow-[#5fa5ba]/20">
+                                    <button
+                                        onClick={() => navigate('/family/services')}
+                                        className="bg-[#5fa5ba] text-white pl-6 pr-1.5 py-1.5 rounded-full font-bold text-xs hover:bg-[#4d8ca0] transition-colors flex items-center gap-4 group shadow-lg shadow-[#5fa5ba]/20"
+                                    >
                                         Explore our services
                                         <span className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center group-hover:bg-white/30 transition-colors">
                                             <span className="material-symbols-outlined text-[14px] text-white">bubble_chart</span>
@@ -199,7 +204,10 @@ const Welcome = () => {
                 <div className="text-center mb-12">
                     <ScrollAnimation animation="fade-up">
                         <h2 className="text-4xl font-medium text-stone-900 mb-6">Explore our care <br />services and expertise</h2>
-                        <button className="px-8 py-2.5 rounded-full border border-[#5fa5ba] text-sm font-bold text-[#5fa5ba] hover:bg-[#5fa5ba] hover:text-white transition-colors">
+                        <button
+                            onClick={() => navigate('/family/services')}
+                            className="px-8 py-2.5 rounded-full border border-[#5fa5ba] text-sm font-bold text-[#5fa5ba] hover:bg-[#5fa5ba] hover:text-white transition-colors"
+                        >
                             Explore now
                         </button>
                     </ScrollAnimation>

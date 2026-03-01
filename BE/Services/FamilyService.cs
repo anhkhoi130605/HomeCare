@@ -100,6 +100,9 @@ public class FamilyService : IFamilyService
             Allergies = dto.Allergies,
             CurrentCondition = dto.CurrentCondition,
             Address = dto.Address,
+            EmergencyContact = dto.EmergencyContact,
+            EmergencyPhone = dto.EmergencyPhone,
+            Relation = dto.Relation,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -124,6 +127,9 @@ public class FamilyService : IFamilyService
         patient.Allergies = dto.Allergies ?? patient.Allergies;
         patient.CurrentCondition = dto.CurrentCondition ?? patient.CurrentCondition;
         patient.Address = dto.Address ?? patient.Address;
+        patient.EmergencyContact = dto.EmergencyContact ?? patient.EmergencyContact;
+        patient.EmergencyPhone = dto.EmergencyPhone ?? patient.EmergencyPhone;
+        patient.Relation = dto.Relation ?? patient.Relation;
 
         await _context.SaveChangesAsync();
 
@@ -155,6 +161,9 @@ public class FamilyService : IFamilyService
             Allergies = patient.Allergies,
             CurrentCondition = patient.CurrentCondition,
             Address = patient.Address,
+            EmergencyContact = patient.EmergencyContact,
+            EmergencyPhone = patient.EmergencyPhone,
+            Relation = patient.Relation,
             CreatedAt = patient.CreatedAt
         };
     }

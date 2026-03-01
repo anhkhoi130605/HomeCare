@@ -118,7 +118,8 @@ public class ContractService : IContractService
             EndDate = dto.EndDate,
             TotalAmount = totalAmount,
             Status = ContractStatus.Pending,
-            WeeklySchedule = dto.WeeklySchedule
+            WeeklySchedule = dto.WeeklySchedule,
+            Address = dto.Address
         };
 
         _context.Contracts.Add(contract);
@@ -161,6 +162,7 @@ public class ContractService : IContractService
             TotalAmount = c.TotalAmount,
             Status = c.Status.ToString(),
             WeeklySchedule = c.WeeklySchedule,
+            Address = c.Address,
             CreatedAt = c.CreatedAt
         };
     }

@@ -66,6 +66,7 @@ public class CareRequestService : ICareRequestService
             StartTime = TimeSpan.Parse(dto.StartTime),
             EndTime = TimeSpan.Parse(dto.EndTime),
             Notes = dto.Notes,
+            Address = dto.Address,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -151,6 +152,7 @@ public class CareRequestService : ICareRequestService
             StartTime = r.StartTime.ToString(@"hh\:mm"),
             EndTime = r.EndTime.ToString(@"hh\:mm"),
             Notes = r.Notes,
+            Address = r.Address,
             AdminNotes = r.AdminNotes,
             CreatedAt = r.CreatedAt
         };
