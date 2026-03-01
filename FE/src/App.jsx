@@ -135,7 +135,7 @@ const App = () => (
                 <Route path="care-logs/:id" element={<FamilyCareLogDetail />} />
                 <Route path="requests/create" element={<FamilyCreateRequest />} />
                 <Route path="requests/:id" element={<FamilyRequestDetail />} />
-                <Route path="contracts/new" element={<FamilyCreateContract />} />
+                <Route path="contracts/create" element={<FamilyCreateContract />} />
                 <Route path="profile" element={<FamilyProfile />} />
                 <Route path="feedback" element={<FamilyFeedback />} />
               </Route>

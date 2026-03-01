@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { contractApi } from '@/lib/api';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 
 const FamilyContract = () => {
+    const navigate = useNavigate();
     const [contracts, setContracts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -14,12 +15,13 @@ const FamilyContract = () => {
             try {
                 setLoading(true);
                 const data = await contractApi.getMyContracts();
-                setContracts(data);
+                const contractsData = data || [];
+                setContracts(contractsData);
 
                 // Calculate stats
-                const active = data.filter(c => c.status === 'Active' || c.status === 'Approved').length;
-                const pending = data.filter(c => c.status === 'Pending').length;
-                const nearestRenewal = data
+                const active = contractsData.filter(c => c.status === 'Active' || c.status === 'Paid').length;
+                const pending = contractsData.filter(c => c.status === 'Pending' || c.status === 'Approved').length;
+                const nearestRenewal = contractsData
                     .filter(c => c.endDate)
                     .sort((a, b) => new Date(a.endDate) - new Date(b.endDate))[0];
 
@@ -77,7 +79,7 @@ const FamilyContract = () => {
                         <p className="text-white/80 font-medium mt-1 max-w-lg">Manage and monitor your healthcare agreements efficiently.</p>
                     </div>
                     <div className="flex items-center gap-4 relative z-10">
-                        <Link to="/family/contracts/new" className="flex items-center gap-2 px-6 py-3 bg-white text-[#5fa5ba] rounded-full font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all">
+                        <Link to="/family/services" className="flex items-center gap-2 px-6 py-3 bg-white text-[#5fa5ba] rounded-full font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all">
                             <span className="material-symbols-outlined text-xl">add</span>
                             New Contract
                         </Link>
@@ -183,8 +185,28 @@ const FamilyContract = () => {
                                                 <span className="px-4 py-1.5 bg-stone-50 text-stone-600 rounded-full text-xs font-bold border border-stone-100">{duration}</span>
                                             </td>
                                             <td className="px-8 py-6">
-                                                <div className="flex items-center justify-center gap-2">
-                                                    <span className={`text-[10px] font-black tracking-tighter uppercase px-3 py-1 rounded-md ${c.status === 'Active' || c.status === 'Approved' ? 'text-[#5fa5ba] border border-[#B2EBF2] bg-[#E0F2F1]' : c.status === 'Pending' ? 'text-orange-500 border border-orange-200 bg-orange-50' : 'text-stone-500 border border-stone-200 bg-stone-50'}`}>{c.status}</span>
+                                                <div className="flex items-center justify-center gap-4">
+                                                    <span className={`text-[10px] font-black tracking-tighter uppercase px-3 py-1 rounded-md ${c.status === 'Active' || c.status === 'Paid'
+                                                            ? 'text-[#5fa5ba] border border-[#B2EBF2] bg-[#E0F2F1]'
+                                                            : c.status === 'Pending'
+                                                                ? 'text-orange-500 border border-orange-200 bg-orange-50'
+                                                                : c.status === 'Approved'
+                                                                    ? 'text-emerald-600 border border-emerald-200 bg-emerald-50'
+                                                                    : 'text-stone-500 border border-stone-200 bg-stone-50'
+                                                        }`}>
+                                                        {c.status}
+                                                    </span>
+                                                    {(c.status === 'Approved') && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                navigate(`/payment/contract/${c.id}`);
+                                                            }}
+                                                            className="text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-white px-3 py-1 rounded-md shadow-sm hover:bg-emerald-600"
+                                                        >
+                                                            Pay Now
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

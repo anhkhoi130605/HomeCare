@@ -1,462 +1,435 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import ScrollAnimation from "@/components/ui/scroll-animation";
-import { familyApi, serviceApi, caregiverApi, contractApi, paymentApi } from '@/lib/api';
-import AddMemberModal from './AddMemberModal';
+import { familyApi, serviceApi, caregiverApi, contractApi } from '@/lib/api';
 import { toast } from 'sonner';
 
 const CreateContract = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+    const serviceIdParam = searchParams.get('service_id');
+
+    const [patients, setPatients] = useState([]);
+    const [selectedService, setSelectedService] = useState(null);
+    const [caregivers, setCaregivers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
 
-    // Data
-    const [patients, setPatients] = useState([]);
-    const [packages, setPackages] = useState([]);
-    const [caregivers, setCaregivers] = useState([]);
-
     // Selections
     const [selectedPatientId, setSelectedPatientId] = useState('');
-    const [selectedPackageId, setSelectedPackageId] = useState('');
     const [selectedCaregiverId, setSelectedCaregiverId] = useState('');
-
-    // Schedule Configuration
-    const [days, setDays] = useState(['MON', 'TUE', 'WED', 'THU', 'FRI']);
+    const [durationMonths, setDurationMonths] = useState(3);
+    const [selectedDays, setSelectedDays] = useState(['MON', 'WED', 'FRI']);
     const [startTime, setStartTime] = useState('09:00');
-    const [endTime, setEndTime] = useState('17:00');
-    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-    const [endDate, setEndDate] = useState(new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0]);
-
-    // Modal
-    const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
+    const [dailyHours, setDailyHours] = useState(4);
+    const [notes, setNotes] = useState('');
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [patientsData, packagesData, caregiversData] = await Promise.all([
+                setLoading(true);
+                const [patientsData, caregiversData] = await Promise.all([
                     familyApi.getPatients(),
-                    serviceApi.getAll(true),
-                    caregiverApi.getAll(true) // Fetch available caregivers
+                    caregiverApi.getAll(true)
                 ]);
 
                 setPatients(patientsData || []);
-                setPackages(packagesData || []);
                 setCaregivers(caregiversData || []);
 
-                // Pre-select if available
-                if (patientsData?.length > 0) setSelectedPatientId(patientsData[0].id);
+                if (patientsData?.length > 0) {
+                    setSelectedPatientId(patientsData[0].id.toString());
+                }
 
-                const urlPackageId = searchParams.get('packageId');
-                if (urlPackageId) {
-                    setSelectedPackageId(urlPackageId);
-                } else if (packagesData?.length > 0) {
-                    setSelectedPackageId(packagesData[0].id);
+                if (serviceIdParam) {
+                    const services = await serviceApi.getAll();
+                    const service = services.find(s => s.id.toString() === serviceIdParam);
+                    if (service) {
+                        setSelectedService(service);
+                    } else {
+                        toast.error("Service not found");
+                    }
                 }
 
             } catch (error) {
-                console.error("Failed to load data:", error);
-                toast.error("Failed to load preliminary data");
+                console.error("Failed to fetch data:", error);
+                toast.error("Failed to load contract details");
             } finally {
                 setLoading(false);
             }
         };
         fetchData();
-    }, [searchParams]);
+    }, [serviceIdParam]);
 
-    // Derived values
-    const selectedPackage = packages.find(p => p.id === parseInt(selectedPackageId));
-    const selectedCaregiver = caregivers.find(c => c.id === parseInt(selectedCaregiverId));
+    // Cost Calculations
+    const calculations = useMemo(() => {
+        if (!selectedService) return { hourly: 0, monthly: 0, total: 0 };
 
-    // Cost Calculation
-    const calculateTotal = () => {
-        if (!selectedPackage) return 0;
+        const hourlyRate = selectedService.pricePerHour || selectedService.price || 15;
+        const hoursPerWeek = selectedDays.length * dailyHours;
+        const estimatedHoursPerMonth = hoursPerWeek * 4.33; // Average weeks per month
+        const monthlyCost = estimatedHoursPerMonth * hourlyRate;
+        const totalCommitment = monthlyCost * durationMonths;
 
-        const start = new Date(`2000-01-01T${startTime}`);
-        const end = new Date(`2000-01-01T${endTime}`);
-        let hoursPerDay = (end - start) / (1000 * 60 * 60);
-        if (hoursPerDay <= 0) hoursPerDay = 8; // Default fallback
-
-        const startD = new Date(startDate);
-        const endD = new Date(endDate);
-        const dayCount = days.length;
-        const totalDays = (endD - startD) / (1000 * 60 * 60 * 24);
-        const weeks = Math.ceil(totalDays / 7);
-
-        // Simple approximation
-        const totalHours = hoursPerDay * dayCount * weeks;
-        const price = selectedPackage.pricePerHour ?? selectedPackage.PricePerHour ?? 0;
-        return (totalHours * price).toFixed(2);
-    };
+        return {
+            hourly: hourlyRate,
+            weekly: hoursPerWeek,
+            monthly: Math.round(monthlyCost),
+            total: Math.round(totalCommitment)
+        };
+    }, [selectedService, selectedDays, dailyHours, durationMonths]);
 
     const handleDayToggle = (day) => {
-        const newDays = days.includes(day)
-            ? days.filter(d => d !== day)
-            : [...days, day];
-        setDays(newDays);
+        setSelectedDays(prev =>
+            prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+        );
     };
 
-    const handlePatientChange = (e) => {
-        if (e.target.value === 'add-new') {
-            setIsAddMemberModalOpen(true);
-        } else {
-            setSelectedPatientId(e.target.value);
-        }
-    };
-
-    const handleProceed = async () => {
-        if (!selectedPatientId || !selectedPackageId || !startDate || !endDate || days.length === 0) {
-            toast.error("Please fill in all required fields (Patient, Package, Schedule)");
-            return;
-        }
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!selectedPatientId) return toast.error("Please select a patient");
+        if (!selectedService) return toast.error("Please select a service");
+        if (selectedDays.length === 0) return toast.error("Please select at least one day");
 
         try {
             setSubmitting(true);
 
-            // 1. Create Contract
-            const scheduleData = {
-                Days: days,
-                StartTime: startTime,
-                EndTime: endTime
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() + 7); // Starts in 1 week by default
+
+            const endDate = new Date(startDate);
+            endDate.setMonth(endDate.getMonth() + durationMonths);
+
+            const payload = {
+                // Camel case matching Backend DTO
+                patientId: parseInt(selectedPatientId),
+                serviceId: parseInt(selectedService.id),
+                assignedCaregiverId: selectedCaregiverId ? parseInt(selectedCaregiverId) : null,
+                startDate: startDate.toISOString().split('T')[0],
+                endDate: endDate.toISOString().split('T')[0],
+                weeklySchedule: JSON.stringify({
+                    days: selectedDays,
+                    startTime: startTime,
+                    dailyHours: dailyHours
+                }),
+                // Optional extras our service might use
+                totalAmount: calculations.total,
+                status: 'Pending'
             };
 
-            const contractData = {
-                PatientId: parseInt(selectedPatientId),
-                ServiceId: parseInt(selectedPackageId),
-                AssignedCaregiverId: selectedCaregiverId ? parseInt(selectedCaregiverId) : null,
-                StartDate: startDate,
-                EndDate: endDate,
-                WeeklySchedule: JSON.stringify(scheduleData)
-            };
-
-            const contract = await contractApi.create(contractData);
-
-            // 2. Create Payment Logic (Create Payment Record -> Get VNPay URL)
-            const paymentData = {
-                ContractId: contract.id,
-                Amount: contract.totalAmount, // Use amount from backend response
-                PaymentMethod: 'VNPay',
-                OrderInfo: `Payment for Contract #${contract.id}`
-            };
-
-            const payment = await paymentApi.create(paymentData);
-
-            if (payment && payment.paymentId) {
-                // Get VNPay URL
-                const { paymentUrl } = await paymentApi.getVnPayUrl(payment.paymentId);
-                if (paymentUrl) {
-                    window.location.href = paymentUrl;
-                } else {
-                    toast.error("Failed to generate payment URL");
-                }
-            } else {
-                toast.error("Failed to create payment record");
-            }
-
+            await contractApi.create(payload);
+            toast.success("Long-term care contract submitted for review!");
+            navigate('/family/contracts');
         } catch (error) {
-            console.error("Submission failed:", error);
-            toast.error(error.message || "Failed to submit contract");
+            console.error("Failed to create contract:", error);
+            toast.error("Submission failed: " + error.message);
         } finally {
             setSubmitting(false);
         }
     };
 
-    const getPackageImage = (name) => {
-        if (name.includes('Basic')) return "https://lh3.googleusercontent.com/aida-public/AB6AXuChghb6TOUbuaLclIMauhzBL0IIm9vBg8J-Y64vaYiogF-pNPuA--5uQH5whw1tLgb7Gb1geLsywbrLPV314vs11Ucmy_zQptjR8VQqR7E41jusmHuuug8Er01BAJh3_7MazDnKlU-eQjEIZDj5-sXPj-opm2Cm1nTIm9fpqTDYdCqAsIG6x31Y4m-qAHuXiMKTuQ9Rv7QNE65lMQSY0X82S4Tjw_CNFMNKc-arQufSxBXdEtcYSkJkHop4clnzkqwiwNY9ho0cuJWL";
-        if (name.includes('Intensive')) return "https://lh3.googleusercontent.com/aida-public/AB6AXuAc6Jb1JhErh_9a6p8vNbSjwiLl3104mBulsi1Z0wqeApesz111etbxrVLD-r9lbdKtRrGM2W7mHJEQN06nbDG_9KOQNhakeCCFti-fzkkQsISxPTXSkJiXEkw-n9KqcSKgvqXMshADZbVz-qMskuy1fV7QVyCyTeTfgnrp2482IX69JULHr7g0Fg02DtcETbmPxM8BkAg7babDrLa6pz8viaxkxBHuLyITHOPu3jE348wsZaMpS6wmvSFRxNxpjlBkSTkToOIrPt6U";
-        return "https://lh3.googleusercontent.com/aida-public/AB6AXuBgNQtZblyIzvW3oq7RphakqOQlaCAY0p8-r_uhSJACQrU6LpEwZ0kUkuU6i21NtAbUYuhfl4H7ieadwL_9qiKskLMRg8X0uG0Rx1L6CN6XAcp850dIwWMlsFr1H05pVK15q-qgpOoIqt6dLZyqoMyH6xLyLf75F3TYMOjd2w2CjgcfG4NQaZXE4C83AccCfxOVay7SnfTPVxDnzTHAZbpVZVx7iVdhK-dGabRhVKGwGwyP3xj67-C-yyW6mcWs7Q05DiCqEF1wK5Y1";
-    };
-
-    if (loading) return <div className="h-screen flex items-center justify-center"><span className="material-symbols-outlined animate-spin text-4xl text-[#5fa5ba]">progress_activity</span></div>;
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+                <div className="w-12 h-12 border-4 border-[#5fa5ba] border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-stone-500 font-medium tracking-wide uppercase text-xs">Preparing Contract Configuration...</p>
+            </div>
+        );
+    }
 
     return (
-        <div className="max-w-[1200px] mx-auto w-full pb-12 animate-fade-in-up font-['Public_Sans']">
-            {/* Steps Indicator */}
-            <ScrollAnimation animation="fade-in" className="mb-16 mt-8">
-                <div className="flex items-center justify-center gap-6 md:gap-24 relative max-w-4xl mx-auto px-4">
-                    <div className="absolute top-6 left-[10%] right-[10%] h-[3px] bg-stone-100 -z-0 rounded-full"></div>
-                    <div className="relative z-10 flex flex-col items-center gap-3">
-                        <div className="w-12 h-12 rounded-full border-4 border-[#5fa5ba] bg-white flex items-center justify-center text-[#5fa5ba] font-black shadow-lg shadow-[#5fa5ba]/20 scale-110">1</div>
-                        <span className="text-xs font-bold text-stone-800 uppercase tracking-widest text-center mt-1">Configuration</span>
-                    </div>
-                    <div className="relative z-10 flex flex-col items-center gap-3">
-                        <div className="w-12 h-12 rounded-full border-4 border-stone-200 bg-white flex items-center justify-center text-stone-300 font-bold">2</div>
-                        <span className="text-xs font-bold text-stone-300 uppercase tracking-widest text-center mt-1">Payment</span>
-                    </div>
-                    <div className="relative z-10 flex flex-col items-center gap-3">
-                        <div className="w-12 h-12 rounded-full border-4 border-stone-200 bg-white flex items-center justify-center text-stone-300 font-bold">3</div>
-                        <span className="text-xs font-bold text-stone-300 uppercase tracking-widest text-center mt-1">Review</span>
-                    </div>
-                </div>
-            </ScrollAnimation>
+        <div className="max-w-5xl mx-auto pb-24 font-['Public_Sans'] px-4">
 
-            <div className="mb-12 text-center px-4">
-                <ScrollAnimation animation="fade-up">
-                    <h1 className="text-4xl md:text-5xl font-bold text-stone-900 mb-4 tracking-tight">Create New Contract</h1>
-                    <p className="text-stone-500 max-w-2xl mx-auto font-medium text-lg leading-relaxed">
-                        Configure your care plan. Once submitted and approved by our medical board, your schedule is locked and prioritized.
-                    </p>
-                </ScrollAnimation>
+            {/* Header */}
+            <div className="mb-16 text-center">
+                <h1 className="text-4xl md:text-5xl font-black text-stone-900 tracking-tight mb-4">Start Long-Term Care Plan</h1>
+                <p className="text-stone-500 font-medium text-lg max-w-2xl mx-auto">
+                    Commit to a consistent, professional care schedule. Long-term plans offer priority staffing and personalized care coordination.
+                </p>
             </div>
 
-            <div className="space-y-24 px-4 md:px-0">
-                {/* Section 1: Family Member */}
-                <section>
-                    <ScrollAnimation animation="fade-right">
-                        <div className="mb-8 flex items-center gap-5">
-                            <div className="w-14 h-14 rounded-[1.5rem] bg-[#5fa5ba] text-white flex items-center justify-center shadow-lg shadow-[#5fa5ba]/30">
-                                <span className="material-symbols-outlined font-bold text-3xl">person_add</span>
-                            </div>
-                            <div>
-                                <h2 className="text-2xl font-bold text-stone-900">Who is receiving care?</h2>
-                                <p className="text-stone-500 font-medium">Select a family member for this contract</p>
-                            </div>
-                        </div>
-                    </ScrollAnimation>
-                    <ScrollAnimation animation="fade-up">
-                        <div className="relative max-w-3xl">
-                            <select
-                                className="appearance-none w-full bg-white border-2 border-stone-100 hover:border-[#99C5D3] rounded-[2rem] px-10 py-8 text-xl font-bold focus:ring-4 focus:ring-[#99C5D3]/20 focus:border-[#5fa5ba] outline-none transition-all cursor-pointer shadow-sm text-stone-700"
-                                value={selectedPatientId}
-                                onChange={handlePatientChange}
-                            >
-                                <option value="" disabled>Select a patient</option>
-                                {patients.map(p => (
-                                    <option key={p.id} value={p.id}>{p.fullName} ({p.relation})</option>
-                                ))}
-                                <option value="add-new">+ Add New Family Member</option>
-                            </select>
-                            <span className="material-symbols-outlined absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none text-[#5fa5ba] text-4xl font-bold">expand_more</span>
-                        </div>
-                    </ScrollAnimation>
-                </section>
+            <form onSubmit={handleSubmit} className="space-y-16 animate-fade-in-up">
 
-                {/* Section 2: Service Package */}
-                <section>
-                    <ScrollAnimation animation="fade-right">
-                        <div className="mb-10 flex items-center gap-5">
-                            <div className="w-14 h-14 rounded-[1.5rem] bg-[#5fa5ba] text-white flex items-center justify-center shadow-lg shadow-[#5fa5ba]/30">
-                                <span className="material-symbols-outlined font-bold text-3xl">medical_services</span>
-                            </div>
-                            <div>
-                                <h2 className="text-2xl font-bold text-stone-900">Choose a Service Package</h2>
-                                <p className="text-stone-500 font-medium">Find the right level of support for your needs</p>
-                            </div>
+                {/* 1. Who is the care for? */}
+                <section className="space-y-8">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-[#E0F2F1] text-[#00695C] flex items-center justify-center border border-[#B2EBF2] shadow-sm">
+                            <span className="material-symbols-outlined text-2xl">person</span>
                         </div>
-                    </ScrollAnimation>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        {packages.map((pkg, idx) => (
-                            <ScrollAnimation key={pkg.id} animation="fade-up" delay={idx * 0.1} className="h-full">
-                                <label className="relative cursor-pointer group h-full block">
-                                    <input
-                                        className="peer sr-only"
-                                        name="package"
-                                        type="radio"
-                                        value={pkg.id}
-                                        checked={selectedPackageId == pkg.id}
-                                        onChange={() => setSelectedPackageId(pkg.id)}
-                                    />
-                                    <div className="h-full bg-white border-2 border-transparent rounded-[2.5rem] p-8 transition-all duration-300 shadow-sm hover:shadow-xl peer-checked:border-[#5fa5ba] peer-checked:bg-[#E0F2F1]/30 peer-checked:shadow-lg flex flex-col gap-6 ring-1 ring-stone-100 peer-checked:ring-0">
-                                        <div className="aspect-[4/3] rounded-[2rem] bg-cover bg-center grayscale-[20%] group-hover:grayscale-0 transition-all shadow-md" style={{ backgroundImage: `url("${getPackageImage(pkg.name)}")` }}></div>
-                                        <div className="space-y-2">
-                                            <h3 className="font-bold text-2xl text-stone-900 group-peer-checked:text-[#00695C]">{pkg.name}</h3>
-                                            <div className="flex items-baseline gap-1">
-                                                <span className="text-4xl font-black text-[#5fa5ba]">${pkg.pricePerHour ?? pkg.PricePerHour ?? 0}</span>
-                                                <span className="text-stone-400 font-bold text-sm">/hr</span>
-                                            </div>
-                                            <p className="text-stone-500 text-sm mt-2">{pkg.description}</p>
-                                        </div>
+                        <h2 className="text-2xl font-black text-stone-900 tracking-tight">1. Beneficiary</h2>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {patients.map((patient) => (
+                            <div key={patient.id} className="relative group">
+                                <input
+                                    checked={selectedPatientId === patient.id.toString()}
+                                    onChange={() => setSelectedPatientId(patient.id.toString())}
+                                    className="hidden peer"
+                                    id={`patient-${patient.id}`}
+                                    name="patient"
+                                    type="radio"
+                                />
+                                <label
+                                    className="flex items-center gap-4 p-6 bg-white border-2 border-stone-100 rounded-[2rem] cursor-pointer hover:border-[#B2EBF2] transition-all peer-checked:border-[#5fa5ba] peer-checked:bg-[#E0F2F1]/50 hover:shadow-md h-full"
+                                    htmlFor={`patient-${patient.id}`}
+                                >
+                                    <div className="w-14 h-14 rounded-2xl bg-[#5fa5ba] flex items-center justify-center text-white text-xl font-black shadow-lg">
+                                        {patient.fullName?.[0] || 'P'}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="font-bold text-stone-800 text-lg truncate leading-tight">{patient.fullName}</p>
+                                        <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest mt-1">
+                                            {patient.relationship || 'Member'} • Age {patient.age || '--'}
+                                        </p>
                                     </div>
                                 </label>
-                            </ScrollAnimation>
+                            </div>
                         ))}
                     </div>
                 </section>
 
-                {/* Section 3: Caregiver */}
-                <section>
-                    <ScrollAnimation animation="fade-right">
-                        <div className="mb-10 flex items-center gap-5">
-                            <div className="w-14 h-14 rounded-[1.5rem] bg-[#5fa5ba] text-white flex items-center justify-center shadow-lg shadow-[#5fa5ba]/30">
-                                <span className="material-symbols-outlined font-bold text-3xl">groups</span>
-                            </div>
-                            <div>
-                                <h2 className="text-2xl font-bold text-stone-900">Select Fixed Caregiver (Optional)</h2>
-                                <p className="text-stone-500 font-medium">Choose your dedicated professional for consistent care</p>
-                            </div>
+                {/* 2. Selected Service Package */}
+                <section className="space-y-8">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-[#E0F2F1] text-[#00695C] flex items-center justify-center border border-[#B2EBF2] shadow-sm">
+                            <span className="material-symbols-outlined text-2xl">verified</span>
                         </div>
-                    </ScrollAnimation>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                        {caregivers.slice(0, 4).map((cg, idx) => (
-                            <ScrollAnimation key={cg.id} animation="fade-up" delay={idx * 0.1}>
-                                <div className={`bg-white p-8 rounded-[2.5rem] border ${selectedCaregiverId == cg.id ? 'border-[#5fa5ba] ring-4 ring-[#E0F2F1]' : 'border-stone-100'} flex items-center gap-6 group hover:border-[#5fa5ba] transition-all shadow-sm hover:shadow-lg cursor-pointer`} onClick={() => setSelectedCaregiverId(cg.id)}>
-                                    <div className="w-28 h-28 rounded-[2rem] bg-cover bg-center flex-shrink-0 shadow-md" style={{ backgroundImage: `url("${cg.image || 'https://via.placeholder.com/150'}")` }}></div>
-                                    <div className="flex-1">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <h4 className="font-bold text-xl text-stone-900">{cg.fullName}</h4>
-                                                <p className="text-xs font-bold text-[#5fa5ba] mt-0.5 uppercase tracking-wide">{cg.specialization || 'General Care'}</p>
-                                            </div>
-                                            <div className="flex items-center gap-1 bg-[#E0F2F1] px-2 py-1 rounded-lg">
-                                                <span className="material-symbols-outlined text-[#00695C] text-xs font-bold">star</span>
-                                                <span className="text-xs font-black text-[#00695C]">4.9</span>
-                                            </div>
-                                        </div>
-                                        <div className="mt-6 flex items-center justify-between gap-4">
-                                            <button className={`flex-1 px-6 py-3 rounded-full font-bold text-xs transition-all uppercase tracking-wider ${selectedCaregiverId == cg.id ? 'bg-[#5fa5ba] text-white shadow-lg' : 'border border-[#5fa5ba] text-[#5fa5ba] hover:bg-[#E0F2F1]'}`}>
-                                                {selectedCaregiverId == cg.id ? 'Selected' : 'Select'}
-                                            </button>
-                                        </div>
+                        <h2 className="text-2xl font-black text-stone-900 tracking-tight">2. Selected Care Template</h2>
+                    </div>
+                    {selectedService ? (
+                        <div className="bg-white border-2 border-stone-100 rounded-[3rem] p-10 flex flex-col lg:flex-row items-center justify-between gap-10 shadow-sm border-l-[12px] border-l-[#5fa5ba] relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                                <span className="material-symbols-outlined text-[120px]">handshake</span>
+                            </div>
+                            <div className="flex flex-col sm:flex-row items-center gap-8 relative z-10 text-center sm:text-left">
+                                <div className="w-24 h-24 rounded-3xl bg-[#5fa5ba] flex items-center justify-center text-white shadow-xl shadow-[#5fa5ba]/20 shrink-0">
+                                    <span className="material-symbols-outlined text-5xl">health_metrics</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-3xl font-black text-stone-900">{selectedService.name}</h3>
+                                    <p className="text-stone-500 font-medium max-w-md mt-2 leading-relaxed">{selectedService.description}</p>
+                                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-4">
+                                        <span className="bg-[#E0F2F1] text-[#00695C] px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-[#B2EBF2]">
+                                            ${calculations.hourly}/hour
+                                        </span>
+                                        <span className="bg-stone-100 text-stone-600 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest">
+                                            Priority Staffing
+                                        </span>
                                     </div>
                                 </div>
-                            </ScrollAnimation>
+                            </div>
+                            <Link
+                                to="/family/services"
+                                className="px-8 py-4 border-2 border-stone-200 rounded-2xl text-xs font-black text-stone-400 hover:text-stone-900 hover:border-stone-900 transition-all uppercase tracking-widest flex items-center gap-3 bg-stone-50"
+                            >
+                                <span className="material-symbols-outlined text-lg">sync_alt</span>
+                                Change Service
+                            </Link>
+                        </div>
+                    ) : (
+                        <div className="bg-red-50 p-10 rounded-[2.5rem] border-2 border-dashed border-red-200 text-center">
+                            <p className="text-red-600 font-black mb-4 uppercase tracking-widest">No service selected</p>
+                            <Link to="/family/services" className="bg-red-600 text-white px-10 py-4 rounded-full text-sm font-black uppercase tracking-widest shadow-lg shadow-red-200">Browse Marketplace</Link>
+                        </div>
+                    )}
+                </section>
+
+                {/* 3. Plan Duration */}
+                <section className="space-y-8">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-[#E0F2F1] text-[#00695C] flex items-center justify-center border border-[#B2EBF2] shadow-sm">
+                            <span className="material-symbols-outlined text-2xl">event_available</span>
+                        </div>
+                        <h2 className="text-2xl font-black text-stone-900 tracking-tight">3. Plan Duration</h2>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                        {[3, 6, 12].map(months => (
+                            <button
+                                key={months}
+                                type="button"
+                                onClick={() => setDurationMonths(months)}
+                                className={`p-8 rounded-[2.5rem] border-2 transition-all flex flex-col items-center gap-3 ${durationMonths === months ? 'border-[#5fa5ba] bg-[#E0F2F1]/50 shadow-lg' : 'border-stone-100 bg-white hover:border-[#B2EBF2]'}`}
+                            >
+                                <span className="text-4xl font-black text-stone-900">{months}</span>
+                                <span className="text-[10px] font-black text-stone-400 uppercase tracking-[0.3em]">Months</span>
+                                {months === 12 && (
+                                    <span className="bg-emerald-500 text-white px-3 py-1 rounded-full text-[9px] font-black uppercase mt-1">Best Value</span>
+                                )}
+                            </button>
                         ))}
                     </div>
                 </section>
 
-                {/* Section 4: Schedule */}
-                <section>
-                    <ScrollAnimation animation="fade-right">
-                        <div className="mb-10 flex items-center gap-5">
-                            <div className="w-14 h-14 rounded-[1.5rem] bg-[#5fa5ba] text-white flex items-center justify-center shadow-lg shadow-[#5fa5ba]/30">
-                                <span className="material-symbols-outlined font-bold text-3xl">calendar_month</span>
-                            </div>
-                            <div>
-                                <h2 className="text-2xl font-bold text-stone-900">Build Schedule</h2>
-                                <p className="text-stone-500 font-medium">Select recurring days and daily service hours</p>
-                            </div>
+                {/* 4. Recurring Schedule */}
+                <section className="space-y-8">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-[#E0F2F1] text-[#00695C] flex items-center justify-center border border-[#B2EBF2] shadow-sm">
+                            <span className="material-symbols-outlined text-2xl">update</span>
                         </div>
-                    </ScrollAnimation>
-                    <ScrollAnimation animation="fade-up">
-                        <div className="bg-white p-8 md:p-12 rounded-[2.5rem] border border-stone-100 shadow-sm relative overflow-hidden">
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-10 pb-10 border-b border-stone-100">
-                                <div className="space-y-4">
-                                    <label className="text-xs font-bold text-[#5fa5ba] uppercase tracking-widest">Start Date</label>
-                                    <input
-                                        className="w-full bg-[#E0F2F1]/50 border-none hover:bg-[#E0F2F1] rounded-[1.5rem] px-8 py-6 text-xl font-bold text-[#00695C] focus:ring-0 transition-all cursor-pointer outline-none"
-                                        type="date"
-                                        value={startDate}
-                                        onChange={(e) => setStartDate(e.target.value)}
-                                        min={new Date().toISOString().split('T')[0]}
-                                    />
-                                </div>
-                                <div className="space-y-4">
-                                    <label className="text-xs font-bold text-[#5fa5ba] uppercase tracking-widest">End Date</label>
-                                    <input
-                                        className="w-full bg-[#E0F2F1]/50 border-none hover:bg-[#E0F2F1] rounded-[1.5rem] px-8 py-6 text-xl font-bold text-[#00695C] focus:ring-0 transition-all cursor-pointer outline-none"
-                                        type="date"
-                                        value={endDate}
-                                        onChange={(e) => setEndDate(e.target.value)}
-                                        min={startDate}
-                                    />
-                                </div>
-                            </div>
-
-                            <p className="text-lg font-bold text-stone-900 mb-8">Preferred Days</p>
-                            <div className="flex flex-wrap gap-4 mb-14">
-                                {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day) => (
-                                    <label key={day} className="cursor-pointer group flex-1 min-w-[80px]">
-                                        <input
-                                            checked={days.includes(day)}
-                                            onChange={() => handleDayToggle(day)}
-                                            className="peer sr-only"
-                                            type="checkbox"
-                                        />
-                                        <div className={`w-full py-4 rounded-2xl border-2 border-stone-100 peer-checked:bg-[#5fa5ba] peer-checked:text-white peer-checked:border-[#5fa5ba] transition-all font-bold text-sm text-center text-stone-400 hover:border-[#99C5D3]`}>{day}</div>
-                                    </label>
+                        <h2 className="text-2xl font-black text-stone-900 tracking-tight">4. Weekly Activity</h2>
+                    </div>
+                    <div className="bg-white p-10 md:p-14 rounded-[3rem] border-2 border-stone-100 shadow-sm space-y-12">
+                        <div>
+                            <p className="text-xs font-black text-stone-400 uppercase tracking-widest mb-6 ml-2">Active Service Days</p>
+                            <div className="flex flex-wrap gap-4">
+                                {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(day => (
+                                    <button
+                                        key={day}
+                                        type="button"
+                                        onClick={() => handleDayToggle(day)}
+                                        className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl font-black text-sm transition-all border-2 ${selectedDays.includes(day) ? 'bg-[#5fa5ba] text-white border-[#5fa5ba] shadow-lg shadow-[#5fa5ba]/20' : 'bg-white text-stone-300 border-stone-100 hover:border-[#99C5D3]'}`}
+                                    >
+                                        {day.slice(0, 3)}
+                                    </button>
                                 ))}
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-12 border-t border-stone-100 pt-10">
-                                <div className="space-y-4">
-                                    <label className="text-xs font-bold text-[#5fa5ba] uppercase tracking-widest flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-xl">schedule</span> Start Time
-                                    </label>
-                                    <input
-                                        className="w-full bg-[#E0F2F1]/50 border-none hover:bg-[#E0F2F1] rounded-[1.5rem] px-8 py-6 text-3xl font-black text-[#00695C] focus:ring-0 transition-all cursor-pointer outline-none"
-                                        type="time"
-                                        value={startTime}
-                                        onChange={(e) => setStartTime(e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-4">
-                                    <label className="text-xs font-bold text-[#5fa5ba] uppercase tracking-widest flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-xl">hourglass_bottom</span> End Time
-                                    </label>
-                                    <input
-                                        className="w-full bg-[#E0F2F1]/50 border-none hover:bg-[#E0F2F1] rounded-[1.5rem] px-8 py-6 text-3xl font-black text-[#00695C] focus:ring-0 transition-all cursor-pointer outline-none"
-                                        type="time"
-                                        value={endTime}
-                                        onChange={(e) => setEndTime(e.target.value)}
-                                    />
-                                </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                            <div className="space-y-3">
+                                <label className="text-xs font-black text-stone-400 uppercase tracking-widest ml-2">Preferred Entry Time</label>
+                                <input
+                                    value={startTime}
+                                    onChange={(e) => setStartTime(e.target.value)}
+                                    className="w-full bg-stone-50 rounded-2xl border-none py-5 px-8 text-2xl font-black text-stone-800 focus:ring-4 focus:ring-[#E0F2F1] transition-all outline-none"
+                                    type="time"
+                                />
+                            </div>
+                            <div className="space-y-3">
+                                <label className="text-xs font-black text-stone-400 uppercase tracking-widest ml-2">Daily Session Length (Hours)</label>
+                                <select
+                                    value={dailyHours}
+                                    onChange={(e) => setDailyHours(parseInt(e.target.value))}
+                                    className="w-full bg-stone-50 rounded-2xl border-none py-5 px-8 text-2xl font-black text-stone-800 focus:ring-4 focus:ring-[#E0F2F1] transition-all outline-none appearance-none"
+                                >
+                                    {[2, 4, 6, 8, 10, 12, 24].map(h => (
+                                        <option key={h} value={h}>{h} Hours/Day</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
-                    </ScrollAnimation>
+                    </div>
                 </section>
 
-                {/* Section 5: Cost Summary */}
-                <section className="pb-8">
-                    <ScrollAnimation animation="fade-right">
-                        <div className="mb-10 flex items-center gap-5">
-                            <div className="w-14 h-14 rounded-[1.5rem] bg-[#5fa5ba] text-white flex items-center justify-center shadow-lg shadow-[#5fa5ba]/30">
-                                <span className="material-symbols-outlined font-bold text-3xl">receipt_long</span>
-                            </div>
-                            <div>
-                                <h2 className="text-2xl font-bold text-stone-900">Cost Summary</h2>
-                                <p className="text-stone-500 font-medium">Review and finalize your care commitment</p>
-                            </div>
+                {/* 5. Caregiver Assignment */}
+                <section className="space-y-8">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-[#E0F2F1] text-[#00695C] flex items-center justify-center border border-[#B2EBF2] shadow-sm">
+                            <span className="material-symbols-outlined text-2xl">supervisor_account</span>
                         </div>
-                    </ScrollAnimation>
-                    <ScrollAnimation animation="scale-up">
-                        <div className="bg-[#5fa5ba] p-10 md:p-14 rounded-[3rem] shadow-2xl shadow-[#5fa5ba]/30 relative overflow-hidden text-white">
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-bl-[10rem] pointer-events-none"></div>
-                            <div className="space-y-8 relative z-10 text-white">
-                                <div className="flex justify-between items-center pb-8 border-b border-white/20">
-                                    <span className="text-white/80 font-bold text-lg md:text-xl">Selected Package</span>
-                                    <span className="font-bold text-2xl md:text-3xl tracking-tight">{selectedPackage ? selectedPackage.name : 'None Selected'}</span>
-                                </div>
-                                <div className="flex justify-between items-center py-1">
-                                    <span className="text-white/80 font-bold text-lg">Hourly Rate</span>
-                                    <span className="font-bold text-xl">${selectedPackage ? (selectedPackage.pricePerHour ?? selectedPackage.PricePerHour) : 0}</span>
-                                </div>
-                                <div className="flex justify-between items-center py-1">
-                                    <span className="text-white/80 font-bold text-lg">Schedule</span>
-                                    <span className="font-bold text-xl">{days.length} Days/Week ({startTime} - {endTime})</span>
-                                </div>
-
-                                <div className="pt-10 mt-6 border-t border-white/10 flex flex-col lg:flex-row justify-between items-center gap-10">
-                                    <div className="text-center lg:text-left">
-                                        <p className="text-white/70 font-bold uppercase tracking-[0.2em] text-xs mb-2">Estimated Total</p>
-                                        <p className="text-6xl md:text-7xl font-bold tracking-tight">${calculateTotal()}</p>
-                                    </div>
-                                    <div className="w-full lg:w-auto">
-                                        <button
-                                            onClick={handleProceed}
-                                            disabled={submitting}
-                                            className="w-full px-12 py-6 rounded-full bg-white text-[#5fa5ba] font-bold text-xl hover:scale-105 active:scale-95 shadow-xl transition-all flex items-center justify-center gap-4 disabled:opacity-70 disabled:cursor-not-allowed"
-                                        >
-                                            {submitting ? 'Processing...' : 'Proceed to Payment'}
-                                            {!submitting && <span className="material-symbols-outlined font-black text-2xl">arrow_forward</span>}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </ScrollAnimation>
+                        <h2 className="text-2xl font-black text-stone-900 tracking-tight">5. Specific Assignment (Optional)</h2>
+                    </div>
+                    <div className="relative group max-w-2xl">
+                        <select
+                            className="appearance-none w-full bg-white border-2 border-stone-100 hover:border-[#99C5D3] rounded-[2rem] px-10 py-8 text-xl font-bold focus:ring-4 focus:ring-[#99C5D3]/20 focus:border-[#5fa5ba] outline-none transition-all cursor-pointer shadow-sm text-stone-700"
+                            value={selectedCaregiverId}
+                            onChange={(e) => setSelectedCaregiverId(e.target.value)}
+                        >
+                            <option value="">Auto-matching (Smart Selection)</option>
+                            {caregivers.map(cg => (
+                                <option key={cg.id} value={cg.id}>{cg.fullName} ({cg.specialization || 'Professional'})</option>
+                            ))}
+                        </select>
+                        <span className="material-symbols-outlined absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none text-[#5fa5ba] text-4xl font-bold">expand_more</span>
+                    </div>
                 </section>
-            </div>
 
-            <AddMemberModal
-                isOpen={isAddMemberModalOpen}
-                onClose={() => setIsAddMemberModalOpen(false)}
-                onPatientAdded={async () => {
-                    const data = await familyApi.getPatients();
-                    setPatients(data);
-                    if (data.length > 0) setSelectedPatientId(data[data.length - 1].id);
-                    setIsAddMemberModalOpen(false);
-                }}
-            />
+                {/* 6. Professional Notes */}
+                <section className="space-y-8">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-[#E0F2F1] text-[#00695C] flex items-center justify-center border border-[#B2EBF2] shadow-sm">
+                            <span className="material-symbols-outlined text-2xl">rate_review</span>
+                        </div>
+                        <h2 className="text-2xl font-black text-stone-900 tracking-tight">6. Care Requirements & Notes</h2>
+                    </div>
+                    <div className="bg-white p-8 rounded-[3rem] border-2 border-stone-100 shadow-sm focus-within:border-[#5fa5ba] transition-all">
+                        <textarea
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            className="w-full border-none p-4 text-sm font-bold focus:ring-0 transition-all min-h-[160px] outline-none text-stone-700 placeholder:text-stone-300 bg-transparent leading-relaxed"
+                            placeholder="Specify medical histories, dietary restrictions, emergency protocols, or specific personality matches..."
+                        ></textarea>
+                    </div>
+                </section>
+
+                {/* 7. Cost Summary & Commitment */}
+                <section className="bg-stone-900 rounded-[4rem] p-12 md:p-16 text-white shadow-2xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-12 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
+                        <span className="material-symbols-outlined text-[150px]">verified_user</span>
+                    </div>
+
+                    <div className="relative z-10">
+                        <h2 className="text-xl font-black text-[#5fa5ba] uppercase tracking-[0.4em] mb-12 flex items-center gap-3">
+                            <span className="material-symbols-outlined">analytics</span>
+                            Plan Commitment Summary
+                        </h2>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20">
+                            {/* Left: Detailed stats */}
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-center bg-white/5 p-6 rounded-3xl backdrop-blur-sm border border-white/10">
+                                    <span className="text-stone-400 font-bold text-xs uppercase tracking-widest">Monthly Rate</span>
+                                    <span className="text-3xl font-black text-white">${calculations.monthly}</span>
+                                </div>
+                                <div className="space-y-4 px-2">
+                                    <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                                        <span className="text-stone-500 font-bold text-[10px] uppercase tracking-widest">Plan Duration</span>
+                                        <span className="text-lg font-black text-white">{durationMonths} Months</span>
+                                    </div>
+                                    <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                                        <span className="text-stone-500 font-bold text-[10px] uppercase tracking-widest">Active Days</span>
+                                        <span className="text-lg font-black text-white">{selectedDays.length} Days / Week</span>
+                                    </div>
+                                    <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                                        <span className="text-stone-500 font-bold text-[10px] uppercase tracking-widest">Hours / Session</span>
+                                        <span className="text-lg font-black text-white">{dailyHours} Hours</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right: Grand Total & Action */}
+                            <div className="flex flex-col justify-center lg:items-end text-center lg:text-right">
+                                <p className="text-xs font-black text-[#5fa5ba] uppercase tracking-widest mb-2">Total Estimated Commitment</p>
+                                <p className="text-6xl md:text-8xl font-black tracking-tighter text-white mb-6">${calculations.total.toLocaleString()}</p>
+
+                                <p className="text-stone-500 text-[10px] font-bold mb-10 max-w-xs lg:ml-auto leading-relaxed italic">
+                                    * Final amount subject to medical board review. Approval typically takes 4-8 business hours.
+                                </p>
+
+                                <div className="flex flex-col sm:flex-row items-center gap-6 w-full lg:w-auto">
+                                    <Link
+                                        to="/family/services"
+                                        className="text-[10px] font-black text-stone-500 hover:text-white transition-colors uppercase tracking-[3px] py-2"
+                                    >
+                                        Discard
+                                    </Link>
+                                    <button
+                                        type="submit"
+                                        disabled={submitting || patients.length === 0}
+                                        className="w-full sm:w-auto px-12 py-5 bg-[#5fa5ba] text-white text-lg font-black rounded-3xl shadow-2xl shadow-[#5fa5ba]/10 hover:bg-[#4d8ca0] hover:-translate-y-1 active:scale-95 transition-all uppercase tracking-[4px] flex items-center justify-center gap-4 group disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {submitting ? (
+                                            <>
+                                                <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                                                Processing...
+                                            </>
+                                        ) : (
+                                            <>
+                                                Submit Review
+                                                <span className="material-symbols-outlined font-black text-xl group-hover:translate-x-2 transition-transform">send</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div className="flex items-center justify-center gap-4 text-stone-500">
+                    <span className="material-symbols-outlined text-sm">verified</span>
+                    <p className="text-[10px] font-bold uppercase tracking-widest">Clinical Team Review Mandatory • Secure Infrastructure • No charges until approval</p>
+                </div>
+            </form>
         </div>
     );
 };

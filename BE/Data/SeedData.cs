@@ -8,15 +8,13 @@ public static class SeedData
 {
     public static async Task InitializeAsync(ApplicationDbContext context)
     {
-        // Ensure Category column exists (Manual Migration)
+        // Ensure Category column exists (Manual Migration Helper)
         try
         {
+            // Only try to add if it's MySQL/MariaDB
             await context.Database.ExecuteSqlRawAsync("ALTER TABLE Services ADD COLUMN IF NOT EXISTS Category VARCHAR(50) DEFAULT 'Daily Care' AFTER ContractPricePerMonth;");
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine("Note: " + ex.Message);
-        }
+        catch { /* Ignore - column might already exist or DB might not support IF NOT EXISTS */ }
 
         // Seed Admin if not exists
         if (!await context.Users.AnyAsync(u => u.Role == UserRole.Admin))
@@ -103,7 +101,7 @@ public static class SeedData
                 Name = "Basic Home Care",
                 Category = "Daily Care",
                 Description = "Essential daily care including medication reminders, meal assistance, and basic health monitoring.",
-                PricePerHour = 15,
+                PricePerHour = 18,
                 Type = ServiceType.Basic,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
@@ -113,7 +111,7 @@ public static class SeedData
                 Name = "Premium Home Care",
                 Category = "Daily Care",
                 Description = "Comprehensive care with specialized nursing, physical therapy assistance, and 24/7 monitoring.",
-                PricePerHour = 25,
+                PricePerHour = 32,
                 Type = ServiceType.Premium,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
@@ -123,7 +121,7 @@ public static class SeedData
                 Name = "Post-Surgery Recovery",
                 Category = "Specialized Medical",
                 Description = "Expert care for post-surgery recovery, chronic conditions, or specialized medical needs. Includes wound care and physical therapy.",
-                PricePerHour = 45,
+                PricePerHour = 55,
                 Type = ServiceType.Specialized,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
@@ -133,7 +131,7 @@ public static class SeedData
                 Name = "Dementia Care",
                 Category = "Specialized Medical",
                 Description = "Specialized support for patients with Alzheimer's or dementia. Focus on safety, routine, and cognitive engagement.",
-                PricePerHour = 50,
+                PricePerHour = 65,
                 Type = ServiceType.Specialized,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
@@ -143,7 +141,7 @@ public static class SeedData
                 Name = "Social Enrichment",
                 Category = "Companionship",
                 Description = "Companionship for seniors including conversation, games, walking, and social activities to prevent isolation.",
-                PricePerHour = 20,
+                PricePerHour = 22,
                 Type = ServiceType.Basic,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
