@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { familyApi } from '@/lib/api';
 import AddMemberModal from './AddMemberModal';
+import EditPatientModal from './EditPatientModal';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 
 const PatientList = () => {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [patients, setPatients] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [selectedPatient, setSelectedPatient] = useState(null);
 
     const fetchPatients = async () => {
         try {
@@ -28,6 +31,17 @@ const PatientList = () => {
     const handlePatientAdded = () => {
         fetchPatients();
         setIsAddModalOpen(false);
+    };
+
+    const handleEditClick = (patient) => {
+        setSelectedPatient(patient);
+        setIsEditModalOpen(true);
+    };
+
+    const handlePatientUpdated = () => {
+        fetchPatients();
+        setIsEditModalOpen(false);
+        setSelectedPatient(null);
     };
 
     const getAge = (dateOfBirth) => {
@@ -132,10 +146,10 @@ const PatientList = () => {
                                         <div className="flex flex-col gap-1.5 w-full md:w-auto">
                                             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest flex items-center gap-1">
                                                 <span className="w-1.5 h-1.5 bg-[#99C5D3] rounded-full"></span>
-                                                Health Notes
+                                                Medical Records
                                             </span>
                                             <p className="text-sm font-bold text-stone-700 flex items-center gap-2">
-                                                {patient.healthNotes || 'No notes added'}
+                                                {patient.medicalHistory || 'No records added'}
                                             </p>
                                         </div>
 
@@ -150,7 +164,10 @@ const PatientList = () => {
 
                                     {/* Right: Actions */}
                                     <div className="p-4 flex items-center justify-end gap-2 lg:w-[25%]">
-                                        <button className="w-10 h-10 rounded-full bg-stone-50 flex items-center justify-center text-stone-400 hover:bg-[#99C5D3] hover:text-white transition-all shadow-sm">
+                                        <button
+                                            onClick={() => handleEditClick(patient)}
+                                            className="w-10 h-10 rounded-full bg-stone-50 flex items-center justify-center text-stone-400 hover:bg-[#99C5D3] hover:text-white transition-all shadow-sm"
+                                        >
                                             <span className="material-symbols-outlined text-lg">edit</span>
                                         </button>
                                         <Link to={`/family/patients/detail/${patient.id}`} className="ml-2 pl-4 pr-1.5 py-1.5 rounded-full border border-stone-100 hover:border-[#99C5D3] bg-white group-hover:bg-[#99C5D3]/10 transition-all flex items-center gap-3">
@@ -219,6 +236,13 @@ const PatientList = () => {
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
                 onPatientAdded={handlePatientAdded}
+            />
+
+            <EditPatientModal
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                patient={selectedPatient}
+                onPatientUpdated={handlePatientUpdated}
             />
         </div>
     );

@@ -143,12 +143,13 @@ const FamilyContract = () => {
                             <input className="pl-12 pr-6 py-3 bg-[#F0F8FF] border-none rounded-xl w-full md:w-72 text-sm font-medium focus:ring-2 focus:ring-[#99C5D3] text-stone-600 placeholder:text-stone-400" placeholder="Search patients..." />
                         </div>
                     </div>
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto hidden md:block">
                         <table className="w-full text-left">
                             <thead className="bg-[#F0F8FF]/50">
                                 <tr>
                                     <th className="px-8 py-5 text-[10px] font-black text-[#5fa5ba] uppercase tracking-widest">Patient</th>
                                     <th className="px-8 py-5 text-[10px] font-black text-[#5fa5ba] uppercase tracking-widest">Caregiver</th>
+                                    <th className="px-8 py-5 text-[10px] font-black text-[#5fa5ba] uppercase tracking-widest">Care Location</th>
                                     <th className="px-8 py-5 text-[10px] font-black text-[#5fa5ba] uppercase tracking-widest">Service Type</th>
                                     <th className="px-8 py-5 text-[10px] font-black text-[#5fa5ba] uppercase tracking-widest">Duration</th>
                                     <th className="px-8 py-5 text-[10px] font-black text-[#5fa5ba] uppercase tracking-widest text-center">Status Tracking</th>
@@ -157,7 +158,7 @@ const FamilyContract = () => {
                             <tbody className="divide-y divide-stone-50">
                                 {contracts.length === 0 ? (
                                     <tr>
-                                        <td colSpan="5" className="px-8 py-12 text-center text-stone-400">
+                                        <td colSpan="6" className="px-8 py-12 text-center text-stone-400">
                                             <span className="material-symbols-outlined text-4xl mb-2 block">folder_open</span>
                                             No contracts found
                                         </td>
@@ -167,7 +168,7 @@ const FamilyContract = () => {
                                         ? `${new Date(c.startDate).toLocaleDateString()} - ${new Date(c.endDate).toLocaleDateString()}`
                                         : 'Ongoing';
                                     return (
-                                        <tr key={c.id} className="hover:bg-[#E0F2F1]/30 transition-colors group cursor-pointer">
+                                        <tr key={c.id} className="hover:bg-[#E0F2F1]/30 transition-colors group cursor-pointer" onClick={() => navigate(`/family/contract/${c.id}`)}>
                                             <td className="px-8 py-6 font-bold flex items-center gap-3">
                                                 <div className="w-1.5 h-8 bg-[#5fa5ba] rounded-full mr-2 group-hover:h-10 transition-all"></div>
                                                 <span className="text-stone-900">{c.patientName || c.patient?.name || 'Patient'}</span>
@@ -177,22 +178,28 @@ const FamilyContract = () => {
                                                     <div className="w-8 h-8 rounded-full bg-[#5fa5ba] text-white flex items-center justify-center text-xs font-bold border border-stone-100 shadow-sm">
                                                         {c.caregiverName?.charAt(0) || c.caregiver?.name?.charAt(0) || 'C'}
                                                     </div>
-                                                    <span className="font-bold text-stone-600 text-sm">{c.caregiverName || c.caregiver?.name || 'Pending Assignment'}</span>
+                                                    <span className="font-bold text-stone-600 text-sm whitespace-nowrap">{c.caregiverName || c.caregiver?.name || 'Pending Assignment'}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <div className="flex items-center gap-2 text-stone-500 font-medium text-xs">
+                                                    <span className="material-symbols-outlined text-sm">location_on</span>
+                                                    <span className="truncate max-w-[150px]">{c.address || 'N/A'}</span>
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6 font-medium text-stone-500 text-sm">{c.serviceName || c.service?.name || 'Care Service'}</td>
                                             <td className="px-8 py-6">
-                                                <span className="px-4 py-1.5 bg-stone-50 text-stone-600 rounded-full text-xs font-bold border border-stone-100">{duration}</span>
+                                                <span className="px-4 py-1.5 bg-stone-50 text-stone-600 rounded-full text-xs font-bold border border-stone-100 whitespace-nowrap">{duration}</span>
                                             </td>
                                             <td className="px-8 py-6">
                                                 <div className="flex items-center justify-center gap-4">
                                                     <span className={`text-[10px] font-black tracking-tighter uppercase px-3 py-1 rounded-md ${c.status === 'Active' || c.status === 'Paid'
-                                                            ? 'text-[#5fa5ba] border border-[#B2EBF2] bg-[#E0F2F1]'
-                                                            : c.status === 'Pending'
-                                                                ? 'text-orange-500 border border-orange-200 bg-orange-50'
-                                                                : c.status === 'Approved'
-                                                                    ? 'text-emerald-600 border border-emerald-200 bg-emerald-50'
-                                                                    : 'text-stone-500 border border-stone-200 bg-stone-50'
+                                                        ? 'text-[#5fa5ba] border border-[#B2EBF2] bg-[#E0F2F1]'
+                                                        : c.status === 'Pending'
+                                                            ? 'text-orange-500 border border-orange-200 bg-orange-50'
+                                                            : c.status === 'Approved'
+                                                                ? 'text-emerald-600 border border-emerald-200 bg-emerald-50'
+                                                                : 'text-stone-500 border border-stone-200 bg-stone-50'
                                                         }`}>
                                                         {c.status}
                                                     </span>
@@ -204,7 +211,7 @@ const FamilyContract = () => {
                                                             }}
                                                             className="text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-white px-3 py-1 rounded-md shadow-sm hover:bg-emerald-600"
                                                         >
-                                                            Pay Now
+                                                            Pay
                                                         </button>
                                                     )}
                                                 </div>
@@ -214,6 +221,70 @@ const FamilyContract = () => {
                                 })}
                             </tbody>
                         </table>
+                    </div>
+
+                    {/* Mobile View - Cards */}
+                    <div className="md:hidden divide-y divide-stone-50">
+                        {contracts.length === 0 ? (
+                            <div className="p-8 text-center text-stone-400">
+                                No contracts found
+                            </div>
+                        ) : contracts.map((c) => {
+                            const duration = c.startDate && c.endDate
+                                ? `${new Date(c.startDate).toLocaleDateString()} - ${new Date(c.endDate).toLocaleDateString()}`
+                                : 'Ongoing';
+                            return (
+                                <div key={c.id} className="p-6 space-y-4 active:bg-stone-50 transition-colors" onClick={() => navigate(`/family/contract/${c.id}`)}>
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-[#5fa5ba] flex items-center justify-center text-white font-bold">
+                                                {c.patientName?.[0] || 'P'}
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-stone-900">{c.patientName || 'Patient'}</h4>
+                                                <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest">{c.serviceName}</p>
+                                            </div>
+                                        </div>
+                                        <span className={`text-[10px] font-black tracking-tighter uppercase px-2 py-1 rounded-md ${c.status === 'Active' || c.status === 'Paid'
+                                            ? 'text-[#5fa5ba] border border-[#B2EBF2] bg-[#E0F2F1]'
+                                            : c.status === 'Pending'
+                                                ? 'text-orange-500 border border-orange-200 bg-orange-50'
+                                                : 'text-stone-500 border border-stone-200 bg-stone-50'
+                                            }`}>
+                                            {c.status}
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4 pt-2">
+                                        <div className="space-y-1">
+                                            <p className="text-[9px] font-black text-stone-400 uppercase tracking-widest">Caregiver</p>
+                                            <p className="text-xs font-bold text-stone-600">{c.caregiverName || 'Pending'}</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-[9px] font-black text-stone-400 uppercase tracking-widest">Duration</p>
+                                            <p className="text-xs font-bold text-stone-600">{new Date(c.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ...</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 bg-stone-50 p-3 rounded-xl border border-stone-100">
+                                        <span className="material-symbols-outlined text-stone-400 text-sm">location_on</span>
+                                        <p className="text-[10px] font-bold text-stone-500 truncate">{c.address || 'No address provided'}</p>
+                                    </div>
+
+                                    {c.status === 'Approved' && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigate(`/payment/contract/${c.id}`);
+                                            }}
+                                            className="w-full py-3 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all"
+                                        >
+                                            Complete Payment
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </ScrollAnimation>

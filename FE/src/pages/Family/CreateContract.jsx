@@ -21,6 +21,7 @@ const CreateContract = () => {
     const [selectedDays, setSelectedDays] = useState(['MON', 'WED', 'FRI']);
     const [startTime, setStartTime] = useState('09:00');
     const [dailyHours, setDailyHours] = useState(4);
+    const [careAddress, setCareAddress] = useState('');
     const [notes, setNotes] = useState('');
 
     useEffect(() => {
@@ -36,7 +37,9 @@ const CreateContract = () => {
                 setCaregivers(caregiversData || []);
 
                 if (patientsData?.length > 0) {
-                    setSelectedPatientId(patientsData[0].id.toString());
+                    const defaultPatient = patientsData[0];
+                    setSelectedPatientId(defaultPatient.id.toString());
+                    setCareAddress(defaultPatient.address || '');
                 }
 
                 if (serviceIdParam) {
@@ -110,6 +113,7 @@ const CreateContract = () => {
                     startTime: startTime,
                     dailyHours: dailyHours
                 }),
+                address: careAddress,
                 // Optional extras our service might use
                 totalAmount: calculations.total,
                 status: 'Pending'
@@ -162,7 +166,10 @@ const CreateContract = () => {
                             <div key={patient.id} className="relative group">
                                 <input
                                     checked={selectedPatientId === patient.id.toString()}
-                                    onChange={() => setSelectedPatientId(patient.id.toString())}
+                                    onChange={() => {
+                                        setSelectedPatientId(patient.id.toString());
+                                        setCareAddress(patient.address || '');
+                                    }}
                                     className="hidden peer"
                                     id={`patient-${patient.id}`}
                                     name="patient"
@@ -187,6 +194,30 @@ const CreateContract = () => {
                     </div>
                 </section>
 
+                {/* 1.5 Care Location */}
+                <section className="space-y-8">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-100 shadow-sm">
+                            <span className="material-symbols-outlined text-2xl">location_on</span>
+                        </div>
+                        <h2 className="text-2xl font-black text-stone-900 tracking-tight">Care Location</h2>
+                    </div>
+                    <div className="bg-white p-8 rounded-[3rem] border-2 border-stone-100 shadow-sm focus-within:border-[#5fa5ba] transition-all">
+                        <div className="flex flex-col gap-2">
+                            <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest ml-4">Address for Service</label>
+                            <input
+                                value={careAddress}
+                                onChange={(e) => setCareAddress(e.target.value)}
+                                className="w-full border-none px-4 py-2 text-lg font-bold focus:ring-0 transition-all outline-none text-stone-700 placeholder:text-stone-300 bg-transparent"
+                                placeholder="Enter the address where care will be provided..."
+                            />
+                        </div>
+                    </div>
+                    <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest ml-4 italic px-2">
+                        * Defaults to patient's registered address. Update if service address is different.
+                    </p>
+                </section>
+
                 {/* 2. Selected Service Package */}
                 <section className="space-y-8">
                     <div className="flex items-center gap-4">
@@ -195,46 +226,48 @@ const CreateContract = () => {
                         </div>
                         <h2 className="text-2xl font-black text-stone-900 tracking-tight">2. Selected Care Template</h2>
                     </div>
-                    {selectedService ? (
-                        <div className="bg-white border-2 border-stone-100 rounded-[3rem] p-10 flex flex-col lg:flex-row items-center justify-between gap-10 shadow-sm border-l-[12px] border-l-[#5fa5ba] relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-                                <span className="material-symbols-outlined text-[120px]">handshake</span>
-                            </div>
-                            <div className="flex flex-col sm:flex-row items-center gap-8 relative z-10 text-center sm:text-left">
-                                <div className="w-24 h-24 rounded-3xl bg-[#5fa5ba] flex items-center justify-center text-white shadow-xl shadow-[#5fa5ba]/20 shrink-0">
-                                    <span className="material-symbols-outlined text-5xl">health_metrics</span>
+                    {
+                        selectedService ? (
+                            <div className="bg-white border-2 border-stone-100 rounded-[3rem] p-10 flex flex-col lg:flex-row items-center justify-between gap-10 shadow-sm border-l-[12px] border-l-[#5fa5ba] relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                                    <span className="material-symbols-outlined text-[120px]">handshake</span>
                                 </div>
-                                <div>
-                                    <h3 className="text-3xl font-black text-stone-900">{selectedService.name}</h3>
-                                    <p className="text-stone-500 font-medium max-w-md mt-2 leading-relaxed">{selectedService.description}</p>
-                                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-4">
-                                        <span className="bg-[#E0F2F1] text-[#00695C] px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-[#B2EBF2]">
-                                            ${calculations.hourly}/hour
-                                        </span>
-                                        <span className="bg-stone-100 text-stone-600 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest">
-                                            Priority Staffing
-                                        </span>
+                                <div className="flex flex-col sm:flex-row items-center gap-8 relative z-10 text-center sm:text-left">
+                                    <div className="w-24 h-24 rounded-3xl bg-[#5fa5ba] flex items-center justify-center text-white shadow-xl shadow-[#5fa5ba]/20 shrink-0">
+                                        <span className="material-symbols-outlined text-5xl">health_metrics</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-3xl font-black text-stone-900">{selectedService.name}</h3>
+                                        <p className="text-stone-500 font-medium max-w-md mt-2 leading-relaxed">{selectedService.description}</p>
+                                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-4">
+                                            <span className="bg-[#E0F2F1] text-[#00695C] px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-[#B2EBF2]">
+                                                ${calculations.hourly}/hour
+                                            </span>
+                                            <span className="bg-stone-100 text-stone-600 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest">
+                                                Priority Staffing
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
+                                <Link
+                                    to="/family/services"
+                                    className="px-8 py-4 border-2 border-stone-200 rounded-2xl text-xs font-black text-stone-400 hover:text-stone-900 hover:border-stone-900 transition-all uppercase tracking-widest flex items-center gap-3 bg-stone-50"
+                                >
+                                    <span className="material-symbols-outlined text-lg">sync_alt</span>
+                                    Change Service
+                                </Link>
                             </div>
-                            <Link
-                                to="/family/services"
-                                className="px-8 py-4 border-2 border-stone-200 rounded-2xl text-xs font-black text-stone-400 hover:text-stone-900 hover:border-stone-900 transition-all uppercase tracking-widest flex items-center gap-3 bg-stone-50"
-                            >
-                                <span className="material-symbols-outlined text-lg">sync_alt</span>
-                                Change Service
-                            </Link>
-                        </div>
-                    ) : (
-                        <div className="bg-red-50 p-10 rounded-[2.5rem] border-2 border-dashed border-red-200 text-center">
-                            <p className="text-red-600 font-black mb-4 uppercase tracking-widest">No service selected</p>
-                            <Link to="/family/services" className="bg-red-600 text-white px-10 py-4 rounded-full text-sm font-black uppercase tracking-widest shadow-lg shadow-red-200">Browse Marketplace</Link>
-                        </div>
-                    )}
-                </section>
+                        ) : (
+                            <div className="bg-red-50 p-10 rounded-[2.5rem] border-2 border-dashed border-red-200 text-center">
+                                <p className="text-red-600 font-black mb-4 uppercase tracking-widest">No service selected</p>
+                                <Link to="/family/services" className="bg-red-600 text-white px-10 py-4 rounded-full text-sm font-black uppercase tracking-widest shadow-lg shadow-red-200">Browse Marketplace</Link>
+                            </div>
+                        )
+                    }
+                </section >
 
                 {/* 3. Plan Duration */}
-                <section className="space-y-8">
+                < section className="space-y-8" >
                     <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-2xl bg-[#E0F2F1] text-[#00695C] flex items-center justify-center border border-[#B2EBF2] shadow-sm">
                             <span className="material-symbols-outlined text-2xl">event_available</span>
@@ -257,10 +290,10 @@ const CreateContract = () => {
                             </button>
                         ))}
                     </div>
-                </section>
+                </section >
 
                 {/* 4. Recurring Schedule */}
-                <section className="space-y-8">
+                < section className="space-y-8" >
                     <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-2xl bg-[#E0F2F1] text-[#00695C] flex items-center justify-center border border-[#B2EBF2] shadow-sm">
                             <span className="material-symbols-outlined text-2xl">update</span>
@@ -308,10 +341,10 @@ const CreateContract = () => {
                             </div>
                         </div>
                     </div>
-                </section>
+                </section >
 
                 {/* 5. Caregiver Assignment */}
-                <section className="space-y-8">
+                < section className="space-y-8" >
                     <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-2xl bg-[#E0F2F1] text-[#00695C] flex items-center justify-center border border-[#B2EBF2] shadow-sm">
                             <span className="material-symbols-outlined text-2xl">supervisor_account</span>
@@ -331,10 +364,10 @@ const CreateContract = () => {
                         </select>
                         <span className="material-symbols-outlined absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none text-[#5fa5ba] text-4xl font-bold">expand_more</span>
                     </div>
-                </section>
+                </section >
 
                 {/* 6. Professional Notes */}
-                <section className="space-y-8">
+                < section className="space-y-8" >
                     <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-2xl bg-[#E0F2F1] text-[#00695C] flex items-center justify-center border border-[#B2EBF2] shadow-sm">
                             <span className="material-symbols-outlined text-2xl">rate_review</span>
@@ -349,10 +382,10 @@ const CreateContract = () => {
                             placeholder="Specify medical histories, dietary restrictions, emergency protocols, or specific personality matches..."
                         ></textarea>
                     </div>
-                </section>
+                </section >
 
                 {/* 7. Cost Summary & Commitment */}
-                <section className="bg-stone-900 rounded-[4rem] p-12 md:p-16 text-white shadow-2xl relative overflow-hidden group">
+                < section className="bg-stone-900 rounded-[4rem] p-12 md:p-16 text-white shadow-2xl relative overflow-hidden group" >
                     <div className="absolute top-0 right-0 p-12 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
                         <span className="material-symbols-outlined text-[150px]">verified_user</span>
                     </div>
@@ -423,14 +456,14 @@ const CreateContract = () => {
                             </div>
                         </div>
                     </div>
-                </section>
+                </section >
 
                 <div className="flex items-center justify-center gap-4 text-stone-500">
                     <span className="material-symbols-outlined text-sm">verified</span>
                     <p className="text-[10px] font-bold uppercase tracking-widest">Clinical Team Review Mandatory • Secure Infrastructure • No charges until approval</p>
                 </div>
-            </form>
-        </div>
+            </form >
+        </div >
     );
 };
 

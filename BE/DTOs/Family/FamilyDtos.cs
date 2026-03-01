@@ -34,6 +34,9 @@ public class PatientDto
     public string? Allergies { get; set; }
     public string? CurrentCondition { get; set; }
     public string? Address { get; set; }
+    public string? EmergencyContact { get; set; }
+    public string? EmergencyPhone { get; set; }
+    public string? Relation { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 
@@ -46,6 +49,9 @@ public class CreatePatientDto
     public string? Allergies { get; set; }
     public string? CurrentCondition { get; set; }
     public string? Address { get; set; }
+    public string? EmergencyContact { get; set; }
+    public string? EmergencyPhone { get; set; }
+    public string? Relation { get; set; }
 }
 
 public class UpdatePatientDto
@@ -57,4 +63,7 @@ public class UpdatePatientDto
     public string? Allergies { get; set; }
     public string? CurrentCondition { get; set; }
     public string? Address { get; set; }
+    public string? EmergencyContact { get; set; }
+    public string? EmergencyPhone { get; set; }
+    public string? Relation { get; set; }
 }

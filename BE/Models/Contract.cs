@@ -39,6 +39,9 @@ public class Contract
     [MaxLength(1000)]
     public string? WeeklySchedule { get; set; } // JSON: days and times
 
+    [MaxLength(500)]
+    public string? Address { get; set; }
+ 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation properties

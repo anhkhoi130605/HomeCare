@@ -9,7 +9,10 @@ const AddMemberModal = ({ isOpen, onClose, onPatientAdded }) => {
         dateOfBirth: '',
         relation: '',
         gender: '',
-        healthNotes: ''
+        medicalHistory: '',
+        address: '',
+        emergencyContact: '',
+        emergencyPhone: ''
     });
 
     if (!isOpen) return null;
@@ -34,7 +37,10 @@ const AddMemberModal = ({ isOpen, onClose, onPatientAdded }) => {
                 dateOfBirth: formData.dateOfBirth,
                 relation: formData.relation || undefined,
                 gender: formData.gender || undefined,
-                healthNotes: formData.healthNotes || undefined
+                medicalHistory: formData.medicalHistory || undefined,
+                address: formData.address || undefined,
+                emergencyContact: formData.emergencyContact || undefined,
+                emergencyPhone: formData.emergencyPhone || undefined
             });
 
             toast.success('Patient added successfully!');
@@ -43,7 +49,10 @@ const AddMemberModal = ({ isOpen, onClose, onPatientAdded }) => {
                 dateOfBirth: '',
                 relation: '',
                 gender: '',
-                healthNotes: ''
+                medicalHistory: '',
+                address: '',
+                emergencyContact: '',
+                emergencyPhone: ''
             });
 
             if (onPatientAdded) {
@@ -153,13 +162,50 @@ const AddMemberModal = ({ isOpen, onClose, onPatientAdded }) => {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-stone-400 ml-1 uppercase tracking-wider" htmlFor="healthNotes">Health Notes</label>
+                            <label className="text-xs font-bold text-stone-400 ml-1 uppercase tracking-wider" htmlFor="address">Primary Care Address</label>
+                            <input
+                                className="w-full px-6 py-4 bg-[#F8FAFC] border border-stone-100 rounded-2xl focus:ring-2 focus:ring-[#99C5D3] focus:border-[#5fa5ba] text-stone-800 placeholder:text-stone-300 transition-all outline-none font-medium"
+                                id="address"
+                                placeholder="Street, Ward, District, City"
+                                type="text"
+                                value={formData.address}
+                                onChange={handleChange}
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-stone-400 ml-1 uppercase tracking-wider" htmlFor="emergencyContact">Emergency Contact</label>
+                                <input
+                                    className="w-full px-6 py-4 bg-[#F8FAFC] border border-stone-100 rounded-2xl focus:ring-2 focus:ring-[#99C5D3] focus:border-[#5fa5ba] text-stone-800 placeholder:text-stone-300 transition-all outline-none font-medium"
+                                    id="emergencyContact"
+                                    placeholder="Name of contact"
+                                    type="text"
+                                    value={formData.emergencyContact}
+                                    onChange={handleChange}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-stone-400 ml-1 uppercase tracking-wider" htmlFor="emergencyPhone">Emergency Phone</label>
+                                <input
+                                    className="w-full px-6 py-4 bg-[#F8FAFC] border border-stone-100 rounded-2xl focus:ring-2 focus:ring-[#99C5D3] focus:border-[#5fa5ba] text-stone-800 placeholder:text-stone-300 transition-all outline-none font-medium"
+                                    id="emergencyPhone"
+                                    placeholder="Phone number"
+                                    type="tel"
+                                    value={formData.emergencyPhone}
+                                    onChange={handleChange}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-stone-400 ml-1 uppercase tracking-wider" htmlFor="medicalHistory">Medical Summary & Notes</label>
                             <textarea
                                 className="w-full px-6 py-4 bg-[#F8FAFC] border border-stone-100 rounded-3xl focus:ring-2 focus:ring-[#99C5D3] focus:border-[#5fa5ba] text-stone-800 placeholder:text-stone-300 transition-all resize-none outline-none font-medium"
-                                id="healthNotes"
-                                placeholder="Briefly describe any chronic conditions, allergies, or regular medications..."
+                                id="medicalHistory"
+                                placeholder="Describe chronic conditions, allergies, or regular medications..."
                                 rows="4"
-                                value={formData.healthNotes}
+                                value={formData.medicalHistory}
                                 onChange={handleChange}
                             ></textarea>
                         </div>

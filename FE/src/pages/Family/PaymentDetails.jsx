@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { careRequestApi, paymentApi } from '@/lib/api';
+import { careRequestApi, paymentApi, contractApi } from '@/lib/api';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 import { toast } from 'sonner';
 
-const PaymentDetails = () => {
+const PaymentDetails = ({ type }) => {
+    const isContract = type === 'contract';
     const { id } = useParams();
     const navigate = useNavigate();
     const [request, setRequest] = useState(null);
@@ -13,19 +14,21 @@ const PaymentDetails = () => {
     const [paymentMethod, setPaymentMethod] = useState('MoMo');
 
     useEffect(() => {
-        const fetchRequest = async () => {
+        const fetchResource = async () => {
             try {
-                const data = await careRequestApi.getById(id);
+                const data = isContract
+                    ? await contractApi.getById(id)
+                    : await careRequestApi.getById(id);
                 setRequest(data);
             } catch (error) {
-                console.error("Failed to fetch request:", error);
-                toast.error("Failed to load request details");
+                console.error("Failed to fetch details:", error);
+                toast.error("Failed to load details");
             } finally {
                 setLoading(false);
             }
         };
-        fetchRequest();
-    }, [id]);
+        fetchResource();
+    }, [id, isContract]);
 
     const handlePayment = async () => {
         try {
@@ -34,13 +37,17 @@ const PaymentDetails = () => {
             // In a real app, logic for payment gateway (VNPay/MoMo) goes here.
             // Simplified Step 6: Backend updates status to "Paid"
             // We call updateStatus to simulate/trigger this update.
-            await careRequestApi.updateStatus(id, { status: "Paid" });
+            if (isContract) {
+                await contractApi.updateStatus(id, "Paid");
+            } else {
+                await careRequestApi.updateStatus(id, { status: "Paid" });
+            }
 
             toast.success(`Payment Successful! Your request is now Paid.`);
 
-            // Step 7: Redirect to Request list
+            // Step 7: Redirect to list
             setTimeout(() => {
-                navigate('/family/requests');
+                navigate(isContract ? '/family/contracts' : '/family/requests');
             }, 1500);
         } catch (error) {
             console.error("Payment error:", error);
@@ -58,7 +65,8 @@ const PaymentDetails = () => {
     const pName = request.patientName || request.patient?.fullName || "Family Member";
     const rDate = request.requestedDate || request.date;
     const sTime = request.startTime || request.start_time;
-    const durationArr = request.duration || 0;
+    const durationArr = isContract ? null : (request.duration || 0);
+    const months = isContract ? (request.durationMonths || 3) : null;
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 pb-12 pt-4 font-['Public_Sans'] animate-fade-in-up">
@@ -97,9 +105,22 @@ const PaymentDetails = () => {
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-[10px] text-stone-400 font-black uppercase tracking-widest mb-2">Duration</p>
-                                    <p className="font-bold text-lg text-stone-800">{durationArr} Hours</p>
+                                    <p className="text-[10px] text-stone-400 font-black uppercase tracking-widest mb-2">Plan Period</p>
+                                    <p className="font-bold text-lg text-stone-800">
+                                        {isContract
+                                            ? `${new Date(request.startDate).toLocaleDateString()} - ${new Date(request.endDate).toLocaleDateString()}`
+                                            : `${durationArr} Hours`}
+                                    </p>
                                 </div>
+                                {request.address && (
+                                    <div className="col-span-2">
+                                        <p className="text-[10px] text-stone-400 font-black uppercase tracking-widest mb-2">Care Location</p>
+                                        <div className="flex items-center gap-2 font-bold text-lg text-stone-800">
+                                            <span className="material-symbols-outlined text-[#5fa5ba]">location_on</span>
+                                            {request.address}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {request.notes || request.special_note ? (
@@ -171,12 +192,8 @@ const PaymentDetails = () => {
 
                             <div className="space-y-4 mb-8">
                                 <div className="flex justify-between text-white/60 font-medium">
-                                    <span>Base Rate</span>
-                                    <span>{amount && durationArr ? `$${Math.round(amount / durationArr)} / hr` : 'N/A'}</span>
-                                </div>
-                                <div className="flex justify-between text-white/60 font-medium">
-                                    <span>Duration</span>
-                                    <span>{durationArr} hrs</span>
+                                    <span>Plan Period</span>
+                                    <span>{isContract ? `${months} Months Commitment` : `${durationArr} hrs session`}</span>
                                 </div>
                                 <div className="h-px bg-white/10 my-4"></div>
                                 <div className="flex justify-between items-end">

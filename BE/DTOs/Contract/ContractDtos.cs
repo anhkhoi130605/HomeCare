@@ -19,6 +19,7 @@ public class ContractDto
     public decimal TotalAmount { get; set; }
     public string Status { get; set; } = string.Empty;
     public string? WeeklySchedule { get; set; }
+    public string? Address { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 
@@ -38,7 +39,8 @@ public class CreateContractDto
     [Required]
     public DateTime EndDate { get; set; }
 
-    public string? WeeklySchedule { get; set; } // JSON or formatted string
+    public string? WeeklySchedule { get; set; }
+    public string? Address { get; set; }
 }
 
 public class UpdateContractDto

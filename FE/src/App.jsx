@@ -157,6 +157,7 @@ const App = () => (
 
               {/* Redirect /CaregiverDashboard to /caregiver to fix 404 */}
               <Route path="/CaregiverDashboard" element={<Navigate to="/caregiver" replace />} />
+              <Route path="/payment/contract/:id" element={<FamilyPaymentDetails type="contract" />} />
               <Route path="/payment/:id" element={<FamilyPaymentDetails />} />
 
               {/* Catch-all */}

@@ -20,6 +20,7 @@ const CreateRequest = () => {
     const [startTime, setStartTime] = useState('09:00');
     const [duration, setDuration] = useState(2); // hours
     const [notes, setNotes] = useState('');
+    const [careAddress, setCareAddress] = useState('');
 
     useEffect(() => {
         const fetchData = async () => {
@@ -37,9 +38,12 @@ const CreateRequest = () => {
                     const service = services.find(s => s.id.toString() === serviceIdParam);
                     if (service) {
                         setSelectedService(service);
-                    } else {
-                        toast.error("Service not found");
                     }
+                }
+
+                // Sync initial address with first patient
+                if (patientsData?.length > 0) {
+                    setCareAddress(patientsData[0].address || '');
                 }
 
                 // Set default date to tomorrow
@@ -105,7 +109,8 @@ const CreateRequest = () => {
                 startTime: formattedStartTime,
                 endTime: formattedEndTime,
                 notes: notes || null,
-                requestType: requestType.toLowerCase() === 'one-time' ? 0 : 1
+                requestType: requestType.toLowerCase() === 'one-time' ? 0 : 1,
+                address: careAddress
             };
 
             await careRequestApi.create(payload);
@@ -158,7 +163,10 @@ const CreateRequest = () => {
                                 <div key={patient.id} className="relative group">
                                     <input
                                         checked={selectedPatientId === patient.id.toString()}
-                                        onChange={() => setSelectedPatientId(patient.id.toString())}
+                                        onChange={() => {
+                                            setSelectedPatientId(patient.id.toString());
+                                            setCareAddress(patient.address || '');
+                                        }}
                                         className="hidden peer"
                                         id={`patient-${patient.id}`}
                                         name="patient"
@@ -302,6 +310,35 @@ const CreateRequest = () => {
                                     <option key={h} value={h}>{h} {h === 1 ? 'hour' : 'hours'}</option>
                                 ))}
                             </select>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Address Section */}
+                <section className="space-y-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-[#E0F2F1] text-[#00695C] flex items-center justify-center border border-[#B2EBF2]">
+                            <span className="material-symbols-outlined">location_on</span>
+                        </div>
+                        <h2 className="text-xl font-bold text-stone-900">Care Location</h2>
+                    </div>
+                    <div className="bg-white p-6 rounded-[2rem] border-2 border-stone-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 flex-1">
+                            <div className="w-12 h-12 rounded-xl bg-stone-50 flex items-center justify-center text-[#5fa5ba]">
+                                <span className="material-symbols-outlined">map</span>
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-stone-400 mb-1">Service Address</p>
+                                <input
+                                    value={careAddress}
+                                    onChange={(e) => setCareAddress(e.target.value)}
+                                    className="w-full font-bold text-stone-800 bg-transparent border-none p-0 focus:ring-0 outline-none placeholder:text-stone-300"
+                                    placeholder="Enter address for this care visit..."
+                                />
+                            </div>
+                        </div>
+                        <div className="px-4 py-2 bg-stone-50 rounded-xl text-[10px] font-black uppercase text-stone-400 border border-stone-100">
+                            Snapshot Address
                         </div>
                     </div>
                 </section>
