@@ -24,7 +24,7 @@ public class PaymentController : ControllerBase
     /// Get all payments (Admin only)
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<ActionResult<List<PaymentDto>>> GetAllPayments([FromQuery] string? status = null)
     {
         try

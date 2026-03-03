@@ -41,7 +41,7 @@ const IncidentDetail = lazy(() => import("./pages/Caregivers/IncidentDetail"));
 
 // Admin Pages (Lazy Loaded)
 const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
-const Users = lazy(() => import("./pages/Admin/Users"));
+const Users = lazy(() => import("./pages/admin/Users"));
 const Patients = lazy(() => import("./pages/admin/Patients"));
 const Caregivers = lazy(() => import("./pages/admin/Caregivers"));
 const Requests = lazy(() => import("./pages/admin/Requests"));
@@ -49,8 +49,11 @@ const Schedule = lazy(() => import("./pages/admin/Schedule"));
 const Reports = lazy(() => import("./pages/admin/Reports"));
 const CareLogDetail = lazy(() => import("./pages/admin/CareLogDetail"));
 const Payments = lazy(() => import("./pages/admin/Payments"));
-const AdminIncidents = lazy(() => import("./pages/Admin/Incidents"));
-const AdminContracts = lazy(() => import("./pages/Admin/Contracts"));
+const AdminIncidents = lazy(() => import("./pages/admin/Incidents"));
+const AdminContracts = lazy(() => import("./pages/admin/Contracts"));
+
+// Operation Admin Pages (Lazy Loaded)
+const OperationDashboard = lazy(() => import("./pages/operation-admin/Dashboard"));
 
 // Family Pages (Lazy Loaded)
 const FamilyLayout = lazy(() => import("./components/layout/FamilyLayout"));
@@ -116,6 +119,12 @@ const App = () => (
                 <Route path="payments" element={<Payments />} />
                 <Route path="incidents" element={<AdminIncidents />} />
                 <Route path="contracts" element={<AdminContracts />} />
+              </Route>
+
+              {/* Operation Admin Routes */}
+              <Route path="/operation-admin" element={<AdminLayout />}>
+                <Route index element={<OperationDashboard />} />
+                <Route path="dashboard" element={<OperationDashboard />} />
               </Route>
 
               {/* Family Routes */}

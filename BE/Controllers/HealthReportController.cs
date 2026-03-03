@@ -18,7 +18,7 @@ public class HealthReportController : ControllerBase
 
     // GET /api/healthreport - Get all reports (admin)
     [HttpGet]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<ActionResult<List<HealthReportDto>>> GetAll()
     {
         var reports = await _healthReportService.GetAllAsync();
@@ -58,7 +58,7 @@ public class HealthReportController : ControllerBase
 
     // POST /api/healthreport
     [HttpPost]
-    [Authorize(Roles = "Admin,Caregiver")]
+    [Authorize(Roles = "Admin,OperationAdmin,Caregiver")]
     public async Task<ActionResult<HealthReportDto>> Create([FromBody] CreateHealthReportDto dto)
     {
         try
@@ -81,7 +81,7 @@ public class HealthReportController : ControllerBase
 
     // PUT /api/healthreport/{id}
     [HttpPut("{id}")]
-    [Authorize(Roles = "Admin,Caregiver")]
+    [Authorize(Roles = "Admin,OperationAdmin,Caregiver")]
     public async Task<ActionResult<HealthReportDto>> Update(int id, [FromBody] UpdateHealthReportDto dto)
     {
         var report = await _healthReportService.UpdateAsync(id, dto);
@@ -91,7 +91,7 @@ public class HealthReportController : ControllerBase
 
     // DELETE /api/healthreport/{id}
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<IActionResult> Delete(int id)
     {
         var result = await _healthReportService.DeleteAsync(id);

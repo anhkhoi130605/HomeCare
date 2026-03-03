@@ -17,7 +17,7 @@ public class IncidentController : ControllerBase
 
     // GET /api/incident - Admin only
     [HttpGet]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<ActionResult<List<IncidentDto>>> GetAll()
     {
         var incidents = await _incidentService.GetAllAsync();
@@ -78,7 +78,7 @@ public class IncidentController : ControllerBase
 
     // PUT /api/incident/{id}/status
     [HttpPut("{id}/status")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<ActionResult<IncidentDto>> UpdateStatus(int id, [FromBody] UpdateIncidentStatusDto dto)
     {
         var incident = await _incidentService.UpdateStatusAsync(id, dto);
@@ -88,7 +88,7 @@ public class IncidentController : ControllerBase
 
     // DELETE /api/incident/{id}
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<IActionResult> Delete(int id)
     {
         var result = await _incidentService.DeleteAsync(id);
