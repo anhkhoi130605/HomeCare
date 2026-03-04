@@ -54,6 +54,13 @@ const AdminContracts = lazy(() => import("./pages/admin/Contracts"));
 
 // Operation Admin Pages (Lazy Loaded)
 const OperationDashboard = lazy(() => import("./pages/operation-admin/Dashboard"));
+const OperationPatients = lazy(() => import("./pages/operation-admin/Patients"));
+const OperationCaregivers = lazy(() => import("./pages/operation-admin/Caregivers"));
+const OperationRequests = lazy(() => import("./pages/operation-admin/Requests"));
+const OperationSchedule = lazy(() => import("./pages/operation-admin/Schedule"));
+const OperationIncidents = lazy(() => import("./pages/operation-admin/Incidents"));
+const OperationContracts = lazy(() => import("./pages/operation-admin/Contracts"));
+const OperationReports = lazy(() => import("./pages/operation-admin/Reports"));
 
 // Family Pages (Lazy Loaded)
 const FamilyLayout = lazy(() => import("./components/layout/FamilyLayout"));
@@ -125,6 +132,13 @@ const App = () => (
               <Route path="/operation-admin" element={<AdminLayout />}>
                 <Route index element={<OperationDashboard />} />
                 <Route path="dashboard" element={<OperationDashboard />} />
+                <Route path="patients" element={<OperationPatients />} />
+                <Route path="caregivers" element={<OperationCaregivers />} />
+                <Route path="requests" element={<OperationRequests />} />
+                <Route path="schedule" element={<OperationSchedule />} />
+                <Route path="incidents" element={<OperationIncidents />} />
+                <Route path="contracts" element={<OperationContracts />} />
+                <Route path="reports" element={<OperationReports />} />
               </Route>
 
               {/* Family Routes */}

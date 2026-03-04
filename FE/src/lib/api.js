@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE_URL) || 'http://localhost:5000/api';
 const API_TIMEOUT = 60000; // 60 seconds timeout for TiDB Cloud latency during startup
 
 // Custom error class for network errors
@@ -365,6 +365,13 @@ export const adminApi = {
     // Get all patients
     getPatients: async () => {
         return apiCall('/admin/patients');
+    },
+    // Create patient
+    createPatient: async (data) => {
+        return apiCall('/admin/patients', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
     },
 
     // Get all caregivers
