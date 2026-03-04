@@ -74,7 +74,7 @@ public class ScheduleController : ControllerBase
     /// Create a new schedule (admin only)
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<ActionResult<ScheduleDto>> Create([FromBody] CreateScheduleDto dto)
     {
         try

@@ -43,7 +43,7 @@ public class ContractController : ControllerBase
         return Ok(result);
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     [HttpGet]
     public async Task<IActionResult> GetAllContracts()
     {
@@ -60,7 +60,7 @@ public class ContractController : ControllerBase
         return Ok(result);
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     [HttpPut("{id}/status")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateContractDto dto)
     {

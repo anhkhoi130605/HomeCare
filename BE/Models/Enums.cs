@@ -4,7 +4,8 @@ public enum UserRole
 {
     Admin,
     Caregiver,
-    Family
+    Family,
+    OperationAdmin
 }
 
 public enum RequestStatus

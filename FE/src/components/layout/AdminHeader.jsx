@@ -1,8 +1,13 @@
 import { Bell, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { authApi } from "@/lib/api";
 
 const AdminHeader = ({ breadcrumb, searchPlaceholder = "Search..." }) => {
+  const user = authApi.getCurrentUser();
+  const displayName = user?.fullName || user?.email?.split('@')[0] || "Admin";
+  const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+
   return (
     <header className="h-16 bg-background border-b border-border flex items-center justify-between px-6">
       <div className="flex items-center gap-4">
@@ -29,12 +34,12 @@ const AdminHeader = ({ breadcrumb, searchPlaceholder = "Search..." }) => {
 
         <div className="flex items-center gap-3 pl-4 border-l border-border">
           <div className="text-right">
-            <p className="text-sm font-medium">Sarah Jenkins</p>
-            <p className="text-xs text-muted-foreground">System Admin</p>
+            <p className="text-sm font-medium">{displayName}</p>
+            <p className="text-xs text-muted-foreground">{user?.role || "System Admin"}</p>
           </div>
           <Avatar>
-            <AvatarImage src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100" />
-            <AvatarFallback>SJ</AvatarFallback>
+            <AvatarImage src={user?.imageUrl || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100"} />
+            <AvatarFallback>{initials || "AD"}</AvatarFallback>
           </Avatar>
         </div>
       </div>

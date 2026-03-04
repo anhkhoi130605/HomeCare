@@ -33,6 +33,35 @@ public static class SeedData
             Console.WriteLine("✓ Admin account created: admin@homecare.com / admin123");
         }
 
+        // Seed Operation Admin if not exists
+        var opAdminUser = await context.Users.FirstOrDefaultAsync(u => u.Email == "op@homecare.com");
+        if (opAdminUser == null)
+        {
+            opAdminUser = new User
+            {
+                Email = "op@homecare.com",
+                Phone = "+84888888888",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("op123"),
+                Role = UserRole.OperationAdmin,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            context.Users.Add(opAdminUser);
+            await context.SaveChangesAsync();
+            Console.WriteLine("✓ Operation Admin account created: op@homecare.com / op123");
+        }
+        else
+        {
+            // Only update if role is different or we explicitly need to reset password
+            // For now, let's skip the expensive hashing on every startup
+            if (opAdminUser.Role != UserRole.OperationAdmin)
+            {
+                opAdminUser.Role = UserRole.OperationAdmin;
+                await context.SaveChangesAsync();
+                Console.WriteLine("✓ Operation Admin role fixed.");
+            }
+        }
+
         // Seed Caregivers if not exists
         if (!await context.Caregivers.AnyAsync())
         {
@@ -148,9 +177,10 @@ public static class SeedData
             }
         };
 
+        var existingServices = await context.Services.ToListAsync();
         foreach (var svc in serviceList)
         {
-            var existing = await context.Services.FirstOrDefaultAsync(s => s.Name == svc.Name);
+            var existing = existingServices.FirstOrDefault(s => s.Name == svc.Name);
             if (existing == null)
             {
                 context.Services.Add(svc);
