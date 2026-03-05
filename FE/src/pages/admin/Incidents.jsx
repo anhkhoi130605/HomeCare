@@ -13,7 +13,7 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import AdminHeader from "@/components/layout/AdminHeader";
-import { incidentApi } from "@/lib/api";
+import { incidentApi, authApi } from "@/lib/api";
 
 const getSeverityClass = (severity) => {
     switch (severity?.toLowerCase()) {
@@ -60,6 +60,7 @@ const Incidents = () => {
     const [showResolveModal, setShowResolveModal] = useState(false);
     const [resolution, setResolution] = useState("");
     const [updating, setUpdating] = useState(false);
+    const canManage = authApi.getCurrentUser()?.role === "OperationAdmin";
 
     useEffect(() => {
         fetchIncidents();
@@ -243,7 +244,7 @@ const Incidents = () => {
                                             </td>
                                             <td className="p-4">
                                                 <div className="flex items-center justify-end gap-2">
-                                                    {incident.status === 'Open' && (
+                                                    {canManage && incident.status === 'Open' && (
                                                         <>
                                                             <Button
                                                                 variant="outline"
@@ -263,7 +264,7 @@ const Incidents = () => {
                                                             </Button>
                                                         </>
                                                     )}
-                                                    {incident.status === 'InProgress' && (
+                                                    {canManage && incident.status === 'InProgress' && (
                                                         <Button
                                                             size="sm"
                                                             onClick={() => {
@@ -292,6 +293,7 @@ const Incidents = () => {
             </div>
 
             {/* Resolve Modal */}
+            {canManage && (
             <Dialog open={showResolveModal} onOpenChange={setShowResolveModal}>
                 <DialogContent>
                     <DialogHeader>
@@ -329,6 +331,7 @@ const Incidents = () => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            )}
         </div>
     );
 };

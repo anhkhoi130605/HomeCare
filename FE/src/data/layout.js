@@ -1,5 +1,5 @@
 //admin sidebar--------------------------------------------
-import { Heart, LayoutDashboard, Users, UserCheck, FileText, Calendar, BarChart3, Settings, HelpCircle, AlertTriangle, ClipboardList, UserCog, Activity } from "lucide-react";
+import { Heart, LayoutDashboard, Users, UserCheck, FileText, Calendar, BarChart3, AlertTriangle, ClipboardList, UserCog, Activity } from "lucide-react";
 
 export const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin", roles: ["Admin"] },
@@ -22,6 +22,5 @@ export const menuItems = [
 ];
 
 export const bottomItems = [
-  { icon: Settings, label: "Settings", path: "/admin/settings", roles: ["Admin"] },
-  { icon: HelpCircle, label: "Help Center", path: "/admin/help", roles: ["Admin", "OperationAdmin"] },
+  // removed
 ];
