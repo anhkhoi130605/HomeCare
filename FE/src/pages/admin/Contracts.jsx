@@ -13,7 +13,7 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import AdminHeader from "@/components/layout/AdminHeader";
-import { contractApi, scheduleApi } from "@/lib/api";
+import { contractApi, scheduleApi, authApi } from "@/lib/api";
 
 const getStatusClass = (status) => {
     switch (status?.toLowerCase()) {
@@ -55,6 +55,7 @@ const Contracts = () => {
     const [updating, setUpdating] = useState(false);
     const [showResultModal, setShowResultModal] = useState(false);
     const [generationResult, setGenerationResult] = useState(null);
+    const canManage = authApi.getCurrentUser()?.role === "OperationAdmin";
 
     useEffect(() => {
         fetchContracts();
@@ -240,7 +241,7 @@ const Contracts = () => {
                                                         <Eye className="w-4 h-4 mr-1" />
                                                         View
                                                     </Button>
-                                                    {contract.status?.toLowerCase() === 'pending' && (
+                                                    {canManage && contract.status?.toLowerCase() === 'pending' && (
                                                         <>
                                                             <Button
                                                                 size="sm"
@@ -333,7 +334,7 @@ const Contracts = () => {
                         <Button variant="outline" onClick={() => setShowDetailModal(false)}>
                             Close
                         </Button>
-                        {selectedContract?.status?.toLowerCase() === 'pending' && (
+                        {canManage && selectedContract?.status?.toLowerCase() === 'pending' && (
                             <>
                                 <Button
                                     className="bg-green-500 hover:bg-green-600"
@@ -351,7 +352,7 @@ const Contracts = () => {
                                 </Button>
                             </>
                         )}
-                        {['active', 'approved'].includes(selectedContract?.status?.toLowerCase()) && (
+                        {canManage && ['active', 'approved'].includes(selectedContract?.status?.toLowerCase()) && (
                             <Button
                                 className="bg-blue-600 hover:bg-blue-700 text-white"
                                 disabled={updating}

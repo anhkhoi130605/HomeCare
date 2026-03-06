@@ -13,7 +13,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import AdminHeader from "@/components/layout/AdminHeader";
-import { adminApi, careRequestApi, scheduleApi } from "@/lib/api";
+import { adminApi, careRequestApi, scheduleApi, authApi } from "@/lib/api";
 
 const getStatusClass = (status) => {
   switch (status?.toLowerCase()) {
@@ -41,6 +41,7 @@ const Requests = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("pending");
   const [processing, setProcessing] = useState(null);
+  const canManage = authApi.getCurrentUser()?.role === "OperationAdmin";
 
   // Assign modal state
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -114,6 +115,7 @@ const Requests = () => {
   };
 
   const openAssignModal = (request) => {
+    if (!canManage) return;
     setSelectedRequest(request);
     setSelectedCaregiver('');
     setConflict(false);
@@ -271,7 +273,7 @@ const Requests = () => {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center justify-end gap-2">
-                          {request.status === 'Pending' && (
+                          {canManage && request.status === 'Pending' && (
                             <>
                               <Button
                                 variant="outline"
@@ -308,7 +310,7 @@ const Requests = () => {
                               </Button>
                             </>
                           )}
-                          {request.status === 'Approved' && !request.assignedCaregiverName && (
+                          {canManage && request.status === 'Approved' && !request.assignedCaregiverName && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -406,6 +408,7 @@ const Requests = () => {
       </div>
 
       {/* Assign Caregiver Modal */}
+      {canManage && (
       <Dialog open={showAssignModal} onOpenChange={setShowAssignModal}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -462,6 +465,7 @@ const Requests = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
     </div>
   );
 };

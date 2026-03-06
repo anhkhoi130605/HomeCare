@@ -34,6 +34,7 @@ const Schedule = () => {
     return new Date(today.setDate(diff));
   });
   const user = authApi.getCurrentUser();
+  const canManage = user?.role === "OperationAdmin";
 
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const date = new Date(currentWeekStart);
@@ -231,10 +232,12 @@ const Schedule = () => {
           </div>
 
           <div className="flex items-center gap-2 mb-4">
-            <Button className="flex-1 gap-2">
-              <Plus className="w-4 h-4" />
-              New Shift
-            </Button>
+            {canManage && (
+              <Button className="flex-1 gap-2">
+                <Plus className="w-4 h-4" />
+                New Shift
+              </Button>
+            )}
             <Button variant="outline" size="icon">
               <Filter className="w-4 h-4" />
             </Button>

@@ -32,16 +32,7 @@ const AdminHeader = ({ breadcrumb, searchPlaceholder = "Search..." }) => {
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full" />
         </button>
 
-        <div className="flex items-center gap-3 pl-4 border-l border-border">
-          <div className="text-right">
-            <p className="text-sm font-medium">{displayName}</p>
-            <p className="text-xs text-muted-foreground">{user?.role || "System Admin"}</p>
-          </div>
-          <Avatar>
-            <AvatarImage src={user?.imageUrl || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100"} />
-            <AvatarFallback>{initials || "AD"}</AvatarFallback>
-          </Avatar>
-        </div>
+        
       </div>
     </header>
   );
