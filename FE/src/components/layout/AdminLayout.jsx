@@ -9,6 +9,7 @@ const AdminLayout = () => {
   const navigate = useNavigate();
   const user = authApi.getCurrentUser();
   const profileImage = user?.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.fullName || 'Admin')}&background=5fa5ba&color=fff&size=128`;
+  const homePath = (user?.role === "OperationAdmin") ? "/operation-admin" : "/admin";
 
   const handleLogout = () => {
     authApi.logout();
@@ -36,7 +37,7 @@ const AdminLayout = () => {
             >
               <span className="material-symbols-outlined">light_mode</span>
             </button>
-            <Link to="/admin" className="flex items-center gap-3.5 ml-2 border-l pl-6 border-stone-100 hover:opacity-80 transition-opacity group">
+            <Link to={homePath} className="flex items-center gap-3.5 ml-2 border-l pl-6 border-stone-100 hover:opacity-80 transition-opacity group">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-bold text-stone-900 leading-tight group-hover:text-[#5fa5ba] transition-colors">{user?.fullName || user?.email?.split('@')[0] || 'Admin'}</p>
               </div>
