@@ -86,10 +86,10 @@ using (var scope = app.Services.CreateScope())
     
     try
     {
-        // Ensure database is created (don't delete - TiDB Cloud can timeout)
-        logger.LogInformation("Ensuring database is created...");
-        dbContext.Database.EnsureCreated();
-        logger.LogInformation("Database ready.");
+        // Apply pending migrations
+        logger.LogInformation("Applying migrations...");
+        dbContext.Database.Migrate();
+        logger.LogInformation("Database migrated successfully.");
         
         // Seed initial data (Admin, Caregivers) if not exists
         await SeedData.InitializeAsync(dbContext);

@@ -65,12 +65,14 @@ const Payments = () => {
 
   const getStatusBadge = (status) => {
     switch (status?.toLowerCase()) {
-      case 'paid':
+      case 'success':
         return 'bg-green-100 text-green-700';
       case 'pending':
         return 'bg-yellow-100 text-yellow-700';
-      case 'overdue':
+      case 'failed':
         return 'bg-red-100 text-red-700';
+      case 'refunded':
+        return 'bg-blue-100 text-blue-700';
       default:
         return 'bg-gray-100 text-gray-700';
     }
@@ -209,9 +211,9 @@ const Payments = () => {
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-3 mb-4">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${invoice.status === 'Paid' ? 'bg-green-100' : 'bg-yellow-100'
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${invoice.status === 'Success' ? 'bg-green-100' : invoice.status === 'Failed' ? 'bg-red-100' : 'bg-yellow-100'
                   }`}>
-                  <CheckCircle className={`w-5 h-5 ${invoice.status === 'Paid' ? 'text-green-600' : 'text-yellow-600'
+                  <CheckCircle className={`w-5 h-5 ${invoice.status === 'Success' ? 'text-green-600' : invoice.status === 'Failed' ? 'text-red-600' : 'text-yellow-600'
                     }`} />
                 </div>
                 <div>

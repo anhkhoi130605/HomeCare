@@ -18,13 +18,17 @@ import { adminApi, careRequestApi, scheduleApi, authApi } from "@/lib/api";
 const getStatusClass = (status) => {
   switch (status?.toLowerCase()) {
     case "pending":
+    case "awaitingpayment":
       return "bg-amber-100 text-amber-700";
+    case "paid":
     case "approved":
       return "bg-green-100 text-green-700";
-    case "rejected":
-      return "bg-red-100 text-red-700";
+    case "assigned":
     case "completed":
       return "bg-blue-100 text-blue-700";
+    case "rejected":
+    case "cancelled":
+      return "bg-red-100 text-red-700";
     default:
       return "bg-gray-100 text-gray-700";
   }
@@ -39,9 +43,10 @@ const Requests = () => {
   const [requests, setRequests] = useState([]);
   const [caregivers, setCaregivers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("pending");
+  const [activeTab, setActiveTab] = useState("paid");
   const [processing, setProcessing] = useState(null);
-  const canManage = authApi.getCurrentUser()?.role === "OperationAdmin";
+  const currentUserRole = authApi.getCurrentUser()?.role;
+  const canManage = currentUserRole === "OperationAdmin" || currentUserRole === "Admin";
 
   // Assign modal state
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -70,24 +75,14 @@ const Requests = () => {
     }
   };
 
-  const handleApprove = async (requestId) => {
-    try {
-      setProcessing(requestId);
-      await careRequestApi.updateStatus(requestId, { status: 1 }); // 1 = Approved
-      await fetchData();
-    } catch (error) {
-      console.error("Failed to approve:", error);
-      alert("Failed to approve request: " + error.message);
-    } finally {
-      setProcessing(null);
-    }
-  };
+  // Note: Requests don't have a separate "Approve" step anymore - they go from Paid -> Assigned when a caregiver is assigned.
+
 
   const handleReject = async (requestId) => {
     if (!confirm("Are you sure you want to reject this request?")) return;
     try {
       setProcessing(requestId);
-      await careRequestApi.updateStatus(requestId, { status: 2 }); // 2 = Rejected
+      await careRequestApi.updateStatus(requestId, { status: 6 }); // 6 = Rejected
       await fetchData();
     } catch (error) {
       console.error("Failed to reject:", error);
@@ -141,21 +136,23 @@ const Requests = () => {
   };
 
   const filteredRequests = requests.filter(r => {
-    if (activeTab === 'pending') return r.status === 'Pending';
-    if (activeTab === 'approved') return r.status === 'Approved';
-    if (activeTab === 'rejected') return r.status === 'Rejected';
+    if (activeTab === 'pending') return r.status === 'Pending' || r.status === 'AwaitingPayment';
+    if (activeTab === 'paid') return r.status === 'Paid' || r.status === 'Approved';
+    if (activeTab === 'assigned') return r.status === 'Assigned';
+    if (activeTab === 'rejected') return r.status === 'Rejected' || r.status === 'Cancelled';
     return true;
   });
 
   const stats = {
-    pending: requests.filter(r => r.status === 'Pending').length,
-    approved: requests.filter(r => r.status === 'Approved').length,
+    pending: requests.filter(r => r.status === 'Pending' || r.status === 'AwaitingPayment').length,
+    paid: requests.filter(r => r.status === 'Paid' || r.status === 'Approved').length,
+    assigned: requests.filter(r => r.status === 'Assigned').length,
     available: caregivers.length
   };
 
   const statsCards = [
-    { label: "PENDING REQUESTS", value: stats.pending.toString().padStart(2, '0'), icon: AlertTriangle, color: "bg-red-50", iconColor: "text-red-500" },
-    { label: "APPROVED TODAY", value: stats.approved.toString(), icon: CheckCircle, color: "bg-green-50", iconColor: "text-green-500" },
+    { label: "AWAITING PAYMENT", value: stats.pending.toString().padStart(2, '0'), icon: AlertTriangle, color: "bg-red-50", iconColor: "text-red-500" },
+    { label: "PAID - READY TO ASSIGN", value: stats.paid.toString(), icon: CheckCircle, color: "bg-green-50", iconColor: "text-green-500" },
     { label: "AVAILABLE CAREGIVERS", value: `${stats.available} Available`, icon: Users, color: "bg-teal-50", iconColor: "text-teal-500" },
   ];
 
@@ -176,11 +173,14 @@ const Requests = () => {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
               <TabsTrigger value="pending" className="gap-1">
-                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
                 Pending ({stats.pending})
               </TabsTrigger>
-              <TabsTrigger value="approved" className="gap-1">
-                Approved ({stats.approved})
+              <TabsTrigger value="paid" className="gap-1">
+                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                Paid/Approved ({stats.paid})
+              </TabsTrigger>
+              <TabsTrigger value="assigned">
+                Assigned ({stats.assigned})
               </TabsTrigger>
               <TabsTrigger value="rejected">
                 Rejected
@@ -273,54 +273,34 @@ const Requests = () => {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center justify-end gap-2">
-                          {canManage && request.status === 'Pending' && (
+                          {canManage && (
                             <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1"
-                                onClick={() => openAssignModal(request)}
-                                disabled={processing === request.id}
-                              >
-                                <UserPlus className="w-3 h-3" />
-                                Assign
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="gap-1 bg-green-500 hover:bg-green-600"
-                                onClick={() => handleApprove(request.id)}
-                                disabled={processing === request.id}
-                              >
-                                {processing === request.id ? (
-                                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                ) : (
-                                  <Check className="w-3 h-3" />
-                                )}
-                                Approve
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                className="gap-1"
-                                onClick={() => handleReject(request.id)}
-                                disabled={processing === request.id}
-                              >
-                                <X className="w-3 h-3" />
-                                Reject
-                              </Button>
+                              {(request.status === 'Paid' || request.status === 'Approved') && !request.assignedCaregiverName && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1"
+                                  onClick={() => openAssignModal(request)}
+                                  disabled={processing === request.id}
+                                >
+                                  <UserPlus className="w-3 h-3" />
+                                  Assign Caregiver
+                                </Button>
+                              )}
+
+                              {(request.status === 'Pending' || request.status === 'AwaitingPayment' || request.status === 'Paid' || request.status === 'Approved') && (
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  className="gap-1"
+                                  onClick={() => handleReject(request.id)}
+                                  disabled={processing === request.id}
+                                >
+                                  <X className="w-3 h-3" />
+                                  Reject
+                                </Button>
+                              )}
                             </>
-                          )}
-                          {canManage && request.status === 'Approved' && !request.assignedCaregiverName && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1"
-                              onClick={() => openAssignModal(request)}
-                              disabled={processing === request.id}
-                            >
-                              <UserPlus className="w-3 h-3" />
-                              Assign Caregiver
-                            </Button>
                           )}
                         </div>
                       </td>
@@ -388,8 +368,8 @@ const Requests = () => {
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 mt-0.5 text-amber-400" />
                   <div>
-                    <p className="font-medium">{stats.pending} Pending Requests</p>
-                    <p className="text-sm text-white/70">Awaiting your approval</p>
+                    <p className="font-medium">{stats.pending} Pending / Unpaid</p>
+                    <p className="text-sm text-white/70">Awaiting family payment</p>
                   </div>
                 </div>
               </div>
@@ -397,7 +377,7 @@ const Requests = () => {
                 <div className="flex items-start gap-3">
                   <CheckCircle className="w-5 h-5 mt-0.5 text-green-400" />
                   <div>
-                    <p className="font-medium">{stats.approved} Approved</p>
+                    <p className="font-medium">{stats.paid} Paid / Approved</p>
                     <p className="text-sm text-white/70">Ready for scheduling</p>
                   </div>
                 </div>

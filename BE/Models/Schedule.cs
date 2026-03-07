@@ -22,6 +22,11 @@ public class Schedule
     [ForeignKey("ContractId")]
     public Contract? Contract { get; set; }
 
+    public int? CareRequestId { get; set; }
+
+    [ForeignKey("CareRequestId")]
+    public CareRequest? CareRequest { get; set; }
+
     public DateTime Date { get; set; }
 
     public TimeSpan StartTime { get; set; }

@@ -139,6 +139,8 @@ public class CaregiverService : ICaregiverService
     {
         var query = _context.Schedules
             .Include(s => s.Patient)
+            .Include(s => s.Contract).ThenInclude(c => c.Service)
+            .Include(s => s.CareRequest).ThenInclude(r => r.Service)
             .Where(s => s.CaregiverId == caregiverId);
 
         if (from.HasValue)
@@ -157,6 +159,8 @@ public class CaregiverService : ICaregiverService
             PatientAddress = s.Patient.Address,
             CaregiverId = s.CaregiverId,
             ContractId = s.ContractId,
+            CareRequestId = s.CareRequestId,
+            ServiceName = s.CareRequest?.Service?.Name ?? s.Contract?.Service?.Name,
             Date = s.Date,
             StartTime = s.StartTime,
             EndTime = s.EndTime,
@@ -171,6 +175,8 @@ public class CaregiverService : ICaregiverService
     {
         var schedule = await _context.Schedules
             .Include(s => s.Patient)
+            .Include(s => s.Contract).ThenInclude(c => c.Service)
+            .Include(s => s.CareRequest).ThenInclude(r => r.Service)
             .FirstOrDefaultAsync(s => s.Id == scheduleId && s.CaregiverId == caregiverId);
 
         if (schedule == null) return null;
@@ -188,6 +194,8 @@ public class CaregiverService : ICaregiverService
             PatientAddress = schedule.Patient.Address,
             CaregiverId = schedule.CaregiverId,
             ContractId = schedule.ContractId,
+            CareRequestId = schedule.CareRequestId,
+            ServiceName = schedule.CareRequest?.Service?.Name ?? schedule.Contract?.Service?.Name,
             Date = schedule.Date,
             StartTime = schedule.StartTime,
             EndTime = schedule.EndTime,
@@ -202,6 +210,8 @@ public class CaregiverService : ICaregiverService
     {
         var schedule = await _context.Schedules
             .Include(s => s.Patient)
+            .Include(s => s.Contract).ThenInclude(c => c.Service)
+            .Include(s => s.CareRequest).ThenInclude(r => r.Service)
             .FirstOrDefaultAsync(s => s.Id == scheduleId && s.CaregiverId == caregiverId);
 
         if (schedule == null) return null;
@@ -219,6 +229,8 @@ public class CaregiverService : ICaregiverService
             PatientAddress = schedule.Patient.Address,
             CaregiverId = schedule.CaregiverId,
             ContractId = schedule.ContractId,
+            CareRequestId = schedule.CareRequestId,
+            ServiceName = schedule.CareRequest?.Service?.Name ?? schedule.Contract?.Service?.Name,
             Date = schedule.Date,
             StartTime = schedule.StartTime,
             EndTime = schedule.EndTime,

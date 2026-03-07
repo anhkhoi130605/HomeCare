@@ -40,6 +40,8 @@ public class ScheduleDto
     public int CaregiverId { get; set; }
     public string? CaregiverName { get; set; }
     public int? ContractId { get; set; }
+    public int? CareRequestId { get; set; }
+    public string? ServiceName { get; set; }
     public DateTime Date { get; set; }
     public TimeSpan StartTime { get; set; }
     public TimeSpan EndTime { get; set; }

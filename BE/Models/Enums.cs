@@ -11,7 +11,11 @@ public enum UserRole
 public enum RequestStatus
 {
     Pending,
+    AwaitingPayment,
     Approved,
+    Paid,
+    Assigned,
+    Completed,
     Rejected,
     Cancelled
 }
@@ -67,7 +71,7 @@ public enum IncidentStatus
 public enum PaymentStatus
 {
     Pending,
-    Completed,
+    Success,
     Failed,
     Refunded
 }

@@ -25,19 +25,19 @@ const BookingService = () => {
                     id: s.id,
                     name: s.name,
                     category: s.category || (s.type === 'Specialized' ? 'Specialized Medical' : 'Daily Care'),
-                    price: s.pricePerHour || s.price || 15,
-                    unit: '/ hour',
+                    price: s.pricePerHour || s.price || 150000,
+                    unit: '/ giờ',
                     features: s.features || (s.description ? [s.description] : []),
                     image: s.image || 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=400',
-                    skillLevel: s.skillLevel || (s.pricePerHour > 40 ? 'Expert' : s.pricePerHour > 20 ? 'Intermediate' : 'Basic'),
+                    skillLevel: s.skillLevel || (s.pricePerHour > 400000 ? 'Expert' : s.pricePerHour > 200000 ? 'Intermediate' : 'Basic'),
                     durationAllowed: s.durationAllowed || (s.type === 'Specialized' ? '4h / 12h' : '2h / 4h')
                 })) : [
                     // Mock data if API is empty
-                    { id: 1, name: 'Basic Home Care', category: 'Daily Care', price: 18, unit: '/ hour', skillLevel: 'Basic', durationAllowed: '2h / 4h', image: 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=400', features: [] },
-                    { id: 2, name: 'Premium Home Care', category: 'Daily Care', price: 32, unit: '/ hour', skillLevel: 'Intermediate', durationAllowed: '4h / 8h', image: 'https://images.unsplash.com/photo-1516733725897-1aa73b87c8e8?w=400', features: [], recommended: true },
-                    { id: 3, name: 'Post-Surgery Recovery', category: 'Specialized Medical', price: 55, unit: '/ hour', skillLevel: 'Expert', durationAllowed: '8h / 24h', image: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=400', features: [] },
-                    { id: 4, name: 'Dementia Care', category: 'Specialized Medical', price: 65, unit: '/ hour', skillLevel: 'Expert', durationAllowed: '4h / 12h', image: 'https://images.unsplash.com/photo-1581578731522-aa7c04ae596d?w=400', features: [] },
-                    { id: 5, name: 'Social Enrichment', category: 'Companionship', price: 22, unit: '/ hour', skillLevel: 'Basic', durationAllowed: '2h / 6h', image: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=400', features: [] }
+                    { id: 1, name: 'Basic Home Care', category: 'Daily Care', price: 180000, unit: '/ giờ', skillLevel: 'Basic', durationAllowed: '2h / 4h', image: 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=400', features: [] },
+                    { id: 2, name: 'Premium Home Care', category: 'Daily Care', price: 320000, unit: '/ giờ', skillLevel: 'Intermediate', durationAllowed: '4h / 8h', image: 'https://images.unsplash.com/photo-1516733725897-1aa73b87c8e8?w=400', features: [], recommended: true },
+                    { id: 3, name: 'Post-Surgery Recovery', category: 'Specialized Medical', price: 550000, unit: '/ giờ', skillLevel: 'Expert', durationAllowed: '8h / 24h', image: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=400', features: [] },
+                    { id: 4, name: 'Dementia Care', category: 'Specialized Medical', price: 650000, unit: '/ giờ', skillLevel: 'Expert', durationAllowed: '4h / 12h', image: 'https://images.unsplash.com/photo-1581578731522-aa7c04ae596d?w=400', features: [] },
+                    { id: 5, name: 'Social Enrichment', category: 'Companionship', price: 220000, unit: '/ giờ', skillLevel: 'Basic', durationAllowed: '2h / 6h', image: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=400', features: [] }
                 ];
                 setServices(mappedServices);
             } catch (err) {
@@ -178,7 +178,7 @@ const BookingService = () => {
                                                 </div>
                                             </div>
                                             <div className="text-right md:hidden">
-                                                <p className="text-2xl font-black text-stone-900">${service.price}<span className="text-sm font-medium text-stone-400"> / hour</span></p>
+                                                <p className="text-2xl font-black text-stone-900">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(service.price)}<span className="text-sm font-medium text-stone-400"> / giờ</span></p>
                                             </div>
                                         </div>
                                     </div>
@@ -186,8 +186,8 @@ const BookingService = () => {
                                     {/* Action - Right Side */}
                                     <div className="flex flex-col gap-3 w-full md:w-auto justify-center mt-4 md:mt-0 pl-0 md:pl-8 md:border-l border-stone-100 min-w-[180px]">
                                         <div className="hidden md:block text-right mb-2">
-                                            <p className="text-3xl font-black text-stone-900 tracking-tight">${service.price}</p>
-                                            <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest mt-1">/ Hour</p>
+                                            <p className="text-3xl font-black text-stone-900 tracking-tight">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(service.price)}</p>
+                                            <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest mt-1">/ Giờ</p>
                                         </div>
 
                                         <div className="flex flex-row md:flex-col gap-2 w-full">
