@@ -29,6 +29,7 @@ public class CaregiverService : ICaregiverService
     public async Task<List<CaregiverDto>> GetAllCaregiversAsync(bool? available = null)
     {
         var query = _context.Caregivers
+            .AsNoTracking()
             .Include(c => c.User)
             .AsQueryable();
 
@@ -37,9 +38,7 @@ public class CaregiverService : ICaregiverService
             query = query.Where(c => c.IsAvailable == available.Value);
         }
 
-        var caregivers = await query.ToListAsync();
-
-        return caregivers.Select(c => new CaregiverDto
+        return await query.Select(c => new CaregiverDto
         {
             Id = c.Id,
             UserId = c.UserId,
@@ -52,7 +51,7 @@ public class CaregiverService : ICaregiverService
             ImageUrl = c.ImageUrl,
             IsAvailable = c.IsAvailable,
             HourlyRate = c.HourlyRate
-        }).ToList();
+        }).ToListAsync();
     }
 
     public async Task<CaregiverDto?> GetCaregiverAsync(int caregiverId)

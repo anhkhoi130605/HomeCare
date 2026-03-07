@@ -17,7 +17,8 @@ public class CareRequestService : ICareRequestService
     public async Task<List<CareRequestDto>> GetAllAsync()
     {
         var requests = await _context.CareRequests
-            .Include(r => r.Family).ThenInclude(f => f.User)
+            .AsNoTracking()
+            .Include(r => r.Family)
             .Include(r => r.Patient)
             .Include(r => r.Service)
             .Include(r => r.AssignedCaregiver)
@@ -30,8 +31,9 @@ public class CareRequestService : ICareRequestService
     public async Task<List<CareRequestDto>> GetByFamilyAsync(int familyId)
     {
         var requests = await _context.CareRequests
+            .AsNoTracking()
             .Where(r => r.FamilyId == familyId)
-            .Include(r => r.Family).ThenInclude(f => f.User)
+            .Include(r => r.Family)
             .Include(r => r.Patient)
             .Include(r => r.Service)
             .Include(r => r.AssignedCaregiver)
@@ -44,7 +46,8 @@ public class CareRequestService : ICareRequestService
     public async Task<CareRequestDto?> GetByIdAsync(int id)
     {
         var request = await _context.CareRequests
-            .Include(r => r.Family).ThenInclude(f => f.User)
+            .AsNoTracking()
+            .Include(r => r.Family)
             .Include(r => r.Patient)
             .Include(r => r.Service)
             .Include(r => r.AssignedCaregiver)
