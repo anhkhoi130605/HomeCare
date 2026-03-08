@@ -154,7 +154,7 @@ public class PaymentController : ControllerBase
             }
 
             var status = payment.Status.ToString().ToLower();
-            return Redirect($"http://localhost:8080/family/payments?status={status}&paymentId={payment.Id}");
+            return Redirect($"http://localhost:8080/family/payments?status={status}&paymentId={payment.Id}&careRequestId={payment.CareRequestId}");
         }
         catch (Exception ex)
         {

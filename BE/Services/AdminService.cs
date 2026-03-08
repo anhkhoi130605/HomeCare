@@ -53,7 +53,7 @@ public class AdminService : IAdminService
             .CountAsync();
 
         var monthlyRevenue = await _context.Payments
-            .Where(p => p.PaidAt >= thisMonth && p.Status == PaymentStatus.Completed)
+            .Where(p => p.PaidAt >= thisMonth && p.Status == PaymentStatus.Success)
             .SumAsync(p => p.Amount);
 
         var pendingPayments = await _context.Payments

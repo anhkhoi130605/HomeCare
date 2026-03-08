@@ -130,7 +130,7 @@ public static class SeedData
                 Name = "Basic Home Care",
                 Category = "Daily Care",
                 Description = "Essential daily care including medication reminders, meal assistance, and basic health monitoring.",
-                PricePerHour = 18,
+                PricePerHour = 180000,
                 Type = ServiceType.Basic,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
@@ -140,7 +140,7 @@ public static class SeedData
                 Name = "Premium Home Care",
                 Category = "Daily Care",
                 Description = "Comprehensive care with specialized nursing, physical therapy assistance, and 24/7 monitoring.",
-                PricePerHour = 32,
+                PricePerHour = 320000,
                 Type = ServiceType.Premium,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow

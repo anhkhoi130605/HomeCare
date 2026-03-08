@@ -104,8 +104,8 @@ const ServiceBookingModal = ({ isOpen, onClose, service }) => {
                         </span>
                         <h2 className="text-3xl font-extrabold mb-2 leading-tight">{service?.name || 'Service Booking'}</h2>
                         <div className="flex items-center gap-2 mt-4">
-                            <span className="text-3xl font-black text-[#5fa5ba]">${service?.price || '0'}</span>
-                            <span className="text-white/80 text-sm font-medium">/ hour</span>
+                            <span className="text-3xl font-black text-[#5fa5ba]">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(service?.price || 0)}</span>
+                            <span className="text-white/80 text-sm font-medium">/ giờ</span>
                         </div>
                     </div>
                 </div>
@@ -120,8 +120,8 @@ const ServiceBookingModal = ({ isOpen, onClose, service }) => {
                                     <p className="text-xs font-bold text-[#5fa5ba] uppercase tracking-widest mt-1">Package Summary</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-2xl font-black text-stone-900">${service?.price}</p>
-                                    <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">/ Hour</p>
+                                    <p className="text-2xl font-black text-stone-900">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(service?.price || 0)}</p>
+                                    <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">/ Giờ</p>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[#5fa5ba]/10">
@@ -223,8 +223,8 @@ const ServiceBookingModal = ({ isOpen, onClose, service }) => {
 
                             {/* Cost Section */}
                             <div className="mt-8 pt-6 border-t border-stone-100 flex items-center justify-between mb-8">
-                                <span className="text-sm font-bold text-stone-500">Total Estimated Cost</span>
-                                <span className="text-3xl font-black text-[#5fa5ba]">${totalEstimatedCost}</span>
+                                <span className="text-sm font-bold text-stone-500">Tổng chi phí ước tính</span>
+                                <span className="text-3xl font-black text-[#5fa5ba]">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalEstimatedCost)}</span>
                             </div>
 
                             <button

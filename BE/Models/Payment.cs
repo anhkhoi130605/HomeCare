@@ -12,6 +12,11 @@ public class Payment
     [ForeignKey("ContractId")]
     public Contract? Contract { get; set; }
 
+    public int? CareRequestId { get; set; }
+
+    [ForeignKey("CareRequestId")]
+    public CareRequest? CareRequest { get; set; }
+
     public int FamilyId { get; set; }
 
     [ForeignKey("FamilyId")]

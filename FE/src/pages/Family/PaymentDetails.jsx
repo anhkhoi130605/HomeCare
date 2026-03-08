@@ -11,7 +11,7 @@ const PaymentDetails = ({ type }) => {
     const [request, setRequest] = useState(null);
     const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState('MoMo');
+    const [paymentMethod, setPaymentMethod] = useState('VNPay');
 
     useEffect(() => {
         const fetchResource = async () => {
@@ -34,24 +34,29 @@ const PaymentDetails = ({ type }) => {
         try {
             setProcessing(true);
 
-            // In a real app, logic for payment gateway (VNPay/MoMo) goes here.
-            // Simplified Step 6: Backend updates status to "Paid"
-            // We call updateStatus to simulate/trigger this update.
-            if (isContract) {
-                await contractApi.updateStatus(id, "Paid");
-            } else {
-                await careRequestApi.updateStatus(id, { status: "Paid" });
+            // Step 1: Create payment record (BE auto-calculates amount)
+            const paymentData = isContract
+                ? { contractId: parseInt(id), amount: amount }
+                : { careRequestId: parseInt(id) };
+
+            const paymentResult = await paymentApi.create(paymentData);
+
+            if (!paymentResult?.paymentId) {
+                throw new Error('Failed to create payment');
             }
 
-            toast.success(`Payment Successful! Your request is now Paid.`);
+            // Step 2: Generate VNPay URL and redirect
+            const vnPayResult = await paymentApi.getVnPayUrl(paymentResult.paymentId);
 
-            // Step 7: Redirect to list
-            setTimeout(() => {
-                navigate(isContract ? '/family/contracts' : '/family/requests');
-            }, 1500);
+            if (vnPayResult?.paymentUrl) {
+                // Redirect to VNPay gateway
+                window.location.href = vnPayResult.paymentUrl;
+            } else {
+                throw new Error('Failed to generate payment URL');
+            }
         } catch (error) {
             console.error("Payment error:", error);
-            toast.error("Payment failed. Please try again.");
+            toast.error(error.message || "Payment failed. Please try again.");
         } finally {
             setProcessing(false);
         }
@@ -65,7 +70,7 @@ const PaymentDetails = ({ type }) => {
     const pName = request.patientName || request.patient?.fullName || "Family Member";
     const rDate = request.requestedDate || request.date;
     const sTime = request.startTime || request.start_time;
-    const durationArr = isContract ? null : (request.duration || 0);
+    const durationArr = isContract ? null : (request.duration || 2); // Fallback to 2 hours if old data has 0
     const months = isContract ? (request.durationMonths || 3) : null;
 
     return (
@@ -133,55 +138,6 @@ const PaymentDetails = ({ type }) => {
                             ) : null}
                         </div>
                     </ScrollAnimation>
-
-                    <ScrollAnimation animation="fade-up" delay={0.1}>
-                        <div className="bg-white rounded-[2rem] border border-stone-100 shadow-sm p-8 space-y-6">
-                            <h2 className="text-xl font-bold text-stone-900 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[#5fa5ba]">payments</span>
-                                Payment Method
-                            </h2>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <label className="cursor-pointer group">
-                                    <input
-                                        type="radio"
-                                        name="payment"
-                                        className="hidden peer"
-                                        checked={paymentMethod === 'MoMo'}
-                                        onChange={() => setPaymentMethod('MoMo')}
-                                    />
-                                    <div className="flex items-center gap-4 p-5 rounded-2xl border-2 border-transparent bg-stone-50 peer-checked:border-[#A50064] peer-checked:bg-[#A50064]/5 transition-all hover:bg-stone-100">
-                                        <div className="size-10 rounded-xl bg-[#A50064] flex items-center justify-center shrink-0 shadow-sm">
-                                            <span className="material-symbols-outlined text-white">wallet</span>
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-base font-bold text-stone-800 group-peer-checked:text-[#A50064]">MoMo E-Wallet</span>
-                                            <span className="text-xs text-stone-400 font-bold">Fast & Secure</span>
-                                        </div>
-                                    </div>
-                                </label>
-
-                                <label className="cursor-pointer group">
-                                    <input
-                                        type="radio"
-                                        name="payment"
-                                        className="hidden peer"
-                                        checked={paymentMethod === 'BankQR'}
-                                        onChange={() => setPaymentMethod('BankQR')}
-                                    />
-                                    <div className="flex items-center gap-4 p-5 rounded-2xl border-2 border-transparent bg-stone-50 peer-checked:border-[#5fa5ba] peer-checked:bg-[#5fa5ba]/5 transition-all hover:bg-stone-100">
-                                        <div className="size-10 rounded-xl bg-[#5fa5ba]/10 flex items-center justify-center shrink-0">
-                                            <span className="material-symbols-outlined text-[#5fa5ba]">qr_code_2</span>
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-base font-bold text-stone-800 group-peer-checked:text-[#5fa5ba]">Bank QR</span>
-                                            <span className="text-xs text-stone-400 font-bold">Scan to Pay</span>
-                                        </div>
-                                    </div>
-                                </label>
-                            </div>
-                        </div>
-                    </ScrollAnimation>
                 </div>
 
                 {/* Right: Payment Sidebar */}
@@ -197,8 +153,8 @@ const PaymentDetails = ({ type }) => {
                                 </div>
                                 <div className="h-px bg-white/10 my-4"></div>
                                 <div className="flex justify-between items-end">
-                                    <span className="text-sm font-bold uppercase tracking-widest text-[#5fa5ba]">Total Amount</span>
-                                    <span className="text-4xl font-black text-white">${amount}</span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-[#B2EBF2] mb-1">To Pay</span>
+                                    <span className="text-4xl font-black text-white">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)}</span>
                                 </div>
                             </div>
 

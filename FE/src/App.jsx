@@ -161,6 +161,8 @@ const App = () => (
                 <Route path="contracts/create" element={<FamilyCreateContract />} />
                 <Route path="profile" element={<FamilyProfile />} />
                 <Route path="feedback" element={<FamilyFeedback />} />
+                <Route path="payment/contract/:id" element={<FamilyPaymentDetails type="contract" />} />
+                <Route path="payment/:id" element={<FamilyPaymentDetails type="request" />} />
               </Route>
 
               {/* Caregiver Routes - FIXED: Added path and fixed nesting */}
@@ -180,8 +182,6 @@ const App = () => (
 
               {/* Redirect /CaregiverDashboard to /caregiver to fix 404 */}
               <Route path="/CaregiverDashboard" element={<Navigate to="/caregiver" replace />} />
-              <Route path="/payment/contract/:id" element={<FamilyPaymentDetails type="contract" />} />
-              <Route path="/payment/:id" element={<FamilyPaymentDetails />} />
 
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />

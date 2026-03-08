@@ -67,6 +67,8 @@ public class ScheduleService : IScheduleService
         var query = _context.Schedules
             .Include(s => s.Patient)
             .Include(s => s.Caregiver)
+            .Include(s => s.Contract).ThenInclude(c => c.Service)
+            .Include(s => s.CareRequest).ThenInclude(r => r.Service)
             .AsQueryable();
 
         if (from.HasValue)
@@ -84,6 +86,8 @@ public class ScheduleService : IScheduleService
         var query = _context.Schedules
             .Include(s => s.Patient)
             .Include(s => s.Caregiver)
+            .Include(s => s.Contract).ThenInclude(c => c.Service)
+            .Include(s => s.CareRequest).ThenInclude(r => r.Service)
             .Where(s => s.CaregiverId == caregiverId);
 
         if (from.HasValue)
@@ -101,6 +105,8 @@ public class ScheduleService : IScheduleService
         var query = _context.Schedules
             .Include(s => s.Patient)
             .Include(s => s.Caregiver)
+            .Include(s => s.Contract).ThenInclude(c => c.Service)
+            .Include(s => s.CareRequest).ThenInclude(r => r.Service)
             .Where(s => s.PatientId == patientId);
 
         if (from.HasValue)
@@ -118,6 +124,8 @@ public class ScheduleService : IScheduleService
         var schedule = await _context.Schedules
             .Include(s => s.Patient)
             .Include(s => s.Caregiver)
+            .Include(s => s.Contract).ThenInclude(c => c.Service)
+            .Include(s => s.CareRequest).ThenInclude(r => r.Service)
             .FirstOrDefaultAsync(s => s.Id == id);
 
         return schedule == null ? null : MapToDto(schedule);
@@ -323,6 +331,8 @@ public class ScheduleService : IScheduleService
             CaregiverId = s.CaregiverId,
             CaregiverName = s.Caregiver?.FullName,
             ContractId = s.ContractId,
+            CareRequestId = s.CareRequestId,
+            ServiceName = s.CareRequest?.Service?.Name ?? s.Contract?.Service?.Name,
             Date = s.Date,
             StartTime = s.StartTime,
             EndTime = s.EndTime,

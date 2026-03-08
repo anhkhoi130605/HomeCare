@@ -73,12 +73,47 @@ public class PaymentService : IPaymentService
 
     public async Task<CreatePaymentResult> CreatePaymentAsync(int familyId, CreatePaymentDto dto)
     {
+        decimal amount;
+        string description = dto.Description ?? "";
+
+        // Auto-calculate amount for CareRequest
+        if (dto.CareRequestId.HasValue)
+        {
+            var careRequest = await _context.CareRequests
+                .Include(cr => cr.Service)
+                .FirstOrDefaultAsync(cr => cr.Id == dto.CareRequestId.Value && cr.FamilyId == familyId);
+
+            if (careRequest == null)
+                throw new KeyNotFoundException("Care request not found");
+
+            if (careRequest.Service == null)
+                throw new InvalidOperationException("Service not found for this care request");
+
+            amount = careRequest.Service.PricePerHour * careRequest.Duration;
+            description = string.IsNullOrEmpty(description)
+                ? $"Payment for Care Request #{careRequest.Id} - {careRequest.Service.Name} ({careRequest.Duration}h)"
+                : description;
+
+            // Update CareRequest status to AwaitingPayment
+            careRequest.Status = RequestStatus.AwaitingPayment;
+            careRequest.UpdatedAt = DateTime.UtcNow;
+        }
+        else if (dto.Amount.HasValue)
+        {
+            amount = dto.Amount.Value;
+        }
+        else
+        {
+            throw new InvalidOperationException("Either CareRequestId or Amount must be provided");
+        }
+
         var payment = new Payment
         {
             FamilyId = familyId,
             ContractId = dto.ContractId,
-            Amount = dto.Amount,
-            Description = dto.Description,
+            CareRequestId = dto.CareRequestId,
+            Amount = amount,
+            Description = description,
             Method = PaymentMethod.VNPay,
             Status = PaymentStatus.Pending,
             CreatedAt = DateTime.UtcNow
@@ -158,6 +193,7 @@ public class PaymentService : IPaymentService
         var payment = await _context.Payments
             .Include(p => p.Family)
             .Include(p => p.Contract)
+            .Include(p => p.CareRequest)
             .FirstOrDefaultAsync(p => p.Id == paymentId);
 
         if (payment == null) return null;
@@ -165,9 +201,16 @@ public class PaymentService : IPaymentService
         // Update payment status based on VNPay response
         if (vnPayReturn.vnp_ResponseCode == "00" && vnPayReturn.vnp_TransactionStatus == "00")
         {
-            payment.Status = PaymentStatus.Completed;
+            payment.Status = PaymentStatus.Success;
             payment.PaidAt = DateTime.UtcNow;
             payment.TransactionId = vnPayReturn.vnp_TransactionNo;
+
+            // If this is a care request payment, update request status to Paid
+            if (payment.CareRequestId.HasValue && payment.CareRequest != null)
+            {
+                payment.CareRequest.Status = RequestStatus.Paid;
+                payment.CareRequest.UpdatedAt = DateTime.UtcNow;
+            }
 
             // If this is a contract payment, update contract status
             if (payment.ContractId.HasValue)
@@ -193,6 +236,13 @@ public class PaymentService : IPaymentService
         else
         {
             payment.Status = PaymentStatus.Failed;
+
+            // Revert CareRequest status if payment failed
+            if (payment.CareRequestId.HasValue && payment.CareRequest != null)
+            {
+                payment.CareRequest.Status = RequestStatus.Pending;
+                payment.CareRequest.UpdatedAt = DateTime.UtcNow;
+            }
         }
 
         await _context.SaveChangesAsync();
@@ -218,6 +268,7 @@ public class PaymentService : IPaymentService
             FamilyId = p.FamilyId,
             FamilyName = p.Family?.FullName,
             ContractId = p.ContractId,
+            CareRequestId = p.CareRequestId,
             Amount = p.Amount,
             Status = p.Status.ToString(),
             Method = p.Method.ToString(),

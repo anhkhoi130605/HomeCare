@@ -29,6 +29,7 @@ public class CaregiverService : ICaregiverService
     public async Task<List<CaregiverDto>> GetAllCaregiversAsync(bool? available = null)
     {
         var query = _context.Caregivers
+            .AsNoTracking()
             .Include(c => c.User)
             .AsQueryable();
 
@@ -37,9 +38,7 @@ public class CaregiverService : ICaregiverService
             query = query.Where(c => c.IsAvailable == available.Value);
         }
 
-        var caregivers = await query.ToListAsync();
-
-        return caregivers.Select(c => new CaregiverDto
+        return await query.Select(c => new CaregiverDto
         {
             Id = c.Id,
             UserId = c.UserId,
@@ -52,7 +51,7 @@ public class CaregiverService : ICaregiverService
             ImageUrl = c.ImageUrl,
             IsAvailable = c.IsAvailable,
             HourlyRate = c.HourlyRate
-        }).ToList();
+        }).ToListAsync();
     }
 
     public async Task<CaregiverDto?> GetCaregiverAsync(int caregiverId)
@@ -139,6 +138,8 @@ public class CaregiverService : ICaregiverService
     {
         var query = _context.Schedules
             .Include(s => s.Patient)
+            .Include(s => s.Contract).ThenInclude(c => c.Service)
+            .Include(s => s.CareRequest).ThenInclude(r => r.Service)
             .Where(s => s.CaregiverId == caregiverId);
 
         if (from.HasValue)
@@ -157,6 +158,8 @@ public class CaregiverService : ICaregiverService
             PatientAddress = s.Patient.Address,
             CaregiverId = s.CaregiverId,
             ContractId = s.ContractId,
+            CareRequestId = s.CareRequestId,
+            ServiceName = s.CareRequest?.Service?.Name ?? s.Contract?.Service?.Name,
             Date = s.Date,
             StartTime = s.StartTime,
             EndTime = s.EndTime,
@@ -171,6 +174,8 @@ public class CaregiverService : ICaregiverService
     {
         var schedule = await _context.Schedules
             .Include(s => s.Patient)
+            .Include(s => s.Contract).ThenInclude(c => c.Service)
+            .Include(s => s.CareRequest).ThenInclude(r => r.Service)
             .FirstOrDefaultAsync(s => s.Id == scheduleId && s.CaregiverId == caregiverId);
 
         if (schedule == null) return null;
@@ -188,6 +193,8 @@ public class CaregiverService : ICaregiverService
             PatientAddress = schedule.Patient.Address,
             CaregiverId = schedule.CaregiverId,
             ContractId = schedule.ContractId,
+            CareRequestId = schedule.CareRequestId,
+            ServiceName = schedule.CareRequest?.Service?.Name ?? schedule.Contract?.Service?.Name,
             Date = schedule.Date,
             StartTime = schedule.StartTime,
             EndTime = schedule.EndTime,
@@ -202,6 +209,8 @@ public class CaregiverService : ICaregiverService
     {
         var schedule = await _context.Schedules
             .Include(s => s.Patient)
+            .Include(s => s.Contract).ThenInclude(c => c.Service)
+            .Include(s => s.CareRequest).ThenInclude(r => r.Service)
             .FirstOrDefaultAsync(s => s.Id == scheduleId && s.CaregiverId == caregiverId);
 
         if (schedule == null) return null;
@@ -219,6 +228,8 @@ public class CaregiverService : ICaregiverService
             PatientAddress = schedule.Patient.Address,
             CaregiverId = schedule.CaregiverId,
             ContractId = schedule.ContractId,
+            CareRequestId = schedule.CareRequestId,
+            ServiceName = schedule.CareRequest?.Service?.Name ?? schedule.Contract?.Service?.Name,
             Date = schedule.Date,
             StartTime = schedule.StartTime,
             EndTime = schedule.EndTime,

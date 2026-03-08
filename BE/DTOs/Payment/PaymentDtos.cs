@@ -6,6 +6,7 @@ public class PaymentDto
     public int FamilyId { get; set; }
     public string? FamilyName { get; set; }
     public int? ContractId { get; set; }
+    public int? CareRequestId { get; set; }
     public decimal Amount { get; set; }
     public string Status { get; set; } = null!;
     public string Method { get; set; } = null!;
@@ -18,7 +19,8 @@ public class PaymentDto
 public class CreatePaymentDto
 {
     public int? ContractId { get; set; }
-    public decimal Amount { get; set; }
+    public int? CareRequestId { get; set; }
+    public decimal? Amount { get; set; } // Optional: auto-calculated for CareRequest
     public string? Description { get; set; }
 }
 

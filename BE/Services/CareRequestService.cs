@@ -17,7 +17,8 @@ public class CareRequestService : ICareRequestService
     public async Task<List<CareRequestDto>> GetAllAsync()
     {
         var requests = await _context.CareRequests
-            .Include(r => r.Family).ThenInclude(f => f.User)
+            .AsNoTracking()
+            .Include(r => r.Family)
             .Include(r => r.Patient)
             .Include(r => r.Service)
             .Include(r => r.AssignedCaregiver)
@@ -30,8 +31,9 @@ public class CareRequestService : ICareRequestService
     public async Task<List<CareRequestDto>> GetByFamilyAsync(int familyId)
     {
         var requests = await _context.CareRequests
+            .AsNoTracking()
             .Where(r => r.FamilyId == familyId)
-            .Include(r => r.Family).ThenInclude(f => f.User)
+            .Include(r => r.Family)
             .Include(r => r.Patient)
             .Include(r => r.Service)
             .Include(r => r.AssignedCaregiver)
@@ -44,7 +46,8 @@ public class CareRequestService : ICareRequestService
     public async Task<CareRequestDto?> GetByIdAsync(int id)
     {
         var request = await _context.CareRequests
-            .Include(r => r.Family).ThenInclude(f => f.User)
+            .AsNoTracking()
+            .Include(r => r.Family)
             .Include(r => r.Patient)
             .Include(r => r.Service)
             .Include(r => r.AssignedCaregiver)
@@ -55,6 +58,13 @@ public class CareRequestService : ICareRequestService
 
     public async Task<CareRequestDto> CreateAsync(int familyId, CreateCareRequestDto dto)
     {
+        // Load service to ensure price calculation works later
+        var service = await _context.Services.FindAsync(dto.ServiceId);
+
+        var startTimeStr = dto.StartTime.Length == 5 ? dto.StartTime + ":00" : dto.StartTime;
+        var startTime = TimeSpan.Parse(startTimeStr);
+        var endTime = startTime.Add(TimeSpan.FromHours(dto.Duration));
+
         var request = new CareRequest
         {
             FamilyId = familyId,
@@ -63,8 +73,9 @@ public class CareRequestService : ICareRequestService
             Type = dto.Type,
             Status = RequestStatus.Pending,
             RequestedDate = dto.RequestedDate,
-            StartTime = TimeSpan.Parse(dto.StartTime),
-            EndTime = TimeSpan.Parse(dto.EndTime),
+            StartTime = startTime,
+            EndTime = endTime,
+            Duration = dto.Duration,
             Notes = dto.Notes,
             Address = dto.Address,
             CreatedAt = DateTime.UtcNow
@@ -116,8 +127,31 @@ public class CareRequestService : ICareRequestService
 
         request.AssignedCaregiverId = caregiverId;
         request.AssignedCaregiver = caregiver;
-        request.Status = RequestStatus.Approved;
+        request.Status = RequestStatus.Assigned;
         request.UpdatedAt = DateTime.UtcNow;
+
+        var existingSchedule = await _context.Schedules.FirstOrDefaultAsync(s => s.CareRequestId == id);
+        if (existingSchedule != null)
+        {
+            existingSchedule.CaregiverId = caregiverId;
+            existingSchedule.Status = ScheduleStatus.Scheduled;
+        }
+        else
+        {
+            var schedule = new Schedule
+            {
+                PatientId = request.PatientId,
+                CaregiverId = caregiverId,
+                CareRequestId = request.Id,
+                Date = request.RequestedDate,
+                StartTime = request.StartTime,
+                EndTime = request.EndTime,
+                Status = ScheduleStatus.Scheduled,
+                Notes = $"One-time request for: {request.Service.Name}",
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.Schedules.Add(schedule);
+        }
 
         await _context.SaveChangesAsync();
         return MapToDto(request);
@@ -154,7 +188,9 @@ public class CareRequestService : ICareRequestService
             Notes = r.Notes,
             Address = r.Address,
             AdminNotes = r.AdminNotes,
-            CreatedAt = r.CreatedAt
+            CreatedAt = r.CreatedAt,
+            Duration = r.Duration,
+            TotalAmount = r.Service != null ? (r.Service.PricePerHour * r.Duration) : 0
         };
     }
 }
