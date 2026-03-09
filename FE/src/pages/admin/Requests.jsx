@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import AdminHeader from "@/components/layout/AdminHeader";
 import { adminApi, careRequestApi, scheduleApi, authApi } from "@/lib/api";
+import { toast } from 'sonner';
 
 const getStatusClass = (status) => {
   switch (status?.toLowerCase()) {
@@ -82,8 +83,8 @@ const Requests = () => {
     if (!confirm("Are you sure you want to reject this request?")) return;
     try {
       setProcessing(requestId);
-      await careRequestApi.updateStatus(requestId, { status: 6 }); // 6 = Rejected
-      await fetchData();
+      const updated = await careRequestApi.updateStatus(requestId, { status: 6 }); // 6 = Rejected
+      setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: updated?.status || 'Rejected' } : r));
     } catch (error) {
       console.error("Failed to reject:", error);
       alert("Failed to reject request: " + error.message);
@@ -96,14 +97,32 @@ const Requests = () => {
     if (!selectedRequest || !selectedCaregiver) return;
     try {
       setProcessing(selectedRequest.id);
-      await careRequestApi.assignCaregiver(selectedRequest.id, parseInt(selectedCaregiver));
-      await fetchData();
+      const updated = await careRequestApi.assignCaregiver(selectedRequest.id, parseInt(selectedCaregiver));
+      setRequests(prev => prev.map(r => r.id === selectedRequest.id ? { 
+        ...r, 
+        status: updated?.status || 'Assigned', 
+        assignedCaregiverName: caregivers.find(c => c.id === parseInt(selectedCaregiver))?.fullName 
+      } : r));
       setShowAssignModal(false);
       setSelectedRequest(null);
       setSelectedCaregiver('');
     } catch (error) {
       console.error("Failed to assign:", error);
       alert("Failed to assign caregiver: " + error.message);
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleApprove = async (requestId) => {
+    try {
+      setProcessing(requestId);
+      const updated = await careRequestApi.updateStatus(requestId, { status: 1 }); // 1 = AwaitingPayment
+      toast.success("Request approved! Awaiting family payment.");
+      setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: updated?.status || 'AwaitingPayment' } : r));
+    } catch (error) {
+      console.error("Failed to approve:", error);
+      toast.error("Failed to approve request: " + error?.response?.data || error.message);
     } finally {
       setProcessing(null);
     }
@@ -279,12 +298,25 @@ const Requests = () => {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="gap-1"
+                                  className="gap-1 border-blue-200 hover:bg-blue-50 text-blue-700"
                                   onClick={() => openAssignModal(request)}
                                   disabled={processing === request.id}
                                 >
                                   <UserPlus className="w-3 h-3" />
                                   Assign Caregiver
+                                </Button>
+                              )}
+
+                              {request.status === 'Pending' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1 border-green-200 hover:bg-green-50 text-green-700"
+                                  onClick={() => handleApprove(request.id)}
+                                  disabled={processing === request.id}
+                                >
+                                  <Check className="w-3 h-3" />
+                                  Approve
                                 </Button>
                               )}
 

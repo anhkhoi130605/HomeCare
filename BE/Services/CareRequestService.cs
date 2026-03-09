@@ -8,10 +8,12 @@ namespace BE.Services;
 public class CareRequestService : ICareRequestService
 {
     private readonly ApplicationDbContext _context;
+    private readonly INotificationService _notificationService;
 
-    public CareRequestService(ApplicationDbContext context)
+    public CareRequestService(ApplicationDbContext context, INotificationService notificationService)
     {
         _context = context;
+        _notificationService = notificationService;
     }
 
     public async Task<List<CareRequestDto>> GetAllAsync()
@@ -109,6 +111,19 @@ public class CareRequestService : ICareRequestService
         if (adminNotes != null) request.AdminNotes = adminNotes;
 
         await _context.SaveChangesAsync();
+
+        // Send notification if request is approved and waiting for payment
+        if (status == RequestStatus.AwaitingPayment && request.Family?.UserId != null)
+        {
+            await _notificationService.CreateNotificationAsync(
+                request.Family.UserId,
+                "Request Approved",
+                $"Your care request for {request.Patient?.FullName} has been approved. Please proceed to payment to finalize the booking.",
+                "Payment",
+                request.Id
+            );
+        }
+
         return MapToDto(request);
     }
 
