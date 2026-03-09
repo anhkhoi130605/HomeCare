@@ -114,15 +114,8 @@ const CreateRequest = () => {
             };
 
             const createdRequest = await careRequestApi.create(payload);
-            toast.success("Care request created successfully! Please proceed to payment.");
-            
-            // Redirect to payment page instead of requests list
-            const requestId = createdRequest?.id; // Assuming API returns the created object with an ID
-            if (requestId) {
-                navigate(`/family/payment/${requestId}?type=request`);
-            } else {
-                navigate('/family/requests');
-            }
+            toast.success("Care request created successfully! Please wait for admin approval.");
+            navigate('/family/requests');
         } catch (error) {
             console.error("Failed to create request:", error);
             toast.error("Failed to submit request: " + error.message);

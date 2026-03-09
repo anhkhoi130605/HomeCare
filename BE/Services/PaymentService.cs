@@ -75,6 +75,7 @@ public class PaymentService : IPaymentService
     {
         decimal amount;
         string description = dto.Description ?? "";
+        Payment? existingPayment = null;
 
         // Auto-calculate amount for CareRequest
         if (dto.CareRequestId.HasValue)
@@ -97,6 +98,17 @@ public class PaymentService : IPaymentService
             // Update CareRequest status to AwaitingPayment
             careRequest.Status = RequestStatus.AwaitingPayment;
             careRequest.UpdatedAt = DateTime.UtcNow;
+
+            existingPayment = await _context.Payments
+                .FirstOrDefaultAsync(p => p.CareRequestId == dto.CareRequestId.Value);
+        }
+        else if (dto.ContractId.HasValue)
+        {
+            if (dto.Amount.HasValue) amount = dto.Amount.Value;
+            else throw new InvalidOperationException("Amount must be provided for contract payment");
+            
+            existingPayment = await _context.Payments
+                .FirstOrDefaultAsync(p => p.ContractId == dto.ContractId.Value);
         }
         else if (dto.Amount.HasValue)
         {
@@ -105,6 +117,31 @@ public class PaymentService : IPaymentService
         else
         {
             throw new InvalidOperationException("Either CareRequestId or Amount must be provided");
+        }
+
+        if (existingPayment != null)
+        {
+            if (existingPayment.Status == PaymentStatus.Success)
+            {
+                throw new InvalidOperationException("This request or contract has already been paid successfully.");
+            }
+
+            // Reuse existing payment
+            existingPayment.Amount = amount;
+            existingPayment.Description = description;
+            existingPayment.Status = PaymentStatus.Pending;
+            existingPayment.CreatedAt = DateTime.UtcNow;
+            // Clear old transaction Id
+            existingPayment.TransactionId = null;
+
+            await _context.SaveChangesAsync();
+
+            return new CreatePaymentResult
+            {
+                PaymentId = existingPayment.Id,
+                Amount = existingPayment.Amount,
+                Status = existingPayment.Status.ToString()
+            };
         }
 
         var payment = new Payment

@@ -767,6 +767,14 @@ export const careRequestApi = {
             method: 'DELETE',
         });
     },
+
+    // Refund request (admin)
+    refund: async (id, data) => {
+        return apiCall(`/carerequest/${id}/refund`, {
+            method: 'PUT',
+            body: JSON.stringify(data || {}),
+        });
+    },
 };
 
 // ========== NOTIFICATION API ==========

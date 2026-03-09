@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import AdminHeader from "@/components/layout/AdminHeader";
 import { adminApi, careRequestApi, scheduleApi, authApi } from "@/lib/api";
+import { toast } from 'sonner';
 
 const getStatusClass = (status) => {
   switch (status?.toLowerCase()) {
@@ -78,15 +79,23 @@ const Requests = () => {
   // Note: Requests don't have a separate "Approve" step anymore - they go from Paid -> Assigned when a caregiver is assigned.
 
 
-  const handleReject = async (requestId) => {
-    if (!confirm("Are you sure you want to reject this request?")) return;
+  const handleReject = async (requestId, isPaid) => {
+    const actionName = isPaid ? "refund and reject" : "reject";
+    if (!confirm(`Are you sure you want to ${actionName} this request?`)) return;
     try {
       setProcessing(requestId);
-      await careRequestApi.updateStatus(requestId, { status: 6 }); // 6 = Rejected
-      await fetchData();
+      let updated;
+      if (isPaid) {
+        updated = await careRequestApi.refund(requestId, { adminNotes: "Admin refunded and rejected the request." });
+        toast.success("Request refunded successfully.");
+      } else {
+        updated = await careRequestApi.updateStatus(requestId, { status: 6 }); // 6 = Rejected
+        toast.success("Request rejected successfully.");
+      }
+      setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: updated?.status || (isPaid ? 'Cancelled' : 'Rejected') } : r));
     } catch (error) {
-      console.error("Failed to reject:", error);
-      alert("Failed to reject request: " + error.message);
+      console.error(`Failed to ${actionName}:`, error);
+      toast.error(`Failed to ${actionName} request: ` + (error?.response?.data || error.message));
     } finally {
       setProcessing(null);
     }
@@ -96,14 +105,32 @@ const Requests = () => {
     if (!selectedRequest || !selectedCaregiver) return;
     try {
       setProcessing(selectedRequest.id);
-      await careRequestApi.assignCaregiver(selectedRequest.id, parseInt(selectedCaregiver));
-      await fetchData();
+      const updated = await careRequestApi.assignCaregiver(selectedRequest.id, parseInt(selectedCaregiver));
+      setRequests(prev => prev.map(r => r.id === selectedRequest.id ? { 
+        ...r, 
+        status: updated?.status || 'Assigned', 
+        assignedCaregiverName: caregivers.find(c => c.id === parseInt(selectedCaregiver))?.fullName 
+      } : r));
       setShowAssignModal(false);
       setSelectedRequest(null);
       setSelectedCaregiver('');
     } catch (error) {
       console.error("Failed to assign:", error);
       alert("Failed to assign caregiver: " + error.message);
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleApprove = async (requestId) => {
+    try {
+      setProcessing(requestId);
+      const updated = await careRequestApi.updateStatus(requestId, { status: 1 }); // 1 = AwaitingPayment
+      toast.success("Request approved! Awaiting family payment.");
+      setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: updated?.status || 'AwaitingPayment' } : r));
+    } catch (error) {
+      console.error("Failed to approve:", error);
+      toast.error("Failed to approve request: " + error?.response?.data || error.message);
     } finally {
       setProcessing(null);
     }
@@ -275,16 +302,29 @@ const Requests = () => {
                         <div className="flex items-center justify-end gap-2">
                           {canManage && (
                             <>
-                              {(request.status === 'Paid' || request.status === 'Approved') && !request.assignedCaregiverName && (
+                              {(request.status === 'Paid' || request.status === 'Approved' || request.status === 'AwaitingPayment') && !request.assignedCaregiverName && (
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="gap-1"
+                                  className="gap-1 border-blue-200 hover:bg-blue-50 text-blue-700 disabled:opacity-50"
                                   onClick={() => openAssignModal(request)}
-                                  disabled={processing === request.id}
+                                  disabled={request.status === 'AwaitingPayment' || processing === request.id}
                                 >
                                   <UserPlus className="w-3 h-3" />
                                   Assign Caregiver
+                                </Button>
+                              )}
+
+                              {request.status === 'Pending' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1 border-green-200 hover:bg-green-50 text-green-700"
+                                  onClick={() => handleApprove(request.id)}
+                                  disabled={processing === request.id}
+                                >
+                                  <Check className="w-3 h-3" />
+                                  Approve
                                 </Button>
                               )}
 
@@ -293,11 +333,11 @@ const Requests = () => {
                                   variant="destructive"
                                   size="sm"
                                   className="gap-1"
-                                  onClick={() => handleReject(request.id)}
+                                  onClick={() => handleReject(request.id, request.status === 'Paid' || request.status === 'Approved')}
                                   disabled={processing === request.id}
                                 >
                                   <X className="w-3 h-3" />
-                                  Reject
+                                  {(request.status === 'Paid' || request.status === 'Approved') ? "Refund & Reject" : "Reject"}
                                 </Button>
                               )}
                             </>
