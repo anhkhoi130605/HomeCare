@@ -172,6 +172,46 @@ public class CareRequestService : ICareRequestService
         return MapToDto(request);
     }
 
+    public async Task<CareRequestDto?> RefundAsync(int id, string? adminNotes = null)
+    {
+        var request = await _context.CareRequests
+            .Include(r => r.Family).ThenInclude(f => f.User)
+            .Include(r => r.Patient)
+            .Include(r => r.Service)
+            .FirstOrDefaultAsync(r => r.Id == id);
+
+        if (request == null) return null;
+
+        // Cancel the Care Request
+        request.Status = RequestStatus.Cancelled;
+        request.UpdatedAt = DateTime.UtcNow;
+        if (adminNotes != null) request.AdminNotes = adminNotes;
+
+        // Find associated successful payment and refund it
+        var payment = await _context.Payments
+            .FirstOrDefaultAsync(p => p.CareRequestId == id && p.Status == PaymentStatus.Success);
+            
+        if (payment != null)
+        {
+            payment.Status = PaymentStatus.Refunded;
+            
+            // Send notification about refund
+            if (request.Family?.UserId != null)
+            {
+                await _notificationService.CreateNotificationAsync(
+                    request.Family.UserId,
+                    "Payment Refunded",
+                    $"Your payment for care request '{request.Service?.Name}' has been refunded. Reason: {adminNotes ?? "Admin cancelled"}",
+                    "Payment",
+                    request.Id
+                );
+            }
+        }
+
+        await _context.SaveChangesAsync();
+        return MapToDto(request);
+    }
+
     public async Task<bool> DeleteAsync(int id)
     {
         var request = await _context.CareRequests.FindAsync(id);

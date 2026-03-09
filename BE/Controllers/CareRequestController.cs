@@ -95,6 +95,16 @@ public class CareRequestController : ControllerBase
         return Ok(request);
     }
 
+    // PUT /api/carerequest/{id}/refund
+    [HttpPut("{id}/refund")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
+    public async Task<ActionResult<CareRequestDto>> Refund(int id, [FromBody] UpdateRequestStatusDto dto)
+    {
+        var request = await _careRequestService.RefundAsync(id, dto.AdminNotes);
+        if (request == null) return NotFound();
+        return Ok(request);
+    }
+
     // DELETE /api/carerequest/{id}
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin,OperationAdmin,Family")]

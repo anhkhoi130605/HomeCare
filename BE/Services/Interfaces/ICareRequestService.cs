@@ -10,6 +10,7 @@ public interface ICareRequestService
     Task<CareRequestDto> CreateAsync(int familyId, CreateCareRequestDto dto);
     Task<CareRequestDto?> UpdateStatusAsync(int id, RequestStatus status, string? adminNotes = null);
     Task<CareRequestDto?> AssignCaregiverAsync(int id, int caregiverId);
+    Task<CareRequestDto?> RefundAsync(int id, string? adminNotes = null);
     Task<bool> DeleteAsync(int id);
 }
 

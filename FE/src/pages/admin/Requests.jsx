@@ -79,15 +79,23 @@ const Requests = () => {
   // Note: Requests don't have a separate "Approve" step anymore - they go from Paid -> Assigned when a caregiver is assigned.
 
 
-  const handleReject = async (requestId) => {
-    if (!confirm("Are you sure you want to reject this request?")) return;
+  const handleReject = async (requestId, isPaid) => {
+    const actionName = isPaid ? "refund and reject" : "reject";
+    if (!confirm(`Are you sure you want to ${actionName} this request?`)) return;
     try {
       setProcessing(requestId);
-      const updated = await careRequestApi.updateStatus(requestId, { status: 6 }); // 6 = Rejected
-      setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: updated?.status || 'Rejected' } : r));
+      let updated;
+      if (isPaid) {
+        updated = await careRequestApi.refund(requestId, { adminNotes: "Admin refunded and rejected the request." });
+        toast.success("Request refunded successfully.");
+      } else {
+        updated = await careRequestApi.updateStatus(requestId, { status: 6 }); // 6 = Rejected
+        toast.success("Request rejected successfully.");
+      }
+      setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: updated?.status || (isPaid ? 'Cancelled' : 'Rejected') } : r));
     } catch (error) {
-      console.error("Failed to reject:", error);
-      alert("Failed to reject request: " + error.message);
+      console.error(`Failed to ${actionName}:`, error);
+      toast.error(`Failed to ${actionName} request: ` + (error?.response?.data || error.message));
     } finally {
       setProcessing(null);
     }
@@ -294,13 +302,13 @@ const Requests = () => {
                         <div className="flex items-center justify-end gap-2">
                           {canManage && (
                             <>
-                              {(request.status === 'Paid' || request.status === 'Approved') && !request.assignedCaregiverName && (
+                              {(request.status === 'Paid' || request.status === 'Approved' || request.status === 'AwaitingPayment') && !request.assignedCaregiverName && (
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="gap-1 border-blue-200 hover:bg-blue-50 text-blue-700"
+                                  className="gap-1 border-blue-200 hover:bg-blue-50 text-blue-700 disabled:opacity-50"
                                   onClick={() => openAssignModal(request)}
-                                  disabled={processing === request.id}
+                                  disabled={request.status === 'AwaitingPayment' || processing === request.id}
                                 >
                                   <UserPlus className="w-3 h-3" />
                                   Assign Caregiver
@@ -325,11 +333,11 @@ const Requests = () => {
                                   variant="destructive"
                                   size="sm"
                                   className="gap-1"
-                                  onClick={() => handleReject(request.id)}
+                                  onClick={() => handleReject(request.id, request.status === 'Paid' || request.status === 'Approved')}
                                   disabled={processing === request.id}
                                 >
                                   <X className="w-3 h-3" />
-                                  Reject
+                                  {(request.status === 'Paid' || request.status === 'Approved') ? "Refund & Reject" : "Reject"}
                                 </Button>
                               )}
                             </>
