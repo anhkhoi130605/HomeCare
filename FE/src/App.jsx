@@ -73,7 +73,7 @@ const FamilyProfile = lazy(() => import("./pages/Family/FamilyProfile"));
 const FamilyCareLogDetail = lazy(() => import("./pages/Family/CareLogDetail"));
 const FamilyFeedback = lazy(() => import("./pages/Family/Feedback"));
 const FamilyPaymentDetails = lazy(() => import("./pages/Family/PaymentDetails"));
-
+const FamilyChangePassword = lazy(() => import("./pages/Family/ChangePassword"));
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -137,6 +137,7 @@ const App = () => (
                 <Route path="requests/:id" element={<FamilyRequestDetail />} />
                 <Route path="contracts/create" element={<FamilyCreateContract />} />
                 <Route path="profile" element={<FamilyProfile />} />
+                <Route path="change-password" element={<FamilyChangePassword />} />
                 <Route path="feedback" element={<FamilyFeedback />} />
               </Route>
 

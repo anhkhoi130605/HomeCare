@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Heart, Eye, EyeOff, Lock, LogIn, Loader2 } from "lucide-react";
 import { authApi } from "@/lib/api";
-
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider, facebookProvider } from "../../firebase/firebase";
 const GoogleIcon = () => (
   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -72,7 +73,54 @@ const Login = () => {
       setIsLoading(false);
     }
   };
+  // --- Thêm vào từ dòng 95 ---
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    setError("");
+    try {
+      // 1. Mở cửa sổ đăng nhập của Google
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      
+      // 2. Lấy mã Token để gửi cho Backend .NET sau này
+      const token = await user.getIdToken();
+      console.log("Đăng nhập Google thành công:", user.email);
+      console.log("Token:", token);
 
+      // 3. Tạm thời điều hướng để kiểm tra tính năng
+      navigate("/family/dashboard");
+    } catch (err) {
+      console.error("Lỗi Google Auth:", err);
+      setError("Không thể đăng nhập bằng Google. Vui lòng thử lại.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  const handleFacebookLogin = async () => {
+    setIsLoading(true);
+    setError("");
+    try {
+      const result = await signInWithPopup(auth, facebookProvider);
+      const user = result.user;
+      const token = await user.getIdToken();
+      
+      console.log("Đăng nhập Facebook thành công:", user.displayName);
+      console.log("Token FB:", token);
+      
+      navigate("/family/dashboard");
+    } catch (err) {
+      console.error("Lỗi Facebook Auth:", err);
+      // Lỗi phổ biến của FB: Trùng email với Google
+      if (err.code === 'auth/account-exists-with-different-credential') {
+        setError("Email này đã được đăng nhập bằng Google. Vui lòng dùng Google.");
+      } else {
+        setError("Không thể đăng nhập bằng Facebook. Vui lòng thử lại.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 via-background to-cyan-50 p-4">
       {/* Background Decorations */}
@@ -109,8 +157,9 @@ const Login = () => {
               <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg">
                 {error}
               </div>
-            )}
-
+            )
+            
+            }
             <div className="space-y-2">
               <Label htmlFor="email">Email or Phone Number</Label>
               <Input
@@ -189,23 +238,25 @@ const Login = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <Button
-                type="button"
-                variant="outline"
-                className="h-11 gap-2 border-2 hover:bg-blue-50"
-                onClick={() => console.log("Google login")}
-              >
-                <GoogleIcon />
-                <span className="hidden sm:inline">Google</span>
-              </Button>
+    type="button"
+    variant="outline"
+    className="h-11 gap-2 border-2 hover:bg-blue-50"
+    onClick={handleGoogleLogin} // <-- Đã sửa thành gọi hàm đăng nhập
+    disabled={isLoading}        // <-- Đã thêm để khóa nút khi đang xoay
+  >
+    <GoogleIcon />
+    <span className="hidden sm:inline">Google</span>
+</Button>
               <Button
-                type="button"
-                variant="outline"
-                className="h-11 gap-2 border-2 hover:bg-blue-50"
-                onClick={() => console.log("Facebook login")}
-              >
-                <FacebookIcon />
-                <span className="hidden sm:inline">Facebook</span>
-              </Button>
+       type="button"
+       variant="outline"
+      className="h-11 gap-2 border-2 hover:bg-blue-50"
+      onClick={handleFacebookLogin} // <-- Sửa dòng này
+      disabled={isLoading}          // <-- Thêm dòng này
+  >
+    <FacebookIcon />
+    <span className="hidden sm:inline">Facebook</span>
+  </Button>
             </div>
 
             <p className="text-center text-sm text-muted-foreground">
