@@ -23,6 +23,8 @@ import OurCaregivers from "./pages/Public/OurCaregivers";
 import Contact from "./pages/Public/Contact";
 import Login from "./pages/Auth/Login";
 import Register from "./pages/Auth/Register";
+import ForgotPassword from "./pages/Auth/ForgotPassword";
+import ResetPassword from "./pages/Auth/ResetPassword";
 import NotFound from "./pages/Public/NotFound";
 
 // Caregiver Pages
@@ -35,9 +37,11 @@ import Incidents from './pages/Caregivers/Incidents';
 import MySchedule from './pages/Caregivers/MySchedule';
 import Profile from './pages/Caregivers/Profile';
 import CaregiverReports from './pages/Caregivers/Reports';
+const IncidentDetail = lazy(() => import("./pages/Caregivers/IncidentDetail"));
 
 // Admin Pages (Lazy Loaded)
 const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
+const Users = lazy(() => import("./pages/admin/Users"));
 const Patients = lazy(() => import("./pages/admin/Patients"));
 const Caregivers = lazy(() => import("./pages/admin/Caregivers"));
 const Requests = lazy(() => import("./pages/admin/Requests"));
@@ -45,10 +49,41 @@ const Schedule = lazy(() => import("./pages/admin/Schedule"));
 const Reports = lazy(() => import("./pages/admin/Reports"));
 const CareLogDetail = lazy(() => import("./pages/admin/CareLogDetail"));
 const Payments = lazy(() => import("./pages/admin/Payments"));
+const AdminIncidents = lazy(() => import("./pages/admin/Incidents"));
+const AdminContracts = lazy(() => import("./pages/admin/Contracts"));
+
+// Operation Admin Pages (Lazy Loaded)
+const OperationDashboard = lazy(() => import("./pages/operation-admin/Dashboard"));
+const OperationPatients = lazy(() => import("./pages/operation-admin/Patients"));
+const OperationCaregivers = lazy(() => import("./pages/operation-admin/Caregivers"));
+const OperationRequests = lazy(() => import("./pages/operation-admin/Requests"));
+const OperationSchedule = lazy(() => import("./pages/operation-admin/Schedule"));
+const OperationIncidents = lazy(() => import("./pages/operation-admin/Incidents"));
+const OperationContracts = lazy(() => import("./pages/operation-admin/Contracts"));
+const OperationReports = lazy(() => import("./pages/operation-admin/Reports"));
 
 // Family Pages (Lazy Loaded)
 const FamilyLayout = lazy(() => import("./components/layout/FamilyLayout"));
+const FamilyDashboard = lazy(() => import("./pages/Family/FamilyDashboard"));
 const FamilyWelcome = lazy(() => import("./pages/Family/Welcome"));
+
+const FamilyPatientList = lazy(() => import("./pages/Family/PatientList"));
+const FamilySchedule = lazy(() => import("./pages/Family/CareSchedule"));
+const FamilyBooking = lazy(() => import("./pages/Family/BookingService"));
+const FamilyRequests = lazy(() => import("./pages/Family/Request"));
+const FamilyContract = lazy(() => import("./pages/Family/FamilyContract"));
+const FamilyPayment = lazy(() => import("./pages/Family/FamilyPayment"));
+const FamilyReport = lazy(() => import("./pages/Family/CareReport"));
+const FamilyPatientDetail = lazy(() => import("./pages/Family/PatientDetail"));
+const FamilyShiftDetail = lazy(() => import("./pages/Family/ShiftDetail"));
+const FamilyHealthReportDetail = lazy(() => import("./pages/Family/HealthReportDetail"));
+const FamilyCreateRequest = lazy(() => import("./pages/Family/CreateRequest"));
+const FamilyRequestDetail = lazy(() => import("./pages/Family/RequestDetail"));
+const FamilyCreateContract = lazy(() => import("./pages/Family/CreateContract"));
+const FamilyProfile = lazy(() => import("./pages/Family/FamilyProfile"));
+const FamilyCareLogDetail = lazy(() => import("./pages/Family/CareLogDetail"));
+const FamilyFeedback = lazy(() => import("./pages/Family/Feedback"));
+const FamilyPaymentDetails = lazy(() => import("./pages/Family/PaymentDetails"));
 
 const queryClient = new QueryClient();
 
@@ -58,7 +93,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <ScrollToTop />
           <Suspense fallback={<Loader />}>
             <Routes>
@@ -75,10 +110,14 @@ const App = () => (
               {/* Auth Routes */}
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/auth/reset-password" element={<ResetPassword />} />
 
               {/* Admin Routes */}
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<Dashboard />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="users" element={<Users />} />
                 <Route path="patients" element={<Patients />} />
                 <Route path="caregivers" element={<Caregivers />} />
                 <Route path="requests" element={<Requests />} />
@@ -86,16 +125,52 @@ const App = () => (
                 <Route path="reports" element={<Reports />} />
                 <Route path="reports/care-log/:id" element={<CareLogDetail />} />
                 <Route path="payments" element={<Payments />} />
+                <Route path="incidents" element={<AdminIncidents />} />
+                <Route path="contracts" element={<AdminContracts />} />
+              </Route>
+
+              {/* Operation Admin Routes */}
+              <Route path="/operation-admin" element={<AdminLayout />}>
+                <Route index element={<OperationDashboard />} />
+                <Route path="dashboard" element={<OperationDashboard />} />
+                <Route path="patients" element={<OperationPatients />} />
+                <Route path="caregivers" element={<OperationCaregivers />} />
+                <Route path="requests" element={<OperationRequests />} />
+                <Route path="schedule" element={<OperationSchedule />} />
+                <Route path="incidents" element={<OperationIncidents />} />
+                <Route path="contracts" element={<OperationContracts />} />
+                <Route path="reports" element={<OperationReports />} />
               </Route>
 
               {/* Family Routes */}
               <Route path="/family" element={<FamilyLayout />}>
                 <Route index element={<FamilyWelcome />} />
+                <Route path="dashboard" element={<FamilyDashboard />} />
+                <Route path="patients" element={<FamilyPatientList />} />
+                <Route path="schedule" element={<FamilySchedule />} />
+                <Route path="services" element={<FamilyBooking />} />
+                <Route path="requests" element={<FamilyRequests />} />
+                <Route path="contracts" element={<FamilyContract />} />
+                <Route path="payments" element={<FamilyPayment />} />
+                <Route path="reports" element={<FamilyReport />} />
+                <Route path="patients/detail/:id" element={<FamilyPatientDetail />} />
+                <Route path="schedule/detail/:id" element={<FamilyShiftDetail />} />
+                <Route path="reports/detail/:id" element={<FamilyHealthReportDetail />} />
+                <Route path="care-logs/:id" element={<FamilyCareLogDetail />} />
+                <Route path="requests/create" element={<FamilyCreateRequest />} />
+                <Route path="requests/:id" element={<FamilyRequestDetail />} />
+                <Route path="contracts/create" element={<FamilyCreateContract />} />
+                <Route path="profile" element={<FamilyProfile />} />
+                <Route path="feedback" element={<FamilyFeedback />} />
+                <Route path="payment/contract/:id" element={<FamilyPaymentDetails type="contract" />} />
+                <Route path="payment/:id" element={<FamilyPaymentDetails type="request" />} />
               </Route>
 
               {/* Caregiver Routes - FIXED: Added path and fixed nesting */}
               <Route path="/caregiver" element={<CaregiverLayout />}>
                 <Route index element={<CaregiverDashboard />} />
+                <Route path="dashboard" element={<CaregiverDashboard />} />
+
                 <Route path="active-shift" element={<ActiveShift />} />
                 <Route path="care-logs" element={<CareLogs />} />
                 <Route path="care-logs/:id" element={<CareLogDetails />} />
@@ -104,6 +179,9 @@ const App = () => (
                 <Route path="incidents" element={<Incidents />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="reports" element={<CaregiverReports />} />
+
+                <Route path="incidents/detail/:id" element={<IncidentDetail />} />
+
               </Route>
 
               {/* Redirect /CaregiverDashboard to /caregiver to fix 404 */}

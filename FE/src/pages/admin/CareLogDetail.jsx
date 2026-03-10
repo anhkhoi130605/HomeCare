@@ -1,37 +1,78 @@
+import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ChevronLeft, CheckCircle, Send, AlertTriangle, Activity, Pill, UtensilsCrossed, PersonStanding, Clock, User, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-
-const vitalSigns = [
-  { label: "BLOOD PRESSURE", value: "145/92", status: "HIGH", statusColor: "bg-red-100 text-red-700", target: "Target: < 130/80 mmHg" },
-  { label: "HEART RATE", value: "88", unit: "BPM", status: "STABLE", statusColor: "bg-green-100 text-green-700", target: "Resting range: 60-100" },
-  { label: "SPO2 LEVEL", value: "97%", status: "OPTIMAL", statusColor: "bg-green-100 text-green-700", target: "Normal: 95% - 100%" },
-];
-
-const medications = [
-  { name: "Lisinopril", dosage: "10mg", schedule: "Morning (08:00 AM)", status: "ADMINISTERED", statusColor: "text-green-600" },
-  { name: "Metformin", dosage: "500mg", schedule: "Morning (08:00 AM)", status: "MISSED / REFUSED", statusColor: "text-red-600", highlight: true },
-  { name: "Multivitamin", dosage: "1 Tablet", schedule: "Morning (08:00 AM)", status: "ADMINISTERED", statusColor: "text-green-600" },
-];
-
-const patientInfo = {
-  name: "Robert Fox",
-  age: "78 Years",
-  gender: "Male",
-  riskProfile: "HIGH RISK PROFILE",
-  diagnoses: ["Hypertension", "Type 2 Diabetes", "Early Dementia"],
-  emergencyContact: {
-    name: "James Fox",
-    relationship: "SON / PRIMARY GUARDIAN",
-    phone: "+1 (555) 123-4567",
-  },
-};
+import { careLogApi, adminApi } from "@/lib/api";
 
 const CareLogDetail = () => {
   const { id } = useParams();
+  const [careLog, setCareLog] = useState(null);
+  const [patient, setPatient] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const logData = await careLogApi.getById(id);
+        setCareLog(logData);
+
+        // Fetch patient data if available
+        if (logData?.patientId) {
+          const patients = await adminApi.getPatients();
+          const foundPatient = patients?.find(p => p.id === logData.patientId);
+          setPatient(foundPatient);
+        }
+      } catch (error) {
+        console.error("Failed to fetch care log:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [id]);
+
+  const formatTime = (dateStr) => {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!careLog) {
+    return (
+      <div className="p-6">
+        <Link to="/admin/reports" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="w-4 h-4" />
+          Back to Reports
+        </Link>
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Care log not found</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Parse vital signs from notes or use defaults
+  const vitalSigns = [
+    { label: "BLOOD PRESSURE", value: careLog.bloodPressure || "N/A", status: "RECORDED", statusColor: "bg-blue-100 text-blue-700", target: "Target: < 130/80 mmHg" },
+    { label: "HEART RATE", value: careLog.heartRate || "N/A", unit: "BPM", status: "STABLE", statusColor: "bg-green-100 text-green-700", target: "Resting range: 60-100" },
+    { label: "TEMPERATURE", value: careLog.temperature || "N/A", unit: "°C", status: "NORMAL", statusColor: "bg-green-100 text-green-700", target: "Normal: 36-37°C" },
+  ];
 
   return (
     <div>
@@ -42,18 +83,8 @@ const CareLogDetail = () => {
           <span>›</span>
           <Link to="/admin/reports" className="hover:text-foreground">Care Log Monitoring</Link>
           <span>›</span>
-          <span className="text-foreground font-medium">ROBERT FOX LOG</span>
+          <span className="text-foreground font-medium">{careLog.patientName?.toUpperCase() || 'CARE'} LOG</span>
         </nav>
-        <div className="flex items-center gap-3">
-          <Avatar className="w-8 h-8">
-            <AvatarImage src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100" />
-            <AvatarFallback>SJ</AvatarFallback>
-          </Avatar>
-          <div className="text-right">
-            <p className="text-sm font-medium">Sarah Jenkins</p>
-            <p className="text-xs text-muted-foreground">System Admin</p>
-          </div>
-        </div>
       </header>
 
       <div className="p-6">
@@ -65,15 +96,15 @@ const CareLogDetail = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h1 className="text-2xl font-bold mb-2">Robert Fox - Live Care Log</h1>
+                    <h1 className="text-2xl font-bold mb-2">{careLog.patientName} - Care Log</h1>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <User className="w-4 h-4" />
-                        <span>Caregiver: Leslie Alexander</span>
+                        <span>Caregiver: {careLog.caregiverName}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Clock className="w-4 h-4" />
-                        <span>Submitted: Today, 10:15 AM</span>
+                        <span>Submitted: {formatDate(careLog.createdAt)}, {formatTime(careLog.createdAt)}</span>
                       </div>
                     </div>
                   </div>
@@ -84,11 +115,11 @@ const CareLogDetail = () => {
                     </Button>
                     <Button variant="outline" className="gap-2">
                       <Send className="w-4 h-4" />
-                      Send Summary to Family
+                      Send Summary
                     </Button>
                     <Button variant="destructive" className="gap-2">
                       <AlertTriangle className="w-4 h-4" />
-                      Escalate Incident
+                      Escalate
                     </Button>
                   </div>
                 </div>
@@ -106,10 +137,10 @@ const CareLogDetail = () => {
               <CardContent>
                 <div className="grid md:grid-cols-3 gap-4">
                   {vitalSigns.map((vital) => (
-                    <Card key={vital.label} className={`border ${vital.status === 'HIGH' ? 'border-red-200 bg-red-50/50' : ''}`}>
+                    <Card key={vital.label} className="border">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <span className={`text-xs font-medium ${vital.status === 'HIGH' ? 'text-red-600' : 'text-primary'}`}>
+                          <span className="text-xs font-medium text-primary">
                             {vital.label}
                           </span>
                           <Badge className={vital.statusColor}>{vital.status}</Badge>
@@ -126,44 +157,33 @@ const CareLogDetail = () => {
               </CardContent>
             </Card>
 
-            {/* Medication Intake */}
+            {/* Care Activities */}
             <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Pill className="w-5 h-5 text-primary" />
-                  Medication Intake
+                  Care Activities
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-2 text-xs font-medium text-primary uppercase">Medication</th>
-                      <th className="text-left py-2 text-xs font-medium text-primary uppercase">Dosage</th>
-                      <th className="text-left py-2 text-xs font-medium text-primary uppercase">Schedule</th>
-                      <th className="text-left py-2 text-xs font-medium text-primary uppercase">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {medications.map((med) => (
-                      <tr key={med.name} className="border-b border-border last:border-0">
-                        <td className={`py-3 font-medium ${med.highlight ? 'text-red-600' : ''}`}>{med.name}</td>
-                        <td className={`py-3 ${med.highlight ? 'text-red-600' : ''}`}>{med.dosage}</td>
-                        <td className="py-3 text-primary">{med.schedule}</td>
-                        <td className="py-3">
-                          <span className={`flex items-center gap-1 ${med.statusColor}`}>
-                            {med.status === 'ADMINISTERED' ? (
-                              <CheckCircle className="w-4 h-4" />
-                            ) : (
-                              <AlertTriangle className="w-4 h-4" />
-                            )}
-                            {med.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">ACTIVITIES PERFORMED</h4>
+                    <p className="text-sm">{careLog.activitiesPerformed || 'No activities recorded'}</p>
+                  </div>
+                  {careLog.notes && (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">CAREGIVER NOTES</h4>
+                      <p className="text-sm">{careLog.notes}</p>
+                    </div>
+                  )}
+                  {careLog.medicationsGiven && (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">MEDICATIONS GIVEN</h4>
+                      <p className="text-sm">{careLog.medicationsGiven}</p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -178,16 +198,18 @@ const CareLogDetail = () => {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Breakfast</span>
-                    <span className="font-medium">Oatmeal & Fruit</span>
+                    <span className="text-muted-foreground">Meals</span>
+                    <span className="font-medium">{careLog.mealsProvided || 'Not recorded'}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Appetite</span>
-                    <Badge variant="secondary" className="bg-amber-100 text-amber-700">LOW</Badge>
+                    <Badge variant="secondary" className="bg-amber-100 text-amber-700">
+                      {careLog.appetiteLevel || 'Normal'}
+                    </Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground text-primary font-medium">WATER INTAKE</span>
-                    <span className="font-medium">3 glasses</span>
+                    <span className="font-medium">{careLog.waterIntake || 'Not recorded'}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -202,15 +224,11 @@ const CareLogDetail = () => {
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Activity Type</span>
-                    <span className="font-medium">Assisted Walk</span>
+                    <span className="font-medium">{careLog.mobilityAssistance || 'Assisted'}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Duration</span>
-                    <span className="font-medium">15 Minutes</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground text-primary font-medium">ADMIN NOTES</span>
-                    <span className="font-medium">Good progress</span>
+                    <span className="text-muted-foreground">Mood</span>
+                    <span className="font-medium">{careLog.moodObservation || 'Good'}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -223,84 +241,77 @@ const CareLogDetail = () => {
             <Card className="border-0 shadow-sm">
               <CardContent className="p-6 text-center">
                 <Avatar className="w-24 h-24 mx-auto mb-4">
-                  <AvatarImage src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200" />
-                  <AvatarFallback>RF</AvatarFallback>
+                  <AvatarFallback>{careLog.patientName?.[0] || 'P'}</AvatarFallback>
                 </Avatar>
-                <h3 className="text-xl font-bold">{patientInfo.name}</h3>
-                <p className="text-red-600 font-medium text-sm">{patientInfo.riskProfile}</p>
+                <h3 className="text-xl font-bold">{careLog.patientName}</h3>
+                <p className="text-muted-foreground text-sm">Patient ID: {careLog.patientId}</p>
 
-                <div className="grid grid-cols-2 gap-4 mt-6 text-left">
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground uppercase">Age</p>
-                    <p className="font-semibold">{patientInfo.age}</p>
-                  </div>
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground uppercase">Gender</p>
-                    <p className="font-semibold">{patientInfo.gender}</p>
-                  </div>
-                </div>
+                {patient && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4 mt-6 text-left">
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-xs text-muted-foreground uppercase">Age</p>
+                        <p className="font-semibold">{patient.age} Years</p>
+                      </div>
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-xs text-muted-foreground uppercase">Gender</p>
+                        <p className="font-semibold">{patient.gender}</p>
+                      </div>
+                    </div>
 
-                <div className="mt-4 text-left">
-                  <p className="text-xs text-primary font-medium uppercase mb-2">Primary Diagnoses</p>
-                  <div className="flex flex-wrap gap-2">
-                    {patientInfo.diagnoses.map((diagnosis) => (
-                      <Badge key={diagnosis} variant="secondary">{diagnosis}</Badge>
-                    ))}
-                  </div>
-                </div>
+                    {patient.currentCondition && (
+                      <div className="mt-4 text-left">
+                        <p className="text-xs text-primary font-medium uppercase mb-2">Current Condition</p>
+                        <Badge variant="secondary">{patient.currentCondition}</Badge>
+                      </div>
+                    )}
+                  </>
+                )}
               </CardContent>
             </Card>
 
-            {/* Emergency Contact */}
+            {/* Schedule Info */}
             <Card className="border-0 shadow-sm bg-primary text-primary-foreground">
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-4">
-                  <AlertTriangle className="w-5 h-5" />
-                  <span className="font-semibold">Emergency Contact</span>
+                  <Clock className="w-5 h-5" />
+                  <span className="font-semibold">Schedule Info</span>
                 </div>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-primary-foreground/20 rounded-full flex items-center justify-center">
-                    <User className="w-5 h-5" />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-primary-foreground/70">Schedule ID</span>
+                    <span className="font-medium">{careLog.scheduleId}</span>
                   </div>
-                  <div>
-                    <p className="font-semibold">{patientInfo.emergencyContact.name}</p>
-                    <p className="text-sm text-primary-foreground/80">{patientInfo.emergencyContact.relationship}</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-primary-foreground/70">Log Date</span>
+                    <span className="font-medium">{formatDate(careLog.logDate || careLog.createdAt)}</span>
                   </div>
                 </div>
-                <Button variant="secondary" className="w-full gap-2">
-                  <Phone className="w-4 h-4" />
-                  {patientInfo.emergencyContact.phone}
-                </Button>
               </CardContent>
             </Card>
 
-            {/* Submission History */}
+            {/* Log History */}
             <Card className="border-0 shadow-sm">
               <CardHeader>
-                <CardTitle>Submission History</CardTitle>
+                <CardTitle>Log Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
                   <div className="w-2 h-2 rounded-full bg-green-500" />
                   <div className="flex-1">
-                    <p className="text-sm font-medium">Today, 10:15 AM</p>
-                    <p className="text-xs text-muted-foreground">Leslie Alexander</p>
+                    <p className="text-sm font-medium">Created</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(careLog.createdAt)} {formatTime(careLog.createdAt)}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
-                  <div className="w-2 h-2 rounded-full bg-primary" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Yesterday, 08:30 AM</p>
-                    <p className="text-xs text-muted-foreground">Leslie Alexander</p>
+                {careLog.updatedAt && careLog.updatedAt !== careLog.createdAt && (
+                  <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
+                    <div className="w-2 h-2 rounded-full bg-primary" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Last Updated</p>
+                      <p className="text-xs text-muted-foreground">{formatDate(careLog.updatedAt)} {formatTime(careLog.updatedAt)}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
-                  <div className="w-2 h-2 rounded-full bg-primary" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Oct 22, 09:00 AM</p>
-                    <p className="text-xs text-muted-foreground">Guy Hawkins</p>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>

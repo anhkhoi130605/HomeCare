@@ -39,7 +39,7 @@ const HomePublic = () => {
   }, [api]);
 
   return (
-    <div className="flex-1 pt-20 font-manrope bg-[#fcfcf9] dark:bg-[#101f22] text-[#181611] dark:text-white transition-colors duration-300">
+    <div className="flex-1 font-manrope bg-[#fcfcf9] dark:bg-[#101f22] text-[#181611] dark:text-white transition-colors duration-300">
 
       {/* Hero Section */}
       <section className="w-full pb-12">
@@ -49,7 +49,7 @@ const HomePublic = () => {
               {heroSlides.map((slide, index) => (
                 <CarouselItem key={index} className="w-full pl-0">
                   <div
-                    className="relative w-full min-h-[600px] flex items-center justify-center text-center p-8 bg-cover bg-center"
+                    className="relative w-full min-h-[calc(100vh-4rem)] flex items-center justify-center text-center p-8 bg-cover bg-center"
                     style={{
                       backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6)), url("${slide.image}")`
                     }}

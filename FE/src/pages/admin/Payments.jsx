@@ -1,57 +1,92 @@
+import { useState, useEffect } from "react";
 import { ArrowLeft, FileText, PlusCircle, Mail, Phone, CheckCircle } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-
-const invoice = {
-  id: "INV-8821",
-  status: "PAID",
-  source: "ONLINE VIA FAMILY APP",
-  issuedDate: "Oct 24, 2023",
-  patient: {
-    name: "Eleanor Herbert",
-    id: "PAT-4402",
-    address: "482 Oak Lane, Spring Valley, CA 91977",
-  },
-  family: {
-    name: "Sarah Herbert",
-    relationship: "Daughter",
-    email: "sarah.h@email.com",
-    phone: "+1 (555) 012-3456",
-  },
-  payment: {
-    method: "Visa •••• 4242",
-    date: "Oct 25, 2023",
-    transactionId: "TXN_998231024",
-  },
-  services: [
-    { caregiver: "Marcus Wong", serviceType: "SKILLED NURSING", duration: "8 Hours (Oct 21)", amount: 640.00 },
-    { caregiver: "Marcus Wong", serviceType: "SKILLED NURSING", duration: "7.5 Hours (Oct 22)", amount: 600.00 },
-  ],
-  subtotal: 1240.00,
-  tax: 0.00,
-  total: 1240.00,
-  notes: [
-    {
-      text: "Family requested invoice breakdown for insurance reimbursement. Sent via portal.",
-      author: "Robert Chen",
-      date: "Oct 24, 2023",
-    },
-  ],
-};
+import { paymentApi } from "@/lib/api";
 
 const Payments = () => {
+  const { id } = useParams();
+  const [invoice, setInvoice] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPayment = async () => {
+      try {
+        setLoading(true);
+        if (id) {
+          const data = await paymentApi.getById(id);
+          setInvoice(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch payment:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPayment();
+  }, [id]);
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!invoice) {
+    return (
+      <div className="p-6">
+        <Link
+          to="/admin/payments"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Payments
+        </Link>
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Payment not found</p>
+        </div>
+      </div>
+    );
+  }
+
+  const getStatusBadge = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'success':
+        return 'bg-green-100 text-green-700';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-700';
+      case 'failed':
+        return 'bg-red-100 text-red-700';
+      case 'refunded':
+        return 'bg-blue-100 text-blue-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
+    }
+  };
+
   return (
     <div className="p-6">
       {/* Back Link */}
-      <Link 
-        to="/admin/payments" 
+      <Link
+        to="/admin/payments"
         className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="w-4 h-4" />
-        Back to Invoices
+        Back to Payments
       </Link>
 
       {/* Invoice Header */}
@@ -59,11 +94,11 @@ const Payments = () => {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">INVOICE #{invoice.id}</h1>
-            <Badge className="bg-green-100 text-green-700">• {invoice.status}</Badge>
+            <Badge className={getStatusBadge(invoice.status)}>• {invoice.status}</Badge>
           </div>
           <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-            <span className="text-primary font-medium">📱 {invoice.source}</span>
-            <span>📅 Issued: {invoice.issuedDate}</span>
+            <span className="text-primary font-medium">📱 {invoice.paymentMethod || 'ONLINE PAYMENT'}</span>
+            <span>📅 Issued: {formatDate(invoice.createdAt)}</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -87,89 +122,79 @@ const Payments = () => {
               <div className="grid md:grid-cols-2 gap-8">
                 <div>
                   <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4">
-                    PATIENT INFORMATION
+                    CONTRACT INFORMATION
                   </h3>
                   <div className="flex items-start gap-3">
                     <Avatar className="bg-teal-100 text-teal-700">
-                      <AvatarFallback>EH</AvatarFallback>
+                      <AvatarFallback>CT</AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-semibold">{invoice.patient.name}</p>
-                      <p className="text-sm text-primary">Patient ID: #{invoice.patient.id}</p>
-                      <p className="text-sm text-muted-foreground mt-1">{invoice.patient.address}</p>
+                      <p className="font-semibold">Contract #{invoice.contractId}</p>
+                      <p className="text-sm text-primary">Payment ID: #{invoice.id}</p>
+                      <p className="text-sm text-muted-foreground mt-1">Period: {formatDate(invoice.periodStart)} - {formatDate(invoice.periodEnd)}</p>
                     </div>
                   </div>
                 </div>
 
                 <div>
                   <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4">
-                    FAMILY REPRESENTATIVE
+                    FAMILY INFORMATION
                   </h3>
                   <div>
-                    <p className="font-semibold">{invoice.family.name}</p>
-                    <p className="text-sm text-muted-foreground">Relationship: {invoice.family.relationship}</p>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground mt-2">
-                      <Mail className="w-4 h-4" />
-                      {invoice.family.email}
-                    </div>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                      <Phone className="w-4 h-4" />
-                      {invoice.family.phone}
-                    </div>
+                    <p className="font-semibold">{invoice.familyName || 'Family Account'}</p>
+                    <p className="text-sm text-muted-foreground">Family ID: {invoice.familyId}</p>
+                    {invoice.familyEmail && (
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground mt-2">
+                        <Mail className="w-4 h-4" />
+                        {invoice.familyEmail}
+                      </div>
+                    )}
+                    {invoice.familyPhone && (
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                        <Phone className="w-4 h-4" />
+                        {invoice.familyPhone}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Service Breakdown */}
+          {/* Payment Details */}
           <Card className="border-0 shadow-sm">
             <CardHeader>
-              <CardTitle>Service Breakdown</CardTitle>
+              <CardTitle>Payment Details</CardTitle>
             </CardHeader>
             <CardContent>
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-3 text-xs font-medium text-primary uppercase">Caregiver</th>
-                    <th className="text-left py-3 text-xs font-medium text-primary uppercase">Service Type</th>
-                    <th className="text-left py-3 text-xs font-medium text-primary uppercase">Duration</th>
+                    <th className="text-left py-3 text-xs font-medium text-primary uppercase">Description</th>
                     <th className="text-right py-3 text-xs font-medium text-primary uppercase">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {invoice.services.map((service, index) => (
-                    <tr key={index} className="border-b border-border">
-                      <td className="py-4">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="w-8 h-8 bg-primary text-primary-foreground">
-                            <AvatarFallback className="text-xs">MW</AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">{service.caregiver}</span>
-                        </div>
-                      </td>
-                      <td className="py-4">
-                        <Badge variant="secondary" className="skill-tag">
-                          {service.serviceType}
-                        </Badge>
-                      </td>
-                      <td className="py-4 text-muted-foreground">{service.duration}</td>
-                      <td className="py-4 text-right font-medium">${service.amount.toFixed(2)}</td>
-                    </tr>
-                  ))}
+                  <tr className="border-b border-border">
+                    <td className="py-4">
+                      <p className="font-medium">Care Service Payment</p>
+                      <p className="text-sm text-muted-foreground">Period: {formatDate(invoice.periodStart)} - {formatDate(invoice.periodEnd)}</p>
+                    </td>
+                    <td className="py-4 text-right font-medium">{formatCurrency(invoice.amount)}</td>
+                  </tr>
                 </tbody>
                 <tfoot>
                   <tr className="border-b border-border">
-                    <td colSpan={3} className="py-3 text-primary">Subtotal</td>
-                    <td className="py-3 text-right">${invoice.subtotal.toFixed(2)}</td>
+                    <td className="py-3 text-primary">Subtotal</td>
+                    <td className="py-3 text-right">{formatCurrency(invoice.amount)}</td>
                   </tr>
                   <tr className="border-b border-border">
-                    <td colSpan={3} className="py-3 text-primary">Tax (0%)</td>
-                    <td className="py-3 text-right">${invoice.tax.toFixed(2)}</td>
+                    <td className="py-3 text-primary">Tax (0%)</td>
+                    <td className="py-3 text-right">{formatCurrency(0)}</td>
                   </tr>
                   <tr>
-                    <td colSpan={3} className="py-4 font-bold text-lg">TOTAL AMOUNT</td>
-                    <td className="py-4 text-right font-bold text-2xl text-primary">${invoice.total.toFixed(2)}</td>
+                    <td className="py-4 font-bold text-lg">TOTAL AMOUNT</td>
+                    <td className="py-4 text-right font-bold text-2xl text-primary">{formatCurrency(invoice.amount)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -182,47 +207,47 @@ const Payments = () => {
           {/* Payment Origin */}
           <Card className="border-0 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-sm uppercase text-muted-foreground">Payment Origin</CardTitle>
+              <CardTitle className="text-sm uppercase text-muted-foreground">Payment Status</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${invoice.status === 'Success' ? 'bg-green-100' : invoice.status === 'Failed' ? 'bg-red-100' : 'bg-yellow-100'
+                  }`}>
+                  <CheckCircle className={`w-5 h-5 ${invoice.status === 'Success' ? 'text-green-600' : invoice.status === 'Failed' ? 'text-red-600' : 'text-yellow-600'
+                    }`} />
                 </div>
                 <div>
-                  <p className="font-semibold">Paid via Family Portal</p>
-                  <p className="text-xs text-muted-foreground">TRANSACTION ID: {invoice.payment.transactionId}</p>
+                  <p className="font-semibold">{invoice.status}</p>
+                  <p className="text-xs text-muted-foreground">Due: {formatDate(invoice.dueDate)}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground uppercase text-xs">Method</p>
-                  <p className="font-medium">{invoice.payment.method}</p>
+                  <p className="font-medium">{invoice.paymentMethod || 'Bank Transfer'}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground uppercase text-xs">Date</p>
-                  <p className="font-medium">{invoice.payment.date}</p>
+                  <p className="text-muted-foreground uppercase text-xs">Paid Date</p>
+                  <p className="font-medium">{invoice.paidAt ? formatDate(invoice.paidAt) : 'Pending'}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Internal Admin Notes */}
+          {/* Notes */}
           <Card className="border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-sm uppercase text-muted-foreground">Internal Admin Notes</CardTitle>
+              <CardTitle className="text-sm uppercase text-muted-foreground">Notes</CardTitle>
               <Button variant="link" className="text-primary p-0 h-auto">Add New</Button>
             </CardHeader>
             <CardContent>
-              {invoice.notes.map((note, index) => (
-                <div key={index} className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm">{note.text}</p>
-                  <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
-                    <span className="text-primary">By {note.author}</span>
-                    <span>{note.date}</span>
-                  </div>
+              {invoice.notes ? (
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm">{invoice.notes}</p>
                 </div>
-              ))}
+              ) : (
+                <p className="text-sm text-muted-foreground">No notes available</p>
+              )}
             </CardContent>
           </Card>
         </div>

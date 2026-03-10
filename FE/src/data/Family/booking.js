@@ -1,0 +1,135 @@
+export const SERVICES = [
+    // Daily Care
+    {
+        id: 's1',
+        name: 'Elderly Daily Care',
+        category: 'Daily Care',
+        price: 35,
+        unit: 'hr',
+        features: ['Meal preparation & feeding', 'Personal hygiene assistance', 'Mobility and light exercise'],
+        image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAGy5cMNWCr7Ku-nyCsQrrnDOJXIlLFVsjToWDuzNpyw_mfL3L8Vz8yceFCdmqGG5W2J4FqtXZ6BUenAN5o-S7qxIXeUSwacB0aGN_W0wAfFp5cCf-0Iyqbk3EMzkzOBlyWjXD3SOO90iZr9GZhSKKT4FAZGqf8xPhHIONUfIa1AwenY6dsR26ouo5Ia6nj57D4mv1nzLqpXhWbp4bCqqrTTUaENrCfqmzWBaKK_t9FvYz6lf150zJhF6DrTSjH8qSiugqA3A2Vk0lJ',
+        recommended: true
+    },
+    {
+        id: 's4',
+        name: 'Overnight Monitoring',
+        category: 'Daily Care',
+        price: 40,
+        unit: 'night',
+        features: ['Sleep monitoring', 'Emergency assistance', 'Nighttime toileting help'],
+        image: '/images/care1.avif',
+    },
+    {
+        id: 's5',
+        name: 'Mobility Assistance',
+        category: 'Daily Care',
+        price: 30,
+        unit: 'hr',
+        features: ['Walking support', 'Transfer assistance', 'Fall prevention'],
+        image: '/images/care2.png',
+    },
+
+    // Specialized Medical
+    {
+        id: 's2',
+        name: 'Post-Surgical Support',
+        category: 'Specialized Medical',
+        price: 45,
+        unit: 'hr',
+        features: ['Wound dressing & cleaning', 'Medication management', 'Vital signs logging'],
+        image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD7bXbLMUTbBrJPT3TPyLZgdbTp8yb17tWtK8hy4wXcli3WoFzpZb8L9_tKIBhWZzaIxgKAIhmOSUdOCtZ-65bmtHclET6xCqK4qfUvMlBaN4fwPKP7uqo3euf36MuXu7auEcBW-Dg5x7C-1Q11nqb72g1OcvXhjy4J5zMuJ0MwZbF-MpIYUSHCUQiY3FyKNBdd9ZgvFlZFx9Aa4ZBEoRoUX0AFuJo9MuQd1M4JiQE8zw2jeFR8v9W-FtBxtVNpTomXiemhIg5IBnFk'
+    },
+    {
+        id: 's6',
+        name: 'Physical Therapy',
+        category: 'Specialized Medical',
+        price: 60,
+        unit: 'session',
+        features: ['Rehabilitation exercises', 'Pain management', 'Strength training'],
+        image: '/images/care3.jpg',
+        recommended: true
+    },
+    {
+        id: 's7',
+        name: 'Dementia Care',
+        category: 'Specialized Medical',
+        price: 50,
+        unit: 'hr',
+        features: ['Memory care activities', 'Behavioral support', 'Safe environment maintenance'],
+        image: '/images/care4.jpg',
+    },
+    {
+        id: 's10',
+        name: 'Nursing Care',
+        category: 'Specialized Medical',
+        price: 55,
+        unit: 'hr',
+        features: ['Injections & IV', 'Catheter care', 'Health monitoring'],
+        image: '/images/care5.jpg',
+    },
+    {
+        id: 's11',
+        name: 'Palliative Care',
+        category: 'Specialized Medical',
+        price: 65,
+        unit: 'hr',
+        features: ['Pain relief', 'Emotional support', 'Family guidance'],
+        image: '/images/care6.webp',
+    },
+
+    // Companionship
+    {
+        id: 's3',
+        name: 'Social Companionship',
+        category: 'Companionship',
+        price: 25,
+        unit: 'hr',
+        features: ['Social visits & reading', 'Errands and grocery runs', 'Leisure activities & games'],
+        image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAm1FlCSZENYhexKeOXS569RhrClNnoXRvdcsbiIrkN_y2NXFV5X8qdPy1cqtHPGcB51EcgL2ZnWCBTQ2K6ohkP8yPKCyN9RcNqXU9oqJ-W5wwC459dxKwywaM1OoAGCq3S8XAe1tZedRj693GMMiZlr7OLjt8iEP_z5L5NEqPeoSpNmHDFBbvjMqa5lUOpk0KT5dTodrEOfgbPGG-EWycnPeOgx419GV_bOnDAuBrWjF5kI3tHfXpqnTKNqim27IQpBZjJvOj2YOIE'
+    },
+    {
+        id: 's8',
+        name: 'Medical Escort',
+        category: 'Companionship',
+        price: 30,
+        unit: 'trip',
+        features: ['Transport to appointments', 'Note-taking during visits', 'Pharmacy pickup'],
+        image: 'https://images.unsplash.com/photo-1527613426441-4da17471b66d?q=80&w=300&auto=format&fit=crop',
+    },
+    {
+        id: 's9',
+        name: 'Leisure Outings',
+        category: 'Companionship',
+        price: 28,
+        unit: 'hr',
+        features: ['Park visits', 'Cultural events', 'Assisted shopping'],
+        image: 'https://images.unsplash.com/photo-1463947628408-f8581a2f4aca?q=80&w=300&auto=format&fit=crop',
+    },
+    {
+        id: 's12',
+        name: 'Technology Assistance',
+        category: 'Companionship',
+        price: 20,
+        unit: 'hr',
+        features: ['Video calls help', 'Device setup', 'Digital literacy'],
+        image: 'https://images.unsplash.com/photo-1516321497487-e288fb19713f?q=80&w=300&auto=format&fit=crop',
+    },
+    {
+        id: 's13',
+        name: 'Pet Care Support',
+        category: 'Companionship',
+        price: 22,
+        unit: 'hr',
+        features: ['Pet feeding', 'Dog walking', 'Vet visits'],
+        image: 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=300&auto=format&fit=crop',
+    },
+    {
+        id: 's14',
+        name: 'Reading & Hobbies',
+        category: 'Companionship',
+        price: 24,
+        unit: 'hr',
+        features: ['Book reading', 'Knitting/Crafts', 'Gardening help'],
+        image: '/images/care7.jpeg',
+    }
+];

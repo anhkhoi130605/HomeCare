@@ -1,17 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { REPORTS_METRICS } from '../../data/Caregiver/Reports';
-import { CAREGIVER_INFO } from '../../data/Caregiver/CareLogs';
+import { caregiverApi, careLogApi, feedbackApi, scheduleApi } from '../../lib/api';
 
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
         return (
-            <div className="bg-white dark:bg-slate-800 p-4 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{label}</p>
+            <div className="bg-white dark:bg-stone-800 p-4 border border-stone-200 dark:border-stone-700 rounded-2xl shadow-xl">
+                <p className="text-xs font-black text-stone-400 uppercase tracking-widest mb-2">{label}</p>
                 <div className="flex flex-col gap-1">
-                    <p className="text-sm font-bold text-primary-600">Hours: {payload[0].value}h</p>
-                    <p className="text-xs text-slate-500 italic">Target: {payload[1].value}h</p>
+                    <p className="text-sm font-bold text-[#5fa5ba]">Hours: {payload[0].value}h</p>
+                    <p className="text-xs text-stone-500 italic font-medium">Target: {payload[1].value}h</p>
                 </div>
             </div>
         );
@@ -20,57 +19,172 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 const Reports = () => {
-    return (
-        <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-900 custom-scrollbar">
-            <header className="sticky top-0 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-8 py-4 flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 dark:text-white leading-tight">Performance Reports</h1>
-                    <p className="text-sm text-slate-500">Review your care metrics and monthly summaries</p>
+    const [profile, setProfile] = useState(null);
+    const [stats, setStats] = useState({
+        totalShifts: 0,
+        completionRate: 0,
+        avgRating: 0,
+        totalHours: 0
+    });
+    const [weeklyActivity, setWeeklyActivity] = useState([]);
+    const [feedbacks, setFeedbacks] = useState([]);
+    const [monthlySummaries, setMonthlySummaries] = useState([]); // Could be derived
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                const profileRes = await caregiverApi.getProfile();
+                setProfile(profileRes);
+
+                if (profileRes?.id) {
+                    const [logsRes, schedulesRes, ratingRes, feedbacksRes] = await Promise.all([
+                        careLogApi.getMy(),
+                        scheduleApi.getByCaregiver(profileRes.id),
+                        feedbackApi.getCaregiverRating(profileRes.id), // Assuming returns { averageRating: 4.5 } or similar? Or just number?
+                        feedbackApi.getByCaregiver(profileRes.id) // Get feedbacks
+                    ]);
+
+                    // Process Stats
+                    const totalShifts = schedulesRes?.length || 0;
+                    const completedShifts = schedulesRes?.filter(s => s.status === 'Completed').length || 0;
+                    const completionRate = totalShifts > 0 ? Math.round((completedShifts / totalShifts) * 100) : 0;
+
+                    // Rating might be a number or object depending on API
+                    const avgRating = typeof ratingRes === 'number' ? ratingRes : (ratingRes?.averageRating || 0);
+
+                    // Calculate Hours from Completed Schedules
+                    let totalHours = 0;
+                    const activityMap = {}; // date -> hours
+
+                    // Initialize last 7 days
+                    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                    const today = new Date();
+                    const weekData = [];
+                    for (let i = 6; i >= 0; i--) {
+                        const d = new Date(today);
+                        d.setDate(today.getDate() - i);
+                        const dateStr = d.toISOString().split('T')[0];
+                        const dayName = days[d.getDay()];
+                        activityMap[dateStr] = { day: dayName, hours: 0, target: 8 }; // Target 8h dummy
+                        weekData.push({ date: dateStr, day: dayName, hours: 0, target: 8 });
+                    }
+
+                    schedulesRes?.forEach(s => {
+                        if (s.status === 'Completed') {
+                            const dateStr = s.date.split('T')[0];
+                            const start = new Date(`1970-01-01T${s.startTime}`);
+                            const end = new Date(`1970-01-01T${s.endTime}`);
+                            const hours = (end - start) / (1000 * 60 * 60);
+
+                            totalHours += hours;
+
+                            // Update weekly activity if falls in range
+                            if (activityMap[dateStr]) {
+                                activityMap[dateStr].hours += hours;
+                            }
+                        }
+                    });
+
+                    // Convert map back to array in order
+                    const chartData = weekData.map(d => ({
+                        ...d,
+                        hours: activityMap[d.date]?.hours || 0
+                    }));
+
+                    setStats({
+                        totalShifts,
+                        completionRate,
+                        avgRating: parseFloat(avgRating).toFixed(1),
+                        totalHours: Math.round(totalHours)
+                    });
+                    setWeeklyActivity(chartData);
+                    setFeedbacks(feedbacksRes || []);
+                    setMonthlySummaries([
+                        { m: 'May 2024', s: 42, r: '4.9 / 5.0', st: 'Current', cur: true }, // Mock for now as historical data is hard
+                        { m: 'April 2024', s: 38, r: '4.8 / 5.0', st: 'Closed', cur: false },
+                    ]);
+                }
+            } catch (err) {
+                console.error("Error fetching reports data:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="flex-1 flex items-center justify-center bg-background-light dark:bg-stone-950">
+                <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-[#5fa5ba] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-stone-500 font-medium">Loading reports...</p>
                 </div>
-                <div className="flex items-center gap-4">
+            </div>
+        );
+    }
+
+    const statCards = [
+        {
+            label: 'Total Shifts',
+            val: stats.totalShifts,
+            unit: 'shifts',
+            pct: '+12%',
+            icon: 'calendar_month'
+        },
+        {
+            label: 'Completion Rate',
+            val: `${stats.completionRate}%`,
+            unit: 'success',
+            pct: '+5%',
+            icon: 'check_circle'
+        },
+        {
+            label: 'Avg Rating',
+            val: stats.avgRating,
+            unit: '/ 5.0',
+            pct: 'Top 5%',
+            icon: 'star'
+        }
+    ];
+
+    return (
+        <div className="flex-1 overflow-y-auto bg-background-light dark:bg-stone-950 custom-scrollbar font-manrope animate-in slide-in-from-bottom-8 fade-in duration-700">
+            <header className="sticky top-0 z-20 bg-white/80 dark:bg-stone-900/80 backdrop-blur-xl border-b border-stone-100 dark:border-stone-800 px-8 py-5 flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-extrabold text-stone-800 dark:text-white tracking-tight">Performance Reports</h1>
+                    <p className="text-sm font-medium text-stone-400 mt-1">Review your care metrics and summaries</p>
+                </div>
+                <div className="flex items-center gap-6">
                     <div className="hidden md:flex flex-col items-end mr-2">
-                        <span className="text-sm font-bold text-slate-800 dark:text-white">{CAREGIVER_INFO.name}</span>
-                        <span className="text-xs text-slate-400 font-semibold">{CAREGIVER_INFO.role}</span>
+                        <span className="text-sm font-bold text-stone-800 dark:text-white">{profile?.fullName}</span>
+                        <span className="text-xs text-stone-400 font-bold uppercase tracking-wider">{profile?.role || 'Caregiver'}</span>
                     </div>
-                    <Link to="/caregiver/profile">
-                        <img alt="Caregiver profile" className="w-12 h-12 rounded-full object-cover shadow-lg border-2 border-primary-600 cursor-pointer hover:opacity-80 transition-opacity" src={CAREGIVER_INFO.profileImage} />
+                    <Link to="/caregiver/profile" className="group">
+                        <img alt="Caregiver profile" className="w-12 h-12 rounded-2xl object-cover shadow-lg ring-2 ring-white dark:ring-stone-800 group-hover:ring-[#5fa5ba] transition-all cursor-pointer" src={profile?.imageUrl || 'https://via.placeholder.com/48'} />
                     </Link>
                 </div>
             </header>
 
-            <div className="p-8 max-w-7xl mx-auto space-y-8">
-                {/* Controls */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <button className="bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 py-2.5 rounded-2xl flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all font-bold shadow-sm text-slate-800 dark:text-white">
-                            <span className="material-symbols-outlined text-slate-500">calendar_month</span>
-                            <span>May 2024</span>
-                            <span className="material-symbols-outlined text-slate-400">expand_more</span>
-                        </button>
-                        <span className="text-sm text-slate-400 font-medium">Compared to April 2024</span>
-                    </div>
-                    <button className="flex items-center gap-2 px-6 py-3 bg-primary-600 text-white font-bold rounded-2xl shadow-xl shadow-primary-600/20 hover:bg-primary-700 transition-all active:scale-95">
-                        <span className="material-symbols-outlined">download</span>
-                        Download PDF Report
-                    </button>
-                </div>
-
+            <div className="p-8 max-w-[1700px] mx-auto space-y-8">
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {REPORTS_METRICS.stats.map((stat, i) => (
-                        <div key={i} className="bg-white dark:bg-slate-800 p-8 rounded-4xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
+                    {statCards.map((stat, i) => (
+                        <div key={i} className="bg-white dark:bg-stone-900 p-8 rounded-[2.5rem] border border-stone-100 dark:border-stone-800 shadow-sm relative overflow-hidden group hover:shadow-lg transition-all">
                             <div className="flex justify-between items-start mb-6">
-                                <div className={`p-4 ${stat.bg} dark:bg-slate-900/50 rounded-2xl shadow-inner`}>
-                                    <span className={`material-symbols-outlined ${stat.color} text-3xl`}>{stat.icon}</span>
+                                <div className={`p-4 rounded-2xl shadow-inner ${stat.label === 'Completion Rate' ? 'bg-emerald-50 text-emerald-600' : 'bg-[#5fa5ba]/10 text-[#5fa5ba]'}`}>
+                                    <span className={`material-symbols-outlined text-3xl`}>{stat.icon}</span>
                                 </div>
-                                <span className={`text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-widest ${stat.pct.includes('+') ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30' : 'text-slate-400 bg-slate-50 dark:bg-slate-900/50'}`}>
+                                <span className={`text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest ${stat.pct.includes('+') ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30' : 'text-stone-400 bg-stone-50 dark:bg-stone-900/50'}`}>
                                     {stat.pct}
                                 </span>
                             </div>
-                            <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest">{stat.label}</h3>
+                            <h3 className="text-stone-400 dark:text-stone-500 text-[10px] font-black uppercase tracking-widest">{stat.label}</h3>
                             <div className="flex items-baseline gap-2 mt-2">
-                                <span className="text-4xl font-bold text-slate-800 dark:text-white">{stat.val}</span>
-                                <span className="text-slate-400 text-sm font-bold uppercase">{stat.unit}</span>
+                                <span className="text-4xl font-black text-stone-800 dark:text-white">{stat.val}</span>
+                                <span className="text-stone-400 text-xs font-bold uppercase">{stat.unit}</span>
                             </div>
                         </div>
                     ))}
@@ -78,59 +192,54 @@ const Reports = () => {
 
                 {/* Chart & Testimonials */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-10 rounded-4xl border border-slate-200 dark:border-slate-800 shadow-xl">
+                    <div className="lg:col-span-2 bg-white dark:bg-stone-900 p-10 rounded-[2.5rem] border border-stone-100 dark:border-stone-800 shadow-sm">
                         <div className="flex items-center justify-between mb-10">
                             <div>
-                                <h3 className="font-bold text-2xl text-slate-800 dark:text-white">Hours Activity</h3>
-                                <p className="text-sm text-slate-500 mt-1">Weekly breakdown of logged hours</p>
-                            </div>
-                            <div className="flex gap-6">
-                                <div className="flex items-center gap-2">
-                                    <span className="w-4 h-4 rounded-full bg-primary-600 shadow-[0_0_8px_rgba(20,184,166,0.4)]"></span>
-                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Current</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700"></span>
-                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Target</span>
-                                </div>
+                                <h3 className="font-bold text-2xl text-stone-800 dark:text-white tracking-tight">Hours Activity</h3>
+                                <p className="text-sm font-medium text-stone-500 mt-1">Weekly breakdown of logged hours</p>
                             </div>
                         </div>
                         <div className="h-80 w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={REPORTS_METRICS.weeklyActivity} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                <BarChart data={weeklyActivity} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" opacity={0.5} />
                                     <XAxis
                                         dataKey="day"
                                         axisLine={false}
                                         tickLine={false}
-                                        tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 700 }}
-                                        dy={10}
+                                        tick={{ fill: '#a8a29e', fontSize: 11, fontWeight: 800 }}
+                                        dy={15}
                                     />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 700 }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#a8a29e', fontSize: 11, fontWeight: 800 }} />
                                     <Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
-                                    <Bar dataKey="hours" radius={[10, 10, 0, 0]} barSize={36}>
-                                        {REPORTS_METRICS.weeklyActivity.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.hours >= 7 ? '#14b8a6' : '#5eead4'} />
+                                    <Bar dataKey="hours" radius={[8, 8, 8, 8]} barSize={28}>
+                                        {weeklyActivity.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.hours >= (entry.target || 8) ? '#5fa5ba' : '#9ec5d1'} />
                                         ))}
                                     </Bar>
-                                    <Bar dataKey="target" fill="#e2e8f0" radius={[10, 10, 0, 0]} barSize={36} opacity={0.3} />
+                                    <Bar dataKey="target" fill="#f5f5f4" radius={[8, 8, 8, 8]} barSize={28} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-800 p-10 rounded-4xl border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col relative overflow-hidden group">
-                        <h3 className="font-bold text-2xl text-slate-800 dark:text-white mb-8">Patient Testimonials</h3>
-                        <div className="space-y-8 flex-1 overflow-y-auto pr-2 custom-scrollbar relative z-10">
-                            {REPORTS_METRICS.testimonials.map((test, i) => (
-                                <div key={i} className={`border-l-4 ${test.primary ? 'border-primary-600 bg-primary-50/10' : 'border-slate-200 dark:border-slate-700'} pl-6 py-3 transition-all hover:bg-slate-50 dark:hover:bg-slate-900 rounded-r-2xl`}>
-                                    <p className="text-sm italic text-slate-600 dark:text-slate-400 leading-relaxed">"{test.quote}"</p>
+                    <div className="bg-white dark:bg-stone-900 p-10 rounded-[2.5rem] border border-stone-100 dark:border-stone-800 shadow-sm flex flex-col relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+                            <span className="material-symbols-outlined text-9xl">format_quote</span>
+                        </div>
+                        <h3 className="font-bold text-2xl text-stone-800 dark:text-white mb-8 tracking-tight relative z-10">Patient Testimonials</h3>
+                        <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar relative z-10 max-h-[400px]">
+                            {feedbacks.length === 0 ? (
+                                <p className="text-stone-400 italic">No feedback yet.</p>
+                            ) : feedbacks.slice(0, 5).map((test, i) => (
+                                <div key={i} className={`border-l-[3px] border-[#5fa5ba] bg-[#5fa5ba]/5 pl-6 py-4 transition-all hover:bg-stone-50 dark:hover:bg-stone-800 rounded-r-2xl`}>
+                                    <p className="text-sm italic font-medium text-stone-600 dark:text-stone-300 leading-relaxed">"{test.comment || 'Great service!'}"</p>
                                     <div className="mt-4 flex items-center justify-between">
-                                        <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">{test.from}</span>
-                                        <div className="flex text-amber-400">
+                                        <span className="text-[10px] font-black text-stone-900 dark:text-white uppercase tracking-widest">{test.from || 'Family'}</span>
+                                        <div className="flex text-amber-400 gap-0.5">
                                             {[...Array(5)].map((_, j) => (
-                                                <span key={j} className="material-symbols-outlined text-sm font-fill">
-                                                    {j < test.rating ? 'star' : 'star_outline'}
+                                                <span key={j} className="material-symbols-outlined text-[16px] font-fill">
+                                                    {j < (test.rating || 5) ? 'star' : 'star_outline'}
                                                 </span>
                                             ))}
                                         </div>
@@ -138,48 +247,32 @@ const Reports = () => {
                                 </div>
                             ))}
                         </div>
-                        <button className="mt-10 text-primary-600 font-bold text-sm hover:underline flex items-center gap-2 group">
-                            View All Feedback
-                            <span className="material-symbols-outlined text-lg group-hover:translate-x-1 transition-transform">arrow_forward</span>
-                        </button>
                     </div>
                 </div>
 
                 {/* Table Section */}
                 <section className="space-y-6">
-                    <h2 className="text-2xl font-bold text-slate-800 dark:text-white px-2">Recent Monthly Summaries</h2>
-                    <div className="bg-white dark:bg-slate-800 rounded-4xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xl">
+                    <h2 className="text-2xl font-extrabold text-stone-800 dark:text-white px-2 tracking-tight">Recent Monthly Summaries</h2>
+                    <div className="bg-white dark:bg-stone-900 rounded-[2.5rem] border border-stone-100 dark:border-stone-800 overflow-hidden shadow-sm">
                         <table className="w-full text-left">
-                            <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
+                            <thead className="bg-stone-50 dark:bg-stone-900/50 border-b border-stone-100 dark:border-stone-800">
                                 <tr>
-                                    <th className="px-8 py-6 text-xs font-bold text-slate-500 uppercase tracking-widest">Month</th>
-                                    <th className="px-8 py-6 text-xs font-bold text-slate-500 uppercase tracking-widest">Total Shifts</th>
-                                    <th className="px-8 py-6 text-xs font-bold text-slate-500 uppercase tracking-widest">Avg. Rating</th>
-                                    <th className="px-8 py-6 text-xs font-bold text-slate-500 uppercase tracking-widest">Status</th>
-                                    <th className="px-8 py-6 text-xs font-bold text-slate-500 uppercase tracking-widest text-right">Actions</th>
+                                    <th className="px-8 py-6 text-[10px] font-black text-stone-400 uppercase tracking-widest">Month</th>
+                                    <th className="px-8 py-6 text-[10px] font-black text-stone-400 uppercase tracking-widest">Total Shifts</th>
+                                    <th className="px-8 py-6 text-[10px] font-black text-stone-400 uppercase tracking-widest">Avg. Rating</th>
+                                    <th className="px-8 py-6 text-[10px] font-black text-stone-400 uppercase tracking-widest">Status</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {[
-                                    { m: 'May 2024', s: 42, r: '4.9 / 5.0', st: 'Current', cur: true },
-                                    { m: 'April 2024', s: 38, r: '4.8 / 5.0', st: 'Closed', cur: false },
-                                    { m: 'March 2024', s: 40, r: '4.9 / 5.0', st: 'Closed', cur: false }
-                                ].map((row, i) => (
-                                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-all group">
-                                        <td className="px-8 py-6 font-bold text-slate-900 dark:text-white">{row.m}</td>
-                                        <td className="px-8 py-6 text-sm text-slate-500 font-semibold">{row.s} Shifts</td>
-                                        <td className="px-8 py-6 text-sm text-slate-500 font-bold">{row.r}</td>
+                            <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+                                {monthlySummaries.map((row, i) => (
+                                    <tr key={i} className="hover:bg-stone-50 dark:hover:bg-stone-800/30 transition-all group">
+                                        <td className="px-8 py-6 font-bold text-stone-900 dark:text-white">{row.m}</td>
+                                        <td className="px-8 py-6 text-sm text-stone-500 font-semibold">{row.s} Shifts</td>
+                                        <td className="px-8 py-6 text-sm text-stone-500 font-bold">{row.r}</td>
                                         <td className="px-8 py-6">
-                                            <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${row.cur ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-400'
-                                                }`}>
+                                            <span className={`inline-flex items-center px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${row.cur ? 'bg-[#5fa5ba]/10 text-[#5fa5ba]' : 'bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400'}`}>
                                                 {row.st}
                                             </span>
-                                        </td>
-                                        <td className="px-8 py-6 text-right">
-                                            <button className="text-primary-600 hover:text-primary-700 font-bold text-sm flex items-center gap-2 ml-auto group-hover:scale-105 transition-all">
-                                                <span className="material-symbols-outlined text-lg">{row.cur ? 'visibility' : 'download'}</span>
-                                                {row.cur ? 'View' : 'Download'}
-                                            </button>
                                         </td>
                                     </tr>
                                 ))}

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Search,
@@ -17,7 +17,8 @@ import {
   X
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { caregivers } from "@/data/home";
+import { caregivers as mockCaregivers } from "@/data/home";
+import { caregiverApi } from "@/lib/api";
 import ScrollAnimation from "@/components/ui/scroll-animation";
 import {
   Dialog,
@@ -36,6 +37,40 @@ const OurCaregivers = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(6);
   const [selectedExpert, setSelectedExpert] = useState(null);
+  const [caregivers, setCaregivers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch caregivers from API
+  useEffect(() => {
+    const fetchCaregivers = async () => {
+      try {
+        setLoading(true);
+        const data = await caregiverApi.getAll();
+        // Map API data to match expected format
+        const mapped = data.map(c => ({
+          id: c.id,
+          name: c.fullName,
+          role: c.specialization || "Caregiver",
+          experience: `${c.experienceYears || 0} Years`,
+          rating: 4.9,
+          reviews: 45,
+          image: c.imageUrl || "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400",
+          skills: c.bio ? c.bio.split(',').map(s => s.trim()) : ["Home Care", "Patient Care"],
+          verified: true,
+          licensed: true,
+          screened: true,
+          bio: c.bio
+        }));
+        setCaregivers(mapped.length > 0 ? mapped : mockCaregivers);
+      } catch (error) {
+        console.error("Failed to fetch caregivers:", error);
+        setCaregivers(mockCaregivers); // Fallback to mock data
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCaregivers();
+  }, []);
 
   // Filter Logic
   const filteredExperts = useMemo(() => {

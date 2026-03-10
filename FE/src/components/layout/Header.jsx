@@ -24,16 +24,15 @@ const Header = () => {
           <span className="text-xl font-bold text-foreground">HomeCare</span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden md:flex items-center gap-12">
           {navLinks.map((link) => (
             <Link
               key={link.to}
               to={link.to}
-              className={`text-sm font-medium transition-colors ${
-                location.pathname === link.to
+              className={`text-sm font-medium transition-colors ${location.pathname === link.to
                   ? "text-primary"
                   : "text-muted-foreground hover:text-[#19c3e6]"
-              }`}
+                }`}
             >
               {link.label}
             </Link>

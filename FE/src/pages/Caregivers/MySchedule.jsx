@@ -1,164 +1,355 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { SCHEDULE_DATA } from '../../data/Caregiver/MySchedule';
-import { CAREGIVER_INFO } from '../../data/Caregiver/CareLogs';
+import ScrollAnimation from "@/components/ui/scroll-animation";
+import { caregiverApi } from '@/lib/api';
 
 const MySchedule = () => {
-    const days = Array.from({ length: 31 }, (_, i) => i + 1);
+    const [viewMode, setViewMode] = useState('week');
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [schedules, setSchedules] = useState([]);
+    const [selectedShift, setSelectedShift] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [profile, setProfile] = useState(null);
+
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    useEffect(() => {
+        fetchData();
+    }, [selectedDate, viewMode]);
+
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+            const profileData = await caregiverApi.getProfile();
+            setProfile(profileData);
+
+            // Calculate date range based on view mode
+            let from, to;
+            if (viewMode === 'week') {
+                const startOfWeek = new Date(selectedDate);
+                startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay());
+                const endOfWeek = new Date(startOfWeek);
+                endOfWeek.setDate(startOfWeek.getDate() + 6);
+                from = startOfWeek.toISOString().split('T')[0];
+                to = endOfWeek.toISOString().split('T')[0];
+            } else {
+                const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+                const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+                from = startOfMonth.toISOString().split('T')[0];
+                to = endOfMonth.toISOString().split('T')[0];
+            }
+
+            const schedulesData = await caregiverApi.getSchedules(from, to);
+            setSchedules(schedulesData);
+
+            // Auto-select first schedule of today
+            const today = new Date().toISOString().split('T')[0];
+            const todaySchedule = schedulesData.find(s => s.date.split('T')[0] === today);
+            if (todaySchedule) {
+                setSelectedShift(todaySchedule);
+            }
+        } catch (err) {
+            console.error('Failed to fetch schedules:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const getDaysInView = () => {
+        if (viewMode === 'week') {
+            const startOfWeek = new Date(selectedDate);
+            startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay());
+            return Array.from({ length: 7 }, (_, i) => {
+                const day = new Date(startOfWeek);
+                day.setDate(startOfWeek.getDate() + i);
+                return day;
+            });
+        } else {
+            const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+            const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+            const startPadding = startOfMonth.getDay();
+            const days = [];
+
+            // Add padding for start of month
+            for (let i = startPadding - 1; i >= 0; i--) {
+                const day = new Date(startOfMonth);
+                day.setDate(-i);
+                days.push({ date: day, isCurrentMonth: false });
+            }
+
+            // Add days of month
+            for (let i = 1; i <= endOfMonth.getDate(); i++) {
+                days.push({
+                    date: new Date(selectedDate.getFullYear(), selectedDate.getMonth(), i),
+                    isCurrentMonth: true
+                });
+            }
+
+            return days;
+        }
+    };
+
+    const getSchedulesForDay = (date) => {
+        const dateStr = date.toISOString().split('T')[0];
+        return schedules.filter(s => s.date.split('T')[0] === dateStr);
+    };
+
+    const formatTime = (timeStr) => {
+        if (!timeStr) return '';
+        const parts = timeStr.split(':');
+        const hours = parseInt(parts[0]);
+        const minutes = parts[1];
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 || 12;
+        return `${displayHours}:${minutes} ${ampm}`;
+    };
+
+    const isToday = (date) => {
+        const today = new Date();
+        return date.toDateString() === today.toDateString();
+    };
+
+    const getEventStyle = (status) => {
+        if (status === 'InProgress') {
+            return "bg-[#5fa5ba] text-white shadow-[#5fa5ba]/30";
+        } else if (status === 'Completed') {
+            return "bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-300";
+        } else if (status === 'Failed') {
+            return "bg-rose-100 text-rose-700 border-l-4 border-rose-500 shadow-rose-100/30";
+        } else {
+            return "bg-emerald-50 text-emerald-700 border-l-4 border-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-300";
+        }
+    };
+
+    const navigateDate = (direction) => {
+        const newDate = new Date(selectedDate);
+        if (viewMode === 'week') {
+            newDate.setDate(newDate.getDate() + (direction * 7));
+        } else {
+            newDate.setMonth(newDate.getMonth() + direction);
+        }
+        setSelectedDate(newDate);
+    };
+
+    const goToToday = () => {
+        setSelectedDate(new Date());
+    };
+
+    if (loading) {
+        return (
+            <div className="flex-1 flex items-center justify-center bg-background-light dark:bg-stone-950">
+                <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-[#5fa5ba] border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="mt-4 text-stone-500 dark:text-stone-400">Loading schedule...</p>
+                </div>
+            </div>
+        );
+    }
+
+    const days = getDaysInView();
 
     return (
-        <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-900">
-            <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-8 py-4 flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 dark:text-white">My Schedule</h1>
-                    <p className="text-sm text-slate-500">View and manage your upcoming shifts</p>
-                </div>
-                <div className="flex items-center gap-4">
-                    <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200 dark:border-slate-700">
-                        <button className="px-6 py-1.5 text-sm font-bold bg-white dark:bg-slate-700 shadow-sm rounded-xl text-slate-800 dark:text-white">Month</button>
-                        <button className="px-6 py-1.5 text-sm font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">Week</button>
+        <div className="flex-1 flex flex-col overflow-hidden bg-background-light dark:bg-stone-950 font-manrope">
+            <ScrollAnimation animation="fade-down" delay={0.1}>
+                <header className="bg-white dark:bg-stone-900 border-b border-stone-100 dark:border-stone-800 px-8 py-5 flex items-center justify-between">
+                    <div>
+                        <h1 className="text-3xl font-extrabold text-stone-800 dark:text-white tracking-tight">My Schedule</h1>
+                        <p className="text-sm font-medium text-stone-400 mt-1">View and manage your upcoming shifts</p>
                     </div>
-                    <div className="flex items-center gap-4 pl-4 border-l border-slate-200 dark:border-slate-800">
-                        <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full relative">
-                            <span className="material-symbols-outlined">notifications</span>
-                        </button>
-                        <Link to="/caregiver/profile">
-                            <img
-                                alt="Caregiver profile"
-                                className="w-10 h-10 rounded-full object-cover shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer hover:opacity-80 transition-opacity"
-                                src={CAREGIVER_INFO.profileImage}
-                            />
-                        </Link>
+                    <div className="flex items-center gap-6">
+                        <div className="flex bg-stone-100 dark:bg-stone-800 p-1.5 rounded-2xl border border-stone-200 dark:border-stone-700">
+                            <button
+                                onClick={() => setViewMode('month')}
+                                className={`px-6 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${viewMode === 'month' ? 'bg-white dark:bg-stone-700 shadow-sm text-stone-800 dark:text-white' : 'text-stone-500 hover:text-stone-700'}`}>
+                                Month
+                            </button>
+                            <button
+                                onClick={() => setViewMode('week')}
+                                className={`px-6 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${viewMode === 'week' ? 'bg-white dark:bg-stone-700 shadow-sm text-stone-800 dark:text-white' : 'text-stone-500 hover:text-stone-700'}`}>
+                                Week
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-4 pl-6 border-l border-stone-100 dark:border-stone-800">
+                            <button className="p-2 text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-full transition-colors relative">
+                                <span className="material-symbols-outlined text-2xl">notifications</span>
+                            </button>
+                            <Link to="/caregiver/profile" className="group">
+                                <img
+                                    alt="Caregiver profile"
+                                    className="w-12 h-12 rounded-2xl object-cover shadow-sm border-2 border-white dark:border-stone-800 group-hover:border-[#5fa5ba] transition-all"
+                                    src={profile?.imageUrl || "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=100&h=100&fit=crop"}
+                                />
+                            </Link>
+                        </div>
                     </div>
-                </div>
-            </header>
+                </header>
+            </ScrollAnimation>
 
             <div className="flex-1 overflow-hidden flex">
                 {/* Calendar Grid Section */}
-                <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
-                    <div className="bg-white dark:bg-slate-800 rounded-4xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden flex flex-col min-h-[600px]">
-                        <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
-                            <div className="flex items-center gap-4">
-                                <h2 className="text-2xl font-bold text-slate-800 dark:text-white">{SCHEDULE_DATA.currentMonth}</h2>
-                                <div className="flex gap-2 text-slate-600 dark:text-slate-400">
-                                    <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-all">
-                                        <span className="material-symbols-outlined">chevron_left</span>
-                                    </button>
-                                    <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-all">
-                                        <span className="material-symbols-outlined">chevron_right</span>
-                                    </button>
+                <ScrollAnimation animation="fade-right" delay={0.2} className="flex-1 overflow-hidden">
+                    <div className="h-full p-8 overflow-y-auto custom-scrollbar">
+                        <div className="bg-white dark:bg-stone-800 rounded-[2.5rem] border border-stone-100 dark:border-stone-800 shadow-xl overflow-hidden flex flex-col min-h-[700px]">
+                            <div className="flex items-center justify-between p-8 border-b border-stone-100 dark:border-stone-800">
+                                <div className="flex items-center gap-6">
+                                    <h2 className="text-3xl font-extrabold text-stone-800 dark:text-white tracking-tight">
+                                        {monthNames[selectedDate.getMonth()]} {selectedDate.getFullYear()}
+                                    </h2>
+                                    <div className="flex gap-2 text-stone-400 dark:text-stone-400">
+                                        <button
+                                            onClick={() => navigateDate(-1)}
+                                            className="w-10 h-10 flex items-center justify-center border border-stone-200 rounded-full hover:bg-stone-50 hover:text-stone-800 transition-all"
+                                        >
+                                            <span className="material-symbols-outlined">chevron_left</span>
+                                        </button>
+                                        <button
+                                            onClick={() => navigateDate(1)}
+                                            className="w-10 h-10 flex items-center justify-center border border-stone-200 rounded-full hover:bg-stone-50 hover:text-stone-800 transition-all"
+                                        >
+                                            <span className="material-symbols-outlined">chevron_right</span>
+                                        </button>
+                                    </div>
                                 </div>
+                                <button
+                                    onClick={goToToday}
+                                    className="text-sm font-black text-[#5fa5ba] hover:underline uppercase tracking-wider">
+                                    Today
+                                </button>
                             </div>
-                            <button className="text-sm font-bold text-primary-600 hover:underline">Today</button>
-                        </div>
 
-                        <div className="grid grid-cols-7 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-                            {weekDays.map(day => (
-                                <div key={day} className="py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">{day}</div>
-                            ))}
-                        </div>
+                            <div className="grid grid-cols-7 border-b border-stone-100 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/50">
+                                {weekDays.map(day => (
+                                    <div key={day} className="py-4 text-center text-[10px] font-black text-stone-400 uppercase tracking-widest">{day}</div>
+                                ))}
+                            </div>
 
-                        <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 dark:divide-slate-800 flex-1">
-                            {/* Padding for May 2024 (starts on Wed) */}
-                            {[...Array(3)].map((_, i) => (
-                                <div key={`empty-${i}`} className="p-2 bg-slate-50/50 dark:bg-slate-900/30"></div>
-                            ))}
+                            <div className={`grid grid-cols-7 divide-x divide-y divide-stone-100 dark:divide-stone-800 flex-1 ${viewMode === 'week' ? 'auto-rows-[minmax(500px,1fr)]' : ''}`}>
+                                {days.map((dayItem, index) => {
+                                    const date = viewMode === 'week' ? dayItem : dayItem.date;
+                                    const daySchedules = getSchedulesForDay(date);
+                                    const isTodayDate = isToday(date);
+                                    const isCurrentMonth = viewMode === 'week' ? true : dayItem.isCurrentMonth;
 
-                            {days.map(day => {
-                                const shift = SCHEDULE_DATA.shifts.find(s => s.day === day);
-                                const isToday = day === 24;
+                                    return (
+                                        <div
+                                            key={index}
+                                            className={`min-h-[140px] p-4 group transition-colors 
+                                                hover:bg-stone-50 dark:hover:bg-stone-700/20
+                                                ${isTodayDate ? 'ring-2 ring-[#5fa5ba] ring-inset bg-[#5fa5ba]/5' : ''}
+                                                ${!isCurrentMonth ? 'bg-stone-50/50 dark:bg-stone-900/30' : ''}
+                                            `}
+                                        >
+                                            <span className={`text-sm font-bold ${isTodayDate ? 'text-[#5fa5ba]' : isCurrentMonth ? 'text-stone-400 dark:text-stone-500' : 'text-stone-300 dark:text-stone-600'}`}>
+                                                {date.getDate()}
+                                            </span>
 
-                                return (
-                                    <div key={day} className={`min-h-[120px] p-3 group transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/20 ${isToday ? 'ring-2 ring-primary-600 ring-inset bg-primary-50/20 dark:bg-primary-900/10' : ''}`}>
-                                        <span className={`text-sm font-bold ${isToday ? 'text-primary-600' : 'text-slate-400 dark:text-slate-500'}`}>{day}</span>
-
-                                        {shift && (
-                                            <div className="mt-2 space-y-1">
-                                                {shift.events ? (
-                                                    shift.events.map((event, idx) => (
-                                                        <div key={idx} className={`p-1.5 rounded-lg text-[10px] font-bold truncate cursor-pointer shadow-sm ${event.type === 'active'
-                                                            ? 'bg-primary-600 text-white shadow-md'
-                                                            : 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border-l-4 border-teal-500'
-                                                            }`}>
-                                                            {event.time} - {event.patient}
+                                            {daySchedules.length > 0 && (
+                                                <div className="mt-3 space-y-2">
+                                                    {daySchedules.map((schedule) => (
+                                                        <div
+                                                            key={schedule.id}
+                                                            onClick={() => setSelectedShift(schedule)}
+                                                            className={`p-2 rounded-xl text-[10px] font-bold truncate shadow-sm transition-transform hover:scale-105 cursor-pointer ${getEventStyle(schedule.status)}`}
+                                                        >
+                                                            {formatTime(schedule.startTime)} - {schedule.patientName}
                                                         </div>
-                                                    ))
-                                                ) : (
-                                                    <div className="p-1.5 bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded-lg text-[10px] font-bold border-l-4 border-teal-500 truncate cursor-pointer shadow-sm">
-                                                        {shift.title}
-                                                    </div>
-                                                )}
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                </ScrollAnimation>
+
+                {/* Sidebar Details Section */}
+                <ScrollAnimation animation="fade-left" delay={0.3} className="flex-shrink-0">
+                    <aside className="w-[420px] h-full bg-white dark:bg-stone-800 border-l border-stone-100 dark:border-stone-800 overflow-y-auto custom-scrollbar p-8">
+                        <div className="mb-8">
+                            <span className="text-[10px] font-black text-[#5fa5ba] uppercase tracking-widest">Selected Shift</span>
+                            <h3 className="text-3xl font-extrabold mt-1 text-stone-800 dark:text-white tracking-tight">
+                                {selectedShift ? new Date(selectedShift.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : 'No shift selected'}
+                            </h3>
+                        </div>
+
+                        <div className="space-y-6">
+                            {selectedShift ? (
+                                <div className="bg-[#5fa5ba]/5 dark:bg-[#5fa5ba]/10 rounded-[2rem] p-8 border border-[#5fa5ba]/20 dark:border-[#5fa5ba]/30 relative overflow-hidden group">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <span className={`text-[10px] px-3 py-1.5 rounded-lg font-black uppercase tracking-wider ${selectedShift.status === 'InProgress'
+                                            ? 'bg-[#5fa5ba] text-white'
+                                            : selectedShift.status === 'Completed'
+                                                ? 'bg-stone-200 text-stone-600'
+                                                : selectedShift.status === 'Failed'
+                                                    ? 'bg-rose-500 text-white'
+                                                    : 'bg-emerald-100 text-emerald-700'
+                                            }`}>
+                                            {selectedShift.status === 'InProgress' ? 'In Progress' : (selectedShift.status === 'Failed' ? 'Not Completed' : selectedShift.status)}
+                                        </span>
+                                        <span className="text-xs text-stone-500 font-bold dark:text-stone-400">
+                                            {formatTime(selectedShift.startTime)} - {formatTime(selectedShift.endTime)}
+                                        </span>
+                                    </div>
+                                    <h4 className="font-extrabold text-stone-800 dark:text-white text-2xl">{selectedShift.patientName}</h4>
+                                    <div className="mt-6 space-y-5">
+                                        <div className="flex items-start gap-4">
+                                            <span className="material-symbols-outlined text-[#5fa5ba] text-2xl">location_on</span>
+                                            <p className="text-sm text-stone-600 dark:text-stone-300 font-medium leading-relaxed">
+                                                {selectedShift.patientAddress || 'Address not provided'}
+                                            </p>
+                                        </div>
+                                        {selectedShift.notes && (
+                                            <div className="flex items-start gap-4">
+                                                <span className="material-symbols-outlined text-[#5fa5ba] text-2xl">notes</span>
+                                                <p className="text-sm text-stone-600 dark:text-stone-300 font-medium leading-relaxed">
+                                                    {selectedShift.notes}
+                                                </p>
                                             </div>
                                         )}
                                     </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Sidebar Details Section */}
-                <aside className="w-96 flex-shrink-0 bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-800 overflow-y-auto custom-scrollbar p-8">
-                    <div className="mb-8">
-                        <span className="text-[10px] font-bold text-primary-600 uppercase tracking-widest">Selected Date</span>
-                        <h3 className="text-2xl font-bold mt-1 text-slate-800 dark:text-white">{SCHEDULE_DATA.selectedDate}</h3>
-                    </div>
-
-                    <div className="space-y-6">
-                        {/* Active Shift Card */}
-                        <div className="bg-primary-50 dark:bg-primary-900/20 rounded-3xl p-6 border border-primary-100 dark:border-primary-900/30 relative overflow-hidden group">
-                            <div className="flex items-center justify-between mb-4">
-                                <span className="bg-primary-600 text-white text-[10px] px-3 py-1 rounded-full font-bold uppercase">Current</span>
-                                <span className="text-xs text-slate-500 font-bold dark:text-slate-400">9:00 AM - 1:00 PM</span>
-                            </div>
-                            <h4 className="font-bold text-slate-800 dark:text-white text-xl">Eleanor Thompson</h4>
-                            <div className="mt-6 space-y-4">
-                                <div className="flex items-start gap-3">
-                                    <span className="material-symbols-outlined text-primary-600 text-xl">location_on</span>
-                                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-tight">482 Oakwood Ave, Springfield, IL 62704</p>
+                                    {selectedShift.status === 'Scheduled' && (
+                                        <Link to="/caregiver/active-shift" className="w-full mt-8 bg-[#5fa5ba] hover:bg-[#4d8ca0] text-white py-5 rounded-2xl font-bold text-sm shadow-xl shadow-[#5fa5ba]/20 transition-all flex items-center justify-center gap-2 group hover:scale-[1.02]">
+                                            <span className="material-symbols-outlined text-xl group-hover:translate-x-1 transition-transform">login</span>
+                                            QUICK CHECK-IN
+                                        </Link>
+                                    )}
                                 </div>
-                                <div className="flex items-start gap-3">
-                                    <span className="material-symbols-outlined text-primary-600 text-xl">assignment</span>
-                                    <div className="space-y-2">
-                                        <p className="text-sm font-bold text-slate-700 dark:text-slate-100">Care Requirements:</p>
-                                        <ul className="text-xs text-slate-500 dark:text-slate-400 space-y-2 list-disc ml-4">
-                                            <li>Blood pressure monitoring</li>
-                                            <li>Assistance with meal prep</li>
-                                            <li>Light mobility exercise</li>
-                                        </ul>
+                            ) : (
+                                <div className="bg-stone-50 dark:bg-stone-900 rounded-[2rem] p-8 border border-dashed border-stone-200 dark:border-stone-800 text-center py-12">
+                                    <span className="material-symbols-outlined text-4xl text-stone-300 mb-2">event_busy</span>
+                                    <p className="text-stone-500 font-bold">Select a shift to view details</p>
+                                    <p className="text-xs text-stone-400 mt-1">Click on any colored shift block</p>
+                                </div>
+                            )}
+
+                            {/* Status Legend */}
+                            <div className="p-6 bg-stone-50 dark:bg-stone-900 rounded-[2rem] border border-stone-200 dark:border-stone-700">
+                                <h5 className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-4">Shift Status</h5>
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-3 h-3 rounded-full bg-[#5fa5ba]"></div>
+                                        <span className="text-xs font-bold text-stone-600 dark:text-stone-300">Active / In Progress</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                                        <span className="text-xs font-bold text-stone-600 dark:text-stone-300">Upcoming</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-3 h-3 rounded-full bg-stone-300"></div>
+                                        <span className="text-xs font-bold text-stone-600 dark:text-stone-300">Completed</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-3 h-3 rounded-full bg-rose-500"></div>
+                                        <span className="text-xs font-bold text-stone-600 dark:text-stone-300">Not Completed</span>
                                     </div>
                                 </div>
                             </div>
-                            <button className="w-full mt-8 bg-primary-600 hover:bg-primary-700 text-white py-4 rounded-2xl font-bold text-sm shadow-xl shadow-primary-600/20 transition-all flex items-center justify-center gap-2 group">
-                                <span className="material-symbols-outlined text-lg group-hover:translate-x-1 transition-transform">login</span>
-                                QUICK CHECK-IN
-                            </button>
                         </div>
-
-                        {/* Next Shifts */}
-                        <div className="space-y-4">
-                            <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Next Shifts</h5>
-                            <div className="p-5 border border-slate-100 dark:border-slate-700 rounded-3xl hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-all cursor-pointer">
-                                <div className="flex justify-between items-start mb-2">
-                                    <h6 className="font-bold text-slate-800 dark:text-white">James Wilson</h6>
-                                    <span className="text-xs font-bold text-primary-600">02:30 PM</span>
-                                </div>
-                                <p className="text-xs text-slate-500 flex items-center gap-1 dark:text-slate-400">
-                                    <span className="material-symbols-outlined text-[14px]">location_on</span>
-                                    122 Pine St, Apt 4B
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="mt-10 p-5 bg-slate-50 dark:bg-slate-900 rounded-3xl border border-dashed border-slate-300 dark:border-slate-700">
-                            <div className="flex items-center gap-3 text-slate-500">
-                                <span className="material-symbols-outlined text-2xl">help</span>
-                                <p className="text-xs leading-relaxed">Need to request a shift change? Contact your supervisor or use the <strong className="text-primary-600">Reports</strong> section.</p>
-                            </div>
-                        </div>
-                    </div>
-                </aside>
+                    </aside>
+                </ScrollAnimation>
             </div>
         </div>
     );

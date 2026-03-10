@@ -1,4 +1,5 @@
 /** @type {import('tailwindcss').Config} */
+import animate from "tailwindcss-animate";
 export default {
   darkMode: ["class"],
   content: [
@@ -23,8 +24,8 @@ export default {
         ring: "#19c3e6",
         background: "#ffffff",
         foreground: "#000000",
-        "family-primary": "#0d8ca5",
-        "family-primary-dark": "#d97706",
+        "family-primary": "#5fa5ba",
+        "family-primary-dark": "#4d8ca0",
         "secondary-orange": "#fb923c",
         "warm-beige": "#faf7f2",
         "warm-accent": "#ffedd5",
@@ -33,12 +34,12 @@ export default {
         "cream-light": "#FDFBF7",
         "cream-sidebar": "#FFFFFF",
         primary: {
-          DEFAULT: "#19c3e6",
+          DEFAULT: "#5fa5ba",
           foreground: "#ffffff",
         },
         secondary: {
-          DEFAULT: "#E5F2F5",
-          foreground: "#ffffff",
+          DEFAULT: "#E0F2F1",
+          foreground: "#00695C",
         },
         destructive: {
           DEFAULT: "#ef4444",
@@ -60,6 +61,12 @@ export default {
           DEFAULT: "#ffffff",
           foreground: "#000000",
         },
+      },
+      fontFamily: {
+        sans: ["Manrope", "sans-serif"],
+        display: ["Manrope", "sans-serif"],
+        manrope: ["Manrope", "sans-serif"],
+        "public-sans": ["Public Sans", "sans-serif"],
       },
       borderRadius: {
         lg: "0.5rem",
@@ -83,13 +90,18 @@ export default {
             opacity: "0",
           },
         },
+        "fade-in-up": {
+          "0%": { opacity: "0", transform: "translateY(20px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "meteor-effect": "meteor 5s linear infinite",
+        "fade-in-up": "fade-in-up 0.5s ease-out",
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [animate],
 };
