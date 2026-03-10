@@ -113,6 +113,38 @@ const Schedule = () => {
     });
   };
 
+  const getDisplayStatus = (schedule) => {
+    if (!schedule) return '';
+    const { status, date, startTime, endTime } = schedule;
+
+    // Final statuses are permanent
+    if (['Completed', 'Cancelled', 'Failed'].includes(status)) return status;
+
+    const now = new Date();
+    const scheduleDate = new Date(date);
+
+    const parseTime = (timeStr) => {
+      const parts = timeStr.split(':');
+      const d = new Date(scheduleDate);
+      d.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+      return d;
+    };
+
+    const start = parseTime(startTime);
+    const end = parseTime(endTime);
+
+    // Logic for Upcoming vs InProgress vs Not Completed
+    if (now < new Date(start.getTime() - 30 * 60000)) {
+      return 'Scheduled'; // Show as Upcoming
+    }
+
+    if (now > new Date(end.getTime() + 30 * 60000) && status !== 'Completed') {
+      return 'Failed'; // Show as Not Completed
+    }
+
+    return status;
+  };
+
   const unassignedSchedules = schedules.filter(s => !s.caregiverName || s.status === 'Pending');
 
   return (
@@ -201,7 +233,7 @@ const Schedule = () => {
                             return (
                               <div
                                 key={schedule.id}
-                                className={`absolute p-1.5 rounded-lg border shadow-sm transition-all hover:z-50 ${getStatusColor(schedule.status)}`}
+                                className={`absolute p-1.5 rounded-lg border shadow-sm transition-all hover:z-50 ${getStatusColor(getDisplayStatus(schedule))}`}
                                 style={{
                                   width: `calc(${width}% - 4px)`,
                                   left: `calc(${left}% + 2px)`,
@@ -211,15 +243,26 @@ const Schedule = () => {
                               >
                                 <div className="flex items-center justify-between mb-0.5">
                                   <Badge variant="secondary" className="text-[9px] bg-transparent p-0 font-bold opacity-70">
-                                    {schedule.status?.toLowerCase() === 'failed' ? 'NOT COMPLETED' : (schedule.status?.toLowerCase() === 'scheduled' ? 'UPCOMING' : schedule.status?.toUpperCase())}
+                                    {getDisplayStatus(schedule)?.toLowerCase() === 'failed' ? 'NOT COMPLETED' : (getDisplayStatus(schedule)?.toLowerCase() === 'scheduled' ? 'UPCOMING' : getDisplayStatus(schedule)?.toUpperCase())}
                                   </Badge>
                                 </div>
                                 <p className="font-bold text-[11px] leading-tight truncate" title={schedule.patientName}>
                                   {schedule.patientName}
                                 </p>
-                                <p className="text-[10px] text-muted-foreground truncate opacity-80" title={schedule.patientAddress}>
-                                  {schedule.patientAddress}
-                                </p>
+                                <div className="space-y-1 mt-1 opacity-90">
+                                  <div className="flex items-center gap-1.5 text-[9px]">
+                                    <Home className="w-2.5 h-2.5 shrink-0" />
+                                    <p className="truncate" title={schedule.patientAddress}>
+                                      {schedule.patientAddress || 'No address'}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-[9px]">
+                                    <Clock className="w-2.5 h-2.5 shrink-0" />
+                                    <p className="truncate">
+                                      {schedule.startTime} - {schedule.endTime}
+                                    </p>
+                                  </div>
+                                </div>
                                 <div className="flex items-center gap-1 mt-1.5 pt-1 border-t border-black/5">
                                   <Avatar className="w-4 h-4">
                                     <AvatarImage src={schedule.caregiverImage} />
@@ -269,12 +312,12 @@ const Schedule = () => {
               <Card key={schedule.id} className="border shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-2">
-                    <Badge className={`text-[10px] ${schedule.status === 'Confirmed' || schedule.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' :
-                      schedule.status === 'Completed' ? 'bg-green-100 text-green-700' :
-                        schedule.status === 'Failed' ? 'bg-red-100 text-red-700' :
+                    <Badge className={`text-[10px] ${getDisplayStatus(schedule) === 'Confirmed' || getDisplayStatus(schedule) === 'Scheduled' ? 'bg-blue-100 text-blue-700' :
+                      getDisplayStatus(schedule) === 'Completed' ? 'bg-green-100 text-green-700' :
+                        getDisplayStatus(schedule) === 'Failed' ? 'bg-red-100 text-red-700' :
                           'bg-gray-100 text-gray-700'
                       }`}>
-                      {schedule.status === 'Failed' ? 'Not Completed' : (schedule.status === 'Scheduled' ? 'Upcoming' : schedule.status)}
+                      {getDisplayStatus(schedule) === 'Failed' ? 'Not Completed' : (getDisplayStatus(schedule) === 'Scheduled' ? 'Upcoming' : getDisplayStatus(schedule))}
                     </Badge>
                     <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
                   </div>

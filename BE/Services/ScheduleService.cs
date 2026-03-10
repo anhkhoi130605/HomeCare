@@ -331,6 +331,14 @@ public class ScheduleService : IScheduleService
         var schedule = await _context.Schedules.FindAsync(scheduleId);
         if (schedule == null) return null;
 
+        // Time guard: Only allow check-in within 30 minutes of start time
+        var now = DateTime.Now;
+        var shiftStart = schedule.Date.Date.Add(schedule.StartTime);
+        if (now < shiftStart.AddMinutes(-30))
+        {
+            throw new InvalidOperationException("You can only check in up to 30 minutes before the shift starts.");
+        }
+
         schedule.CheckInTime = DateTime.UtcNow;
         schedule.Status = ScheduleStatus.InProgress;
 
@@ -404,10 +412,17 @@ public class ScheduleService : IScheduleService
         if (status == ScheduleStatus.Scheduled || status == ScheduleStatus.InProgress)
         {
             var now = DateTime.Now;
+            var shiftStartDateTime = s.Date.Date.Add(s.StartTime);
             var shiftEndDateTime = s.Date.Date.Add(s.EndTime);
             
-            // If the shift ended more than 30 minutes ago
-            if (shiftEndDateTime < now.AddMinutes(-30))
+            // 1. Safety check for premature InProgress (from previous auto-checkin bugs)
+            if (status == ScheduleStatus.InProgress && shiftStartDateTime > now.AddMinutes(30))
+            {
+                status = ScheduleStatus.Scheduled;
+            }
+            
+            // 2. Dynamic "Failed" status if shift is past its end time and not completed
+            if (shiftEndDateTime < now.AddMinutes(-30) && status != ScheduleStatus.Completed)
             {
                 status = ScheduleStatus.Failed;
             }
@@ -421,7 +436,8 @@ public class ScheduleService : IScheduleService
             PatientAddress = !string.IsNullOrWhiteSpace(s.Patient?.Address) ? s.Patient.Address 
                 : (!string.IsNullOrWhiteSpace(s.CareRequest?.Address) ? s.CareRequest.Address
                 : (!string.IsNullOrWhiteSpace(s.Contract?.Address) ? s.Contract.Address
-                : (s.Patient?.Family?.Address ?? ""))),
+                : (!string.IsNullOrWhiteSpace(s.Patient?.Family?.Address) ? s.Patient.Family.Address 
+                : "No address provided"))),
             CaregiverId = s.CaregiverId,
             CaregiverName = s.Caregiver?.FullName,
             ContractId = s.ContractId,

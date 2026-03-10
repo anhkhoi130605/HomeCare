@@ -160,8 +160,16 @@ public class CaregiverService : ICaregiverService
         if (status == ScheduleStatus.Scheduled || status == ScheduleStatus.InProgress)
         {
             var now = DateTime.Now;
+            var shiftStartDateTime = s.Date.Date.Add(s.StartTime);
             var shiftEndDateTime = s.Date.Date.Add(s.EndTime);
             
+            // 1. Safety check for premature InProgress
+            if (status == ScheduleStatus.InProgress && shiftStartDateTime > now.AddMinutes(30))
+            {
+                status = ScheduleStatus.Scheduled;
+            }
+
+            // 2. Dynamic Failure fallback
             if (shiftEndDateTime < now.AddMinutes(-30))
             {
                 status = ScheduleStatus.Failed;
@@ -176,7 +184,8 @@ public class CaregiverService : ICaregiverService
             PatientAddress = !string.IsNullOrWhiteSpace(s.Patient?.Address) ? s.Patient.Address 
                 : (!string.IsNullOrWhiteSpace(s.CareRequest?.Address) ? s.CareRequest.Address
                 : (!string.IsNullOrWhiteSpace(s.Contract?.Address) ? s.Contract.Address
-                : (s.Patient?.Family?.Address ?? ""))),
+                : (!string.IsNullOrWhiteSpace(s.Patient?.Family?.Address) ? s.Patient.Family.Address 
+                : "No address provided"))),
             CaregiverId = s.CaregiverId,
             ContractId = s.ContractId,
             CareRequestId = s.CareRequestId,
@@ -200,6 +209,14 @@ public class CaregiverService : ICaregiverService
             .FirstOrDefaultAsync(s => s.Id == scheduleId && s.CaregiverId == caregiverId);
 
         if (schedule == null) return null;
+
+        // Time guard: Only allow check-in within 30 minutes of start time
+        var now = DateTime.Now;
+        var shiftStart = schedule.Date.Date.Add(schedule.StartTime);
+        if (now < shiftStart.AddMinutes(-30))
+        {
+            throw new InvalidOperationException("You can only check in up to 30 minutes before the shift starts.");
+        }
 
         schedule.Status = ScheduleStatus.InProgress;
         schedule.CheckInTime = DateTime.UtcNow;

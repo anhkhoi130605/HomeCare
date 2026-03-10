@@ -93,20 +93,14 @@ const ActiveShift = () => {
                     }
                     setCurrentSchedule(activeSchedule);
 
-                    // Auto check-in if schedule is still 'Scheduled'
-                    if (activeSchedule.status === 'Scheduled') {
-                        try {
-                            await caregiverApi.checkIn(activeSchedule.id);
-                            setIsCheckedIn(true);
-                            console.log('Checked in successfully for schedule:', activeSchedule.id);
-                        } catch (checkInErr) {
-                            console.error('Check-in failed:', checkInErr);
-                        }
-                    } else if (activeSchedule.status === 'InProgress') {
+                    // Set check-in state based on current status
+                    if (activeSchedule.status === 'InProgress') {
                         setIsCheckedIn(true);
                         if (activeSchedule.checkInTime) {
                             setCheckInTime(new Date(activeSchedule.checkInTime));
                         }
+                    } else {
+                        setIsCheckedIn(false);
                     }
                 } else {
                     // Fallback: no schedules today
@@ -212,6 +206,22 @@ const ActiveShift = () => {
         return count || 0; // Default to 0 if empty
     };
 
+    const handleCheckIn = async () => {
+        if (currentSchedule?.id && currentSchedule.id !== 'demo') {
+            try {
+                await caregiverApi.checkIn(currentSchedule.id);
+                setIsCheckedIn(true);
+                setCheckInTime(new Date());
+            } catch (err) {
+                console.error('Manual Check-in failed:', err);
+                alert(err.response?.data?.message || 'Check-in failed. Please ensure it is time to start your shift.');
+            }
+        } else {
+            setIsCheckedIn(true);
+            setCheckInTime(new Date());
+        }
+    };
+
     const handleCompleteSession = async () => {
         setIsActive(false);
         setEndTime(new Date());
@@ -275,6 +285,37 @@ const ActiveShift = () => {
     };
 
     // Render "Session Completed" Summary View with User's Custom Design
+    if (!isCheckedIn) {
+        return (
+            <div className="flex-1 flex flex-col items-center justify-center bg-background-light dark:bg-stone-950 h-screen font-manrope">
+                <ScrollAnimation animation="fade-up">
+                    <div className="text-center max-w-md p-10 bg-white dark:bg-stone-900 rounded-[3rem] shadow-2xl border border-stone-100 dark:border-stone-800">
+                        <div className="w-24 h-24 bg-[#5fa5ba]/10 text-[#5fa5ba] rounded-3xl flex items-center justify-center mx-auto mb-8 transform -rotate-6">
+                            <span className="material-symbols-outlined text-5xl">login</span>
+                        </div>
+                        <h2 className="text-4xl font-extrabold text-stone-800 dark:text-white mb-4 tracking-tight">Ready to Start?</h2>
+                        <p className="text-stone-500 dark:text-stone-400 mb-10 font-medium leading-relaxed">
+                            You are scheduled to care for <span className="text-stone-800 dark:text-white font-bold">{currentSchedule?.patientName || 'your patient'}</span>.
+                            Click below to officially check-in and begin your shift log.
+                        </p>
+                        <button
+                            onClick={handleCheckIn}
+                            className="w-full bg-[#5fa5ba] hover:bg-[#4d8ca0] text-white py-6 rounded-[2rem] font-black text-xl transition-all shadow-2xl shadow-[#5fa5ba]/30 hover:scale-[1.02] active:scale-95 uppercase tracking-widest"
+                        >
+                            CHECK IN NOW
+                        </button>
+                        <button
+                            onClick={() => navigate('/caregiver/schedule')}
+                            className="mt-8 text-stone-400 font-bold hover:text-stone-600 dark:hover:text-stone-300 transition-colors uppercase tracking-widest text-[10px]"
+                        >
+                            Back to Schedule
+                        </button>
+                    </div>
+                </ScrollAnimation>
+            </div>
+        );
+    }
+
     if (isCompleted) {
         return (
             <div className="flex-1 h-screen flex flex-col bg-slate-50 dark:bg-slate-900 font-manrope overflow-hidden relative">

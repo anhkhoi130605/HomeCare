@@ -292,25 +292,47 @@ public class AdminService : IAdminService
 
         var schedules = await query.OrderBy(s => s.Date).ThenBy(s => s.StartTime).ToListAsync();
 
-        return schedules.Select(s => new AdminScheduleDto
-        {
-            Id = s.Id,
-            PatientId = s.PatientId,
-            PatientName = s.Patient?.FullName ?? "Unknown",
-            PatientAddress = !string.IsNullOrWhiteSpace(s.Patient?.Address) ? s.Patient.Address 
-                : (!string.IsNullOrWhiteSpace(s.CareRequest?.Address) ? s.CareRequest.Address
-                : (!string.IsNullOrWhiteSpace(s.Contract?.Address) ? s.Contract.Address
-                : (!string.IsNullOrWhiteSpace(s.Patient?.Family?.Address) ? s.Patient.Family.Address 
-                : "No address provided"))),
-            CaregiverId = s.CaregiverId,
-            CaregiverName = s.Caregiver?.FullName ?? "Unassigned",
-            CaregiverImage = s.Caregiver?.ImageUrl,
-            ServiceName = s.CareRequest?.Service?.Name ?? s.Contract?.Service?.Name ?? "N/A",
-            Date = s.Date,
-            StartTime = s.StartTime.ToString(@"hh\:mm"),
-            EndTime = s.EndTime.ToString(@"hh\:mm"),
-            Status = s.Status.ToString(),
-            Notes = s.Notes
+        return schedules.Select(s => {
+            string finalAddress = "No address provided";
+            
+            if (!string.IsNullOrWhiteSpace(s.Patient?.Address))
+                finalAddress = s.Patient.Address;
+            else if (!string.IsNullOrWhiteSpace(s.CareRequest?.Address))
+                finalAddress = s.CareRequest.Address;
+            else if (!string.IsNullOrWhiteSpace(s.Contract?.Address))
+                finalAddress = s.Contract.Address;
+            else if (!string.IsNullOrWhiteSpace(s.Patient?.Family?.Address))
+                finalAddress = s.Patient.Family.Address;
+
+            var displayStatus = s.Status;
+            if (displayStatus == ScheduleStatus.Scheduled || displayStatus == ScheduleStatus.InProgress)
+            {
+                var now = DateTime.Now;
+                var shiftStart = s.Date.Date.Add(s.StartTime);
+                var shiftEnd = s.Date.Date.Add(s.EndTime);
+
+                if (displayStatus == ScheduleStatus.InProgress && shiftStart > now.AddMinutes(30))
+                    displayStatus = ScheduleStatus.Scheduled;
+                else if (shiftEnd < now.AddMinutes(-30))
+                    displayStatus = ScheduleStatus.Failed;
+            }
+
+            return new AdminScheduleDto
+            {
+                Id = s.Id,
+                PatientId = s.PatientId,
+                PatientName = s.Patient?.FullName ?? "Unknown",
+                PatientAddress = finalAddress,
+                CaregiverId = s.CaregiverId,
+                CaregiverName = s.Caregiver?.FullName ?? "Unassigned",
+                CaregiverImage = s.Caregiver?.ImageUrl,
+                ServiceName = s.CareRequest?.Service?.Name ?? s.Contract?.Service?.Name ?? "N/A",
+                Date = s.Date,
+                StartTime = s.StartTime.ToString(@"hh\:mm"),
+                EndTime = s.EndTime.ToString(@"hh\:mm"),
+                Status = displayStatus.ToString(),
+                Notes = s.Notes
+            };
         }).ToList();
     }
 
