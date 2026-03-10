@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Users, UserCheck, FileText, Activity, TrendingUp, Calendar, DollarSign, ClipboardList } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ const Dashboard = () => {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const user = authApi.getCurrentUser();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -87,7 +89,7 @@ const Dashboard = () => {
             <h1 className="text-2xl font-bold">Welcome back, {user?.email?.split('@')[0] || 'Admin'}!</h1>
             <p className="text-muted-foreground">Here's what's happening with your care network today.</p>
           </div>
-          <Button className="gap-2">
+          <Button className="gap-2" onClick={() => navigate('/admin/schedule')}>
             <Calendar className="w-4 h-4" />
             View Schedule
           </Button>
@@ -96,7 +98,12 @@ const Dashboard = () => {
         {/* Stats Cards */}
         <div className="grid md:grid-cols-4 gap-4">
           {statsCards.map((stat) => (
-            <Card key={stat.label} className="border-0 shadow-sm">
+            <Card key={stat.label} className="border-0 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => {
+              if (stat.label === "Total Patients") navigate('/admin/patients');
+              if (stat.label === "Active Caregivers") navigate('/admin/caregivers');
+              if (stat.label === "Active Contracts") navigate('/admin/contracts');
+              if (stat.label === "Today's Schedules") navigate('/admin/schedule');
+            }}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className={`w-12 h-12 ${stat.color} rounded-xl flex items-center justify-center`}>
@@ -120,7 +127,9 @@ const Dashboard = () => {
         {/* Revenue Stats */}
         <div className="grid md:grid-cols-2 gap-4">
           {revenueCards.map((stat) => (
-            <Card key={stat.label} className="border-0 shadow-sm">
+            <Card key={stat.label} className="border-0 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => {
+              if (stat.label === "Pending Payments") navigate('/admin/payments');
+            }}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className={`w-12 h-12 ${stat.color} rounded-xl flex items-center justify-center`}>
@@ -147,19 +156,19 @@ const Dashboard = () => {
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-4">
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2">
+              <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => navigate('/admin/patients')}>
                 <Users className="w-6 h-6 text-primary" />
                 <span>Add Patient</span>
               </Button>
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2">
+              <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => navigate('/admin/caregivers')}>
                 <UserCheck className="w-6 h-6 text-primary" />
                 <span>Add Caregiver</span>
               </Button>
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2">
+              <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => navigate('/admin/contracts')}>
                 <FileText className="w-6 h-6 text-primary" />
                 <span>New Contract</span>
               </Button>
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2">
+              <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => navigate('/admin/reports')}>
                 <Activity className="w-6 h-6 text-primary" />
                 <span>View Reports</span>
               </Button>

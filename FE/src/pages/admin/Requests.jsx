@@ -47,7 +47,7 @@ const Requests = () => {
   const [activeTab, setActiveTab] = useState("paid");
   const [processing, setProcessing] = useState(null);
   const currentUserRole = authApi.getCurrentUser()?.role;
-  const canManage = currentUserRole === "OperationAdmin" || currentUserRole === "Admin";
+  const canManage = currentUserRole === "OperationAdmin";
 
   // Assign modal state
   const [showAssignModal, setShowAssignModal] = useState(false);

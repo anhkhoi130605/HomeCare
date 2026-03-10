@@ -35,6 +35,7 @@ const Schedule = () => {
   });
   const user = authApi.getCurrentUser();
   const canManage = user?.role === "OperationAdmin";
+  const getScheduleAddress = (s) => s.address || s.patientAddress || s.patient?.address || "";
 
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const date = new Date(currentWeekStart);
@@ -206,6 +207,11 @@ const Schedule = () => {
                                   </Avatar>
                                   <span className="text-[10px] truncate font-medium">{schedule.caregiverName?.split(' ')[0]}</span>
                                 </div>
+                              {getScheduleAddress(schedule) && (
+                                <div className="mt-1.5 text-[10px] text-muted-foreground truncate">
+                                  {getScheduleAddress(schedule)}
+                                </div>
+                              )}
                               </div>
                             );
                           })}
@@ -260,11 +266,14 @@ const Schedule = () => {
                   <div className="space-y-1 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <Home className="w-3 h-3" />
-                      <span>{schedule.serviceName}</span>
+                      <span className="truncate">{getScheduleAddress(schedule) || "No address provided"}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="w-3 h-3" />
                       <span>{new Date(schedule.date).toLocaleDateString()} • {schedule.startTime} - {schedule.endTime}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs">{schedule.serviceName}</span>
                     </div>
                   </div>
                 </CardContent>

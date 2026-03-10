@@ -401,8 +401,23 @@ export const adminApi = {
     // Toggle user status
     toggleUserStatus: async (userId, isActive) => {
         return apiCall(`/admin/users/${userId}/status`, {
-            method: 'PATCH',
-            body: JSON.stringify(isActive),
+            method: 'PUT',
+            body: JSON.stringify({ isActive }),
+        });
+    },
+
+    // Create user
+    createUser: async (data) => {
+        return apiCall('/admin/users', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    },
+
+    // Delete user
+    deleteUser: async (userId) => {
+        return apiCall(`/admin/users/${userId}`, {
+            method: 'DELETE',
         });
     },
 

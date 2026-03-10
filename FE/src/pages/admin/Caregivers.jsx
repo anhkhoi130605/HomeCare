@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import AdminHeader from "@/components/layout/AdminHeader";
 import { adminApi } from "@/lib/api";
 import AddCaregiverModal from "./AddCaregiverModal";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const Caregivers = () => {
   const [caregivers, setCaregivers] = useState([]);
@@ -15,6 +18,11 @@ const Caregivers = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCaregiver, setEditingCaregiver] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [minRating, setMinRating] = useState("");
+  const [specFilter, setSpecFilter] = useState("");
+  const [availableOnly, setAvailableOnly] = useState(false);
 
   const fetchCaregivers = useCallback(async () => {
     try {
@@ -56,10 +64,20 @@ const Caregivers = () => {
     fetchCaregivers();
   };
 
-  const filteredCaregivers = caregivers.filter(c =>
-    c.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.specialization?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCaregivers = caregivers.filter(c => {
+    const matchesSearch =
+      c.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.specialization?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" || c.status?.toLowerCase() === statusFilter.toLowerCase();
+    const matchesRating =
+      !minRating || (c.rating || 0) >= parseFloat(minRating);
+    const matchesSpec =
+      !specFilter || c.specialization?.toLowerCase().includes(specFilter.toLowerCase());
+    const matchesAvailable =
+      !availableOnly || c.status === "Online";
+    return matchesSearch && matchesStatus && matchesRating && matchesSpec && matchesAvailable;
+  });
 
   const stats = {
     online: caregivers.filter(c => c.status === 'Online').length,
@@ -96,7 +114,7 @@ const Caregivers = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-64"
             />
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowFilters(true)}>
               <Filter className="w-4 h-4" />
               Filters
             </Button>
@@ -256,6 +274,59 @@ const Caregivers = () => {
         onSuccess={handleModalSuccess}
         caregiverToEdit={editingCaregiver}
       />
+      <Dialog open={showFilters} onOpenChange={setShowFilters}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Filters</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Status</p>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="Online">Online</SelectItem>
+                  <SelectItem value="On-Duty">On-Duty</SelectItem>
+                  <SelectItem value="Offline">Offline</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Minimum Rating</p>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                max="5"
+                value={minRating}
+                onChange={(e) => setMinRating(e.target.value)}
+                placeholder="e.g., 4.0"
+              />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Specialization contains</p>
+              <Input
+                value={specFilter}
+                onChange={(e) => setSpecFilter(e.target.value)}
+                placeholder="e.g., Physical Therapy"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox id="availableOnly" checked={availableOnly} onCheckedChange={setAvailableOnly} />
+              <label htmlFor="availableOnly" className="text-sm">Available online only</label>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => { setStatusFilter("all"); setMinRating(""); setSpecFilter(""); setAvailableOnly(false); }}>
+                Reset
+              </Button>
+              <Button onClick={() => setShowFilters(false)}>Apply</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

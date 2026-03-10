@@ -11,6 +11,29 @@ const Payments = () => {
   const { id } = useParams();
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [payments, setPayments] = useState([]);
+  const [error, setError] = useState(null);
+
+  const normalizeList = (resp) => {
+    if (Array.isArray(resp)) return resp;
+    if (!resp) return [];
+    if (typeof resp === 'string') {
+      try {
+        const parsed = JSON.parse(resp);
+        return normalizeList(parsed);
+      } catch {
+        return [];
+      }
+    }
+    if (typeof resp !== 'object') return [];
+    const commonKeys = ['items', 'data', 'results', 'list', 'content'];
+    for (const k of commonKeys) {
+      const v = resp[k];
+      if (Array.isArray(v)) return v;
+    }
+    const firstArray = Object.values(resp).find(Array.isArray);
+    return Array.isArray(firstArray) ? firstArray : [];
+  };
 
   useEffect(() => {
     const fetchPayment = async () => {
@@ -19,9 +42,16 @@ const Payments = () => {
         if (id) {
           const data = await paymentApi.getById(id);
           setInvoice(data);
+        } else {
+          const list = await paymentApi.getAll();
+          setPayments(normalizeList(list));
+          if (!Array.isArray(list) && normalizeList(list).length === 0) {
+            setError('Unexpected payments response format');
+          }
         }
       } catch (error) {
         console.error("Failed to fetch payment:", error);
+        setError(error?.message || 'Failed to load payments');
       } finally {
         setLoading(false);
       }
@@ -46,7 +76,80 @@ const Payments = () => {
     );
   }
 
-  if (!invoice) {
+  if (!id && !invoice) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Payments</h1>
+          <span className="text-sm text-muted-foreground">{payments.length} records</span>
+        </div>
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-100 rounded-lg text-red-600 text-sm">{error}</div>
+        )}
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : payments.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">No payments found</p>
+          </div>
+        ) : (
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-0">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Payment</th>
+                    <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Family</th>
+                    <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Method</th>
+                    <th className="text-right p-4 text-xs font-medium text-primary uppercase tracking-wider">Amount</th>
+                    <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Status</th>
+                    <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Issued</th>
+                    <th className="text-right p-4 text-xs font-medium text-primary uppercase tracking-wider">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.map((p) => (
+                    <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                      <td className="p-4">
+                        <div>
+                          <p className="font-medium">#{p.id}</p>
+                          <p className="text-sm text-muted-foreground">Contract #{p.contractId}</p>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <span className="text-sm">{p.familyName || 'Family'}</span>
+                      </td>
+                      <td className="p-4">
+                        <span className="text-sm">{p.paymentMethod || 'ONLINE PAYMENT'}</span>
+                      </td>
+                      <td className="p-4 text-right">
+                        <span className="font-medium">{formatCurrency(p.amount)}</span>
+                      </td>
+                      <td className="p-4">
+                        <Badge className={getStatusBadge(p.status)}>• {p.status}</Badge>
+                      </td>
+                      <td className="p-4">
+                        <span className="text-sm">{formatDate(p.createdAt)}</span>
+                      </td>
+                      <td className="p-4 text-right">
+                        <Button size="sm" variant="outline" onClick={() => setInvoice(p)}>
+                          View
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
+  if (id && !invoice && !loading) {
     return (
       <div className="p-6">
         <Link
@@ -64,12 +167,20 @@ const Payments = () => {
   }
 
   const getStatusBadge = (status) => {
-    switch (status?.toLowerCase()) {
+    const statusMapNum = { 0: 'pending', 1: 'success', 2: 'failed', 3: 'refunded' };
+    const normalized =
+      typeof status === 'number'
+        ? statusMapNum[status] || 'unknown'
+        : String(status || '').toLowerCase();
+    switch (normalized) {
       case 'success':
+      case 'paid':
         return 'bg-green-100 text-green-700';
       case 'pending':
+      case 'processing':
         return 'bg-yellow-100 text-yellow-700';
       case 'failed':
+      case 'error':
         return 'bg-red-100 text-red-700';
       case 'refunded':
         return 'bg-blue-100 text-blue-700';
