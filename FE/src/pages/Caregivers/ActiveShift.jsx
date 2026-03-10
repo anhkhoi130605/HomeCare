@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 import { caregiverApi, careLogApi } from '@/lib/api';
+import { formatDateToYYYYMMDD } from '@/lib/utils';
 
 const ActiveShift = () => {
     const navigate = useNavigate();
@@ -61,7 +62,7 @@ const ActiveShift = () => {
             try {
                 setLoading(true);
                 // Get today's schedules for the caregiver
-                const today = new Date().toISOString().split('T')[0];
+                const today = formatDateToYYYYMMDD(new Date());
                 const schedules = await caregiverApi.getSchedules(today, today);
 
                 if (schedules && schedules.length > 0) {

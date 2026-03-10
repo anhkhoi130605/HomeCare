@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { adminApi, authApi } from "@/lib/api";
+import { formatDateToYYYYMMDD } from "@/lib/utils";
 
-const timeSlots = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
+const timeSlots = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
 
 const getStatusColor = (status) => {
   switch (status?.toLowerCase()) {
@@ -36,7 +37,7 @@ const Schedule = () => {
     return new Date(today.setDate(diff));
   });
   const user = authApi.getCurrentUser();
-  const canManage = user?.role === "OperationAdmin";
+  const canManage = user?.role === "OperationAdmin" || user?.role === "Admin";
 
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const date = new Date(currentWeekStart);
@@ -63,8 +64,8 @@ const Schedule = () => {
         const endDate = new Date(currentWeekStart);
         endDate.setDate(endDate.getDate() + 6);
         const data = await adminApi.getSchedules(
-          currentWeekStart.toISOString().split('T')[0],
-          endDate.toISOString().split('T')[0]
+          formatDateToYYYYMMDD(currentWeekStart),
+          formatDateToYYYYMMDD(endDate)
         );
         setSchedules(data || []);
       } catch (error) {
@@ -84,13 +85,31 @@ const Schedule = () => {
 
   // Map schedules to grid positions
   const getScheduleForSlot = (dayIndex, timeSlot) => {
-    const targetDate = weekDays[dayIndex]?.fullDate;
-    if (!targetDate) return [];
+    const targetDateStr = formatDateToYYYYMMDD(weekDays[dayIndex]?.fullDate);
+    if (!targetDateStr) return [];
+
+    const slotHour = parseInt(timeSlot.split(':')[0]);
 
     return schedules.filter(s => {
-      const scheduleDate = new Date(s.date);
-      return scheduleDate.toDateString() === targetDate.toDateString() &&
-        s.startTime === timeSlot;
+      // Use string splitting for date to avoid timezone shifts
+      const scheduleDateStr = s.date?.split('T')[0];
+      if (scheduleDateStr !== targetDateStr) return false;
+
+      // Parse current shift's start hour
+      if (!s.startTime) return false;
+      let shiftHour = 0;
+      const parts = s.startTime.split(':');
+      if (parts.length >= 2) {
+        const hourPart = parts[0];
+        if (hourPart.includes('.')) {
+          // It's "d.HH"
+          shiftHour = parseInt(hourPart.split('.')[1]);
+        } else {
+          shiftHour = parseInt(hourPart);
+        }
+      }
+
+      return shiftHour === slotHour;
     });
   };
 
@@ -138,17 +157,17 @@ const Schedule = () => {
         </div>
       </header>
 
-      <div className="flex">
+      <div className="flex h-[calc(100vh-64px)] overflow-hidden">
         {/* Calendar Grid */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-6 flex flex-col min-w-0">
           {loading ? (
-            <div className="flex items-center justify-center h-64">
+            <div className="flex items-center justify-center h-full">
               <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
           ) : (
-            <>
+            <div className="flex flex-col h-full">
               {/* Week Header */}
-              <div className="grid grid-cols-8 gap-2 mb-4">
+              <div className="grid grid-cols-8 gap-2 mb-4 shrink-0">
                 <div className="w-20" />
                 {weekDays.map((day) => (
                   <div
@@ -162,8 +181,8 @@ const Schedule = () => {
                 ))}
               </div>
 
-              {/* Time Grid */}
-              <div className="relative">
+              {/* Time Grid - Scrollable */}
+              <div className="relative overflow-y-auto flex-1 pr-2 custom-scrollbar-thin">
                 {timeSlots.map((time, timeIndex) => (
                   <div key={time} className="grid grid-cols-8 gap-2 min-h-[80px]">
                     <div className="w-20 text-xs text-muted-foreground pt-2 text-right pr-4">
@@ -192,14 +211,14 @@ const Schedule = () => {
                               >
                                 <div className="flex items-center justify-between mb-0.5">
                                   <Badge variant="secondary" className="text-[9px] bg-transparent p-0 font-bold opacity-70">
-                                    {schedule.status?.toLowerCase() === 'failed' ? 'NOT COMPLETED' : schedule.status?.toUpperCase()}
+                                    {schedule.status?.toLowerCase() === 'failed' ? 'NOT COMPLETED' : (schedule.status?.toLowerCase() === 'scheduled' ? 'UPCOMING' : schedule.status?.toUpperCase())}
                                   </Badge>
                                 </div>
                                 <p className="font-bold text-[11px] leading-tight truncate" title={schedule.patientName}>
                                   {schedule.patientName}
                                 </p>
-                                <p className="text-[10px] text-muted-foreground truncate opacity-80">
-                                  {schedule.serviceName}
+                                <p className="text-[10px] text-muted-foreground truncate opacity-80" title={schedule.patientAddress}>
+                                  {schedule.patientAddress}
                                 </p>
                                 <div className="flex items-center gap-1 mt-1.5 pt-1 border-t border-black/5">
                                   <Avatar className="w-4 h-4">
@@ -217,7 +236,7 @@ const Schedule = () => {
                   </div>
                 ))}
               </div>
-            </>
+            </div>
           )}
         </div>
 
@@ -245,8 +264,8 @@ const Schedule = () => {
             </Button>
           </div>
 
-          <div className="space-y-3 max-h-[400px] overflow-y-auto">
-            {schedules.slice(0, 5).map((schedule) => (
+          <div className="space-y-3 overflow-y-auto pr-2" style={{ maxHeight: 'calc(100vh - 350px)' }}>
+            {schedules.map((schedule) => (
               <Card key={schedule.id} className="border shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-2">
@@ -255,7 +274,7 @@ const Schedule = () => {
                         schedule.status === 'Failed' ? 'bg-red-100 text-red-700' :
                           'bg-gray-100 text-gray-700'
                       }`}>
-                      {schedule.status === 'Failed' ? 'Not Completed' : schedule.status}
+                      {schedule.status === 'Failed' ? 'Not Completed' : (schedule.status === 'Scheduled' ? 'Upcoming' : schedule.status)}
                     </Badge>
                     <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
                   </div>
@@ -263,11 +282,11 @@ const Schedule = () => {
                   <div className="space-y-1 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <Home className="w-3 h-3" />
-                      <span>{schedule.serviceName}</span>
+                      <span className="truncate" title={schedule.patientAddress}>{schedule.patientAddress || 'No address'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="w-3 h-3" />
-                      <span>{new Date(schedule.date).toLocaleDateString()} • {schedule.startTime} - {schedule.endTime}</span>
+                      <span>{schedule.date?.split('T')[0]} • {schedule.startTime} - {schedule.endTime}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -281,7 +300,7 @@ const Schedule = () => {
             <div className="flex items-center gap-4 text-xs flex-wrap">
               <div className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-primary" />
-                <span>Scheduled</span>
+                <span>Upcoming</span>
               </div>
               <div className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-amber-500" />

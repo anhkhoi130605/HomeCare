@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 import { caregiverApi } from '@/lib/api';
+import { formatTimeSpan, formatDateToYYYYMMDD } from '@/lib/utils';
 
 const MySchedule = () => {
     const [viewMode, setViewMode] = useState('week');
@@ -31,20 +32,20 @@ const MySchedule = () => {
                 startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay());
                 const endOfWeek = new Date(startOfWeek);
                 endOfWeek.setDate(startOfWeek.getDate() + 6);
-                from = startOfWeek.toISOString().split('T')[0];
-                to = endOfWeek.toISOString().split('T')[0];
+                from = formatDateToYYYYMMDD(startOfWeek);
+                to = formatDateToYYYYMMDD(endOfWeek);
             } else {
                 const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
                 const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
-                from = startOfMonth.toISOString().split('T')[0];
-                to = endOfMonth.toISOString().split('T')[0];
+                from = formatDateToYYYYMMDD(startOfMonth);
+                to = formatDateToYYYYMMDD(endOfMonth);
             }
 
             const schedulesData = await caregiverApi.getSchedules(from, to);
             setSchedules(schedulesData);
 
             // Auto-select first schedule of today
-            const today = new Date().toISOString().split('T')[0];
+            const today = formatDateToYYYYMMDD(new Date());
             const todaySchedule = schedulesData.find(s => s.date.split('T')[0] === today);
             if (todaySchedule) {
                 setSelectedShift(todaySchedule);
@@ -91,19 +92,11 @@ const MySchedule = () => {
     };
 
     const getSchedulesForDay = (date) => {
-        const dateStr = date.toISOString().split('T')[0];
+        const dateStr = formatDateToYYYYMMDD(date);
         return schedules.filter(s => s.date.split('T')[0] === dateStr);
     };
 
-    const formatTime = (timeStr) => {
-        if (!timeStr) return '';
-        const parts = timeStr.split(':');
-        const hours = parseInt(parts[0]);
-        const minutes = parts[1];
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        const displayHours = hours % 12 || 12;
-        return `${displayHours}:${minutes} ${ampm}`;
-    };
+    const formatTime = (timeStr) => formatTimeSpan(timeStr);
 
     const isToday = (date) => {
         const today = new Date();
@@ -287,7 +280,7 @@ const MySchedule = () => {
                                                     ? 'bg-rose-500 text-white'
                                                     : 'bg-emerald-100 text-emerald-700'
                                             }`}>
-                                            {selectedShift.status === 'InProgress' ? 'In Progress' : (selectedShift.status === 'Failed' ? 'Not Completed' : selectedShift.status)}
+                                            {selectedShift.status === 'InProgress' ? 'In Progress' : (selectedShift.status === 'Failed' ? 'Not Completed' : (selectedShift.status === 'Scheduled' ? 'Upcoming' : selectedShift.status))}
                                         </span>
                                         <span className="text-xs text-stone-500 font-bold dark:text-stone-400">
                                             {formatTime(selectedShift.startTime)} - {formatTime(selectedShift.endTime)}

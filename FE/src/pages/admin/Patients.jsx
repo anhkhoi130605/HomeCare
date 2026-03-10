@@ -162,7 +162,7 @@ const Patients = () => {
                           <div>
                             <p className="font-medium">{patient.fullName}</p>
                             <p className="text-sm text-muted-foreground">
-                              {patient.age} yrs • {patient.gender} • ID: PAT-{patient.id}
+                              {patient.age} yrs • {patient.gender} • {patient.address}
                             </p>
                           </div>
                         </div>

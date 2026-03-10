@@ -71,7 +71,7 @@ public class ScheduleService : IScheduleService
     public async Task<List<ScheduleDto>> GetAllSchedulesAsync(DateTime? from = null, DateTime? to = null)
     {
         var query = _context.Schedules
-            .Include(s => s.Patient)
+            .Include(s => s.Patient).ThenInclude(p => p.Family)
             .Include(s => s.Caregiver)
             .Include(s => s.Contract!).ThenInclude(c => c.Service)
             .Include(s => s.CareRequest!).ThenInclude(r => r.Service)
@@ -90,7 +90,7 @@ public class ScheduleService : IScheduleService
     public async Task<List<ScheduleDto>> GetSchedulesByCaregiverAsync(int caregiverId, DateTime? from = null, DateTime? to = null)
     {
         var query = _context.Schedules
-            .Include(s => s.Patient)
+            .Include(s => s.Patient).ThenInclude(p => p.Family)
             .Include(s => s.Caregiver)
             .Include(s => s.Contract!).ThenInclude(c => c.Service)
             .Include(s => s.CareRequest!).ThenInclude(r => r.Service)
@@ -109,7 +109,7 @@ public class ScheduleService : IScheduleService
     public async Task<List<ScheduleDto>> GetSchedulesByPatientAsync(int patientId, DateTime? from = null, DateTime? to = null)
     {
         var query = _context.Schedules
-            .Include(s => s.Patient)
+            .Include(s => s.Patient).ThenInclude(p => p.Family)
             .Include(s => s.Caregiver)
             .Include(s => s.Contract!).ThenInclude(c => c.Service)
             .Include(s => s.CareRequest!).ThenInclude(r => r.Service)
@@ -128,7 +128,7 @@ public class ScheduleService : IScheduleService
     public async Task<ScheduleDto?> GetScheduleByIdAsync(int id)
     {
         var schedule = await _context.Schedules
-            .Include(s => s.Patient)
+            .Include(s => s.Patient).ThenInclude(p => p.Family)
             .Include(s => s.Caregiver)
             .Include(s => s.Contract!).ThenInclude(c => c.Service)
             .Include(s => s.CareRequest!).ThenInclude(r => r.Service)
@@ -418,7 +418,10 @@ public class ScheduleService : IScheduleService
             Id = s.Id,
             PatientId = s.PatientId,
             PatientName = s.Patient?.FullName ?? "",
-            PatientAddress = s.Patient?.Address ?? "",
+            PatientAddress = !string.IsNullOrWhiteSpace(s.Patient?.Address) ? s.Patient.Address 
+                : (!string.IsNullOrWhiteSpace(s.CareRequest?.Address) ? s.CareRequest.Address
+                : (!string.IsNullOrWhiteSpace(s.Contract?.Address) ? s.Contract.Address
+                : (s.Patient?.Family?.Address ?? ""))),
             CaregiverId = s.CaregiverId,
             CaregiverName = s.Caregiver?.FullName,
             ContractId = s.ContractId,
