@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { careRequestApi } from '@/lib/api';
+import { formatTimeSpan } from '@/lib/utils';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -127,7 +128,7 @@ const RequestDetail = () => {
                                         <p className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-1">Duration</p>
                                         <p className="text-lg font-bold text-stone-800 flex items-center gap-2">
                                             <Clock className="w-4 h-4 text-stone-400" />
-                                            {request.startTime} - {request.endTime}
+                                            {formatTimeSpan(request.startTime)} - {formatTimeSpan(request.endTime)}
                                         </p>
                                     </div>
                                 </div>

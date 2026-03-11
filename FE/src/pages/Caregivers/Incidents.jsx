@@ -383,7 +383,7 @@ const Incidents = () => {
             </div>
 
             <footer className="p-8 text-center text-stone-400 text-xs font-bold mt-auto mb-4">
-                © 2024 HomeCare Systems Inc. All Rights Reserved.
+                Â© 2024 HomeCare Systems Inc. All Rights Reserved.
             </footer>
         </div>
     );

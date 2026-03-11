@@ -178,7 +178,9 @@ const App = () => (
                 <Route path="incidents" element={<Incidents />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="reports" element={<CaregiverReports />} />
+
                 <Route path="incidents/detail/:id" element={<IncidentDetail />} />
+
               </Route>
 
               {/* Redirect /CaregiverDashboard to /caregiver to fix 404 */}

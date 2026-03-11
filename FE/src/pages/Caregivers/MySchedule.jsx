@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 import { caregiverApi } from '@/lib/api';
+import { formatTimeSpan, formatDateToYYYYMMDD } from '@/lib/utils';
 
 const MySchedule = () => {
     const [viewMode, setViewMode] = useState('week');
@@ -31,20 +32,20 @@ const MySchedule = () => {
                 startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay());
                 const endOfWeek = new Date(startOfWeek);
                 endOfWeek.setDate(startOfWeek.getDate() + 6);
-                from = startOfWeek.toISOString().split('T')[0];
-                to = endOfWeek.toISOString().split('T')[0];
+                from = formatDateToYYYYMMDD(startOfWeek);
+                to = formatDateToYYYYMMDD(endOfWeek);
             } else {
                 const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
                 const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
-                from = startOfMonth.toISOString().split('T')[0];
-                to = endOfMonth.toISOString().split('T')[0];
+                from = formatDateToYYYYMMDD(startOfMonth);
+                to = formatDateToYYYYMMDD(endOfMonth);
             }
 
             const schedulesData = await caregiverApi.getSchedules(from, to);
             setSchedules(schedulesData);
 
             // Auto-select first schedule of today
-            const today = new Date().toISOString().split('T')[0];
+            const today = formatDateToYYYYMMDD(new Date());
             const todaySchedule = schedulesData.find(s => s.date.split('T')[0] === today);
             if (todaySchedule) {
                 setSelectedShift(todaySchedule);
@@ -91,23 +92,70 @@ const MySchedule = () => {
     };
 
     const getSchedulesForDay = (date) => {
-        const dateStr = date.toISOString().split('T')[0];
+        const dateStr = formatDateToYYYYMMDD(date);
         return schedules.filter(s => s.date.split('T')[0] === dateStr);
     };
 
-    const formatTime = (timeStr) => {
-        if (!timeStr) return '';
-        const parts = timeStr.split(':');
-        const hours = parseInt(parts[0]);
-        const minutes = parts[1];
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        const displayHours = hours % 12 || 12;
-        return `${displayHours}:${minutes} ${ampm}`;
-    };
+    const formatTime = (timeStr) => formatTimeSpan(timeStr);
 
     const isToday = (date) => {
         const today = new Date();
         return date.toDateString() === today.toDateString();
+    };
+
+    const canCheckIn = (schedule) => {
+        if (!schedule || schedule.status !== 'Scheduled') return false;
+
+        const now = new Date();
+        const scheduleDate = new Date(schedule.date);
+
+        // If it's not today, definitely can't check in
+        if (scheduleDate.toDateString() !== now.toDateString()) return false;
+
+        // Parse "HH:mm:ss" or "HH:mm"
+        const timeParts = schedule.startTime.split(':');
+        const hours = parseInt(timeParts[0]);
+        const minutes = parseInt(timeParts[1]);
+
+        const shiftStart = new Date(now);
+        shiftStart.setHours(hours, minutes, 0, 0);
+
+        // Allow check-in from 30 minutes before
+        const checkInWindowStart = new Date(shiftStart.getTime() - 30 * 60000);
+
+        return now >= checkInWindowStart;
+    };
+
+    const getDisplayStatus = (schedule) => {
+        if (!schedule) return '';
+        const { status, date, startTime, endTime } = schedule;
+
+        // Final statuses are permanent
+        if (['Completed', 'Cancelled', 'Failed'].includes(status)) return status;
+
+        const now = new Date();
+        const scheduleDate = new Date(date);
+
+        const parseTime = (timeStr) => {
+            const parts = timeStr.split(':');
+            const d = new Date(scheduleDate);
+            d.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+            return d;
+        };
+
+        const start = parseTime(startTime);
+        const end = parseTime(endTime);
+
+        // Logic for Upcoming vs InProgress vs Not Completed
+        if (now < new Date(start.getTime() - 30 * 60000)) {
+            return 'Scheduled'; // Show as Upcoming
+        }
+
+        if (now > new Date(end.getTime() + 30 * 60000) && status !== 'Completed') {
+            return 'Failed'; // Show as Not Completed
+        }
+
+        return status;
     };
 
     const getEventStyle = (status) => {
@@ -115,6 +163,8 @@ const MySchedule = () => {
             return "bg-[#5fa5ba] text-white shadow-[#5fa5ba]/30";
         } else if (status === 'Completed') {
             return "bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-300";
+        } else if (status === 'Failed') {
+            return "bg-rose-100 text-rose-700 border-l-4 border-rose-500 shadow-rose-100/30";
         } else {
             return "bg-emerald-50 text-emerald-700 border-l-4 border-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-300";
         }
@@ -248,7 +298,7 @@ const MySchedule = () => {
                                                         <div
                                                             key={schedule.id}
                                                             onClick={() => setSelectedShift(schedule)}
-                                                            className={`p-2 rounded-xl text-[10px] font-bold truncate shadow-sm transition-transform hover:scale-105 cursor-pointer ${getEventStyle(schedule.status)}`}
+                                                            className={`p-2 rounded-xl text-[10px] font-bold truncate shadow-sm transition-transform hover:scale-105 cursor-pointer ${getEventStyle(getDisplayStatus(schedule))}`}
                                                         >
                                                             {formatTime(schedule.startTime)} - {schedule.patientName}
                                                         </div>
@@ -277,13 +327,15 @@ const MySchedule = () => {
                             {selectedShift ? (
                                 <div className="bg-[#5fa5ba]/5 dark:bg-[#5fa5ba]/10 rounded-[2rem] p-8 border border-[#5fa5ba]/20 dark:border-[#5fa5ba]/30 relative overflow-hidden group">
                                     <div className="flex items-center justify-between mb-6">
-                                        <span className={`text-[10px] px-3 py-1.5 rounded-lg font-black uppercase tracking-wider ${selectedShift.status === 'InProgress'
-                                                ? 'bg-[#5fa5ba] text-white'
-                                                : selectedShift.status === 'Completed'
-                                                    ? 'bg-stone-200 text-stone-600'
+                                        <span className={`text-[10px] px-3 py-1.5 rounded-lg font-black uppercase tracking-wider ${getDisplayStatus(selectedShift) === 'InProgress'
+                                            ? 'bg-[#5fa5ba] text-white'
+                                            : getDisplayStatus(selectedShift) === 'Completed'
+                                                ? 'bg-stone-200 text-stone-600'
+                                                : getDisplayStatus(selectedShift) === 'Failed'
+                                                    ? 'bg-rose-500 text-white'
                                                     : 'bg-emerald-100 text-emerald-700'
                                             }`}>
-                                            {selectedShift.status === 'InProgress' ? 'In Progress' : selectedShift.status}
+                                            {getDisplayStatus(selectedShift) === 'InProgress' ? 'In Progress' : (getDisplayStatus(selectedShift) === 'Failed' ? 'Not Completed' : (getDisplayStatus(selectedShift) === 'Scheduled' ? 'Upcoming' : getDisplayStatus(selectedShift)))}
                                         </span>
                                         <span className="text-xs text-stone-500 font-bold dark:text-stone-400">
                                             {formatTime(selectedShift.startTime)} - {formatTime(selectedShift.endTime)}
@@ -306,7 +358,7 @@ const MySchedule = () => {
                                             </div>
                                         )}
                                     </div>
-                                    {selectedShift.status === 'Scheduled' && (
+                                    {canCheckIn(selectedShift) && (
                                         <Link to="/caregiver/active-shift" className="w-full mt-8 bg-[#5fa5ba] hover:bg-[#4d8ca0] text-white py-5 rounded-2xl font-bold text-sm shadow-xl shadow-[#5fa5ba]/20 transition-all flex items-center justify-center gap-2 group hover:scale-[1.02]">
                                             <span className="material-symbols-outlined text-xl group-hover:translate-x-1 transition-transform">login</span>
                                             QUICK CHECK-IN
@@ -336,6 +388,10 @@ const MySchedule = () => {
                                     <div className="flex items-center gap-3">
                                         <div className="w-3 h-3 rounded-full bg-stone-300"></div>
                                         <span className="text-xs font-bold text-stone-600 dark:text-stone-300">Completed</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-3 h-3 rounded-full bg-rose-500"></div>
+                                        <span className="text-xs font-bold text-stone-600 dark:text-stone-300">Not Completed</span>
                                     </div>
                                 </div>
                             </div>

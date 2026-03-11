@@ -215,7 +215,7 @@ const Profile = () => {
                                     <div className="space-y-2 border-b border-stone-50 dark:border-stone-800 pb-3 col-span-2">
                                         <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Status</p>
                                         <p className={`font-bold text-lg leading-tight ${profile?.isAvailable ? 'text-green-500' : 'text-amber-500'}`}>
-                                            {profile?.isAvailable ? '✓ Available for assignments' : '⏸ Currently unavailable'}
+                                            {profile?.isAvailable ? 'âœ“ Available for assignments' : 'â¸ Currently unavailable'}
                                         </p>
                                     </div>
                                     {profile?.bio && (
@@ -269,7 +269,7 @@ const Profile = () => {
                 </div>
             </div>
             <footer className="p-8 text-center text-stone-400 text-xs font-bold mt-auto mb-4">
-                © 2024 HomeCare Systems Inc. All Rights Reserved. • <a href="#" className="hover:text-[#5fa5ba] underline transition-colors">Privacy Policy</a>
+                Â© 2024 HomeCare Systems Inc. All Rights Reserved. â€¢ <a href="#" className="hover:text-[#5fa5ba] underline transition-colors">Privacy Policy</a>
             </footer>
         </div>
     );

@@ -140,12 +140,24 @@ public class CareRequestService : ICareRequestService
         var caregiver = await _context.Caregivers.FindAsync(caregiverId);
         if (caregiver == null) return null;
 
+        // Check for schedule conflicts before assigning
+        var existingSchedule = await _context.Schedules.FirstOrDefaultAsync(s => s.CareRequestId == id);
+        var hasConflict = await _context.Schedules
+            .Where(s => s.CaregiverId == caregiverId)
+            .Where(s => s.Date == request.RequestedDate.Date)
+            .Where(s => s.Status != ScheduleStatus.Cancelled)
+            .Where(s => existingSchedule != null ? s.Id != existingSchedule.Id : true)
+            .Where(s => s.StartTime < request.EndTime && s.EndTime > request.StartTime)
+            .AnyAsync();
+
+        if (hasConflict)
+            throw new InvalidOperationException("Lịch bị trùng! Caregiver này đã có lịch làm việc trùng giờ trong ngày được yêu cầu.");
+
         request.AssignedCaregiverId = caregiverId;
         request.AssignedCaregiver = caregiver;
         request.Status = RequestStatus.Assigned;
         request.UpdatedAt = DateTime.UtcNow;
 
-        var existingSchedule = await _context.Schedules.FirstOrDefaultAsync(s => s.CareRequestId == id);
         if (existingSchedule != null)
         {
             existingSchedule.CaregiverId = caregiverId;

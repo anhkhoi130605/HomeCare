@@ -50,7 +50,8 @@ public enum ScheduleStatus
     Scheduled,
     InProgress,
     Completed,
-    Cancelled
+    Cancelled,
+    Failed
 }
 
 public enum IncidentSeverity

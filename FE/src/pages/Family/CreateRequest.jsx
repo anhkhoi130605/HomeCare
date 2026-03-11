@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { familyApi, serviceApi, careRequestApi } from '@/lib/api';
+import { formatDateToYYYYMMDD } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const CreateRequest = () => {
@@ -49,7 +50,7 @@ const CreateRequest = () => {
                 // Set default date to tomorrow
                 const tomorrow = new Date();
                 tomorrow.setDate(tomorrow.getDate() + 1);
-                setRequestedDate(tomorrow.toISOString().split('T')[0]);
+                setRequestedDate(formatDateToYYYYMMDD(tomorrow));
 
             } catch (error) {
                 console.error("Failed to fetch data:", error);

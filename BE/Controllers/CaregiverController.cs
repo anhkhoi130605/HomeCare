@@ -148,12 +148,12 @@ public class CaregiverController : ControllerBase
     /// </summary>
     [HttpPost("schedules/{scheduleId}/check-out")]
     [Authorize(Roles = "Caregiver")]
-    public async Task<ActionResult<ScheduleDto>> CheckOut(int scheduleId)
+    public async Task<ActionResult<ScheduleDto>> CheckOut(int scheduleId, [FromBody] CheckOutDto dto)
     {
         try
         {
             var caregiverId = GetCaregiverId();
-            var schedule = await _caregiverService.CheckOutAsync(caregiverId, scheduleId);
+            var schedule = await _caregiverService.CheckOutAsync(caregiverId, scheduleId, dto.Notes);
             if (schedule == null)
                 return NotFound(new { message = "Schedule not found" });
             return Ok(schedule);
@@ -181,5 +181,27 @@ public class CaregiverController : ControllerBase
         {
             return StatusCode(500, new { message = ex.Message });
         }
+    }
+
+    /// <summary>
+    /// Find matching caregivers for a request (Matching Engine)
+    /// </summary>
+    [HttpGet("match-request/{requestId}")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
+    public async Task<ActionResult<List<CaregiverDto>>> GetMatchingCaregivers(int requestId)
+    {
+        try
+        {
+            var caregivers = await _caregiverService.GetMatchingCaregiversAsync(requestId);
+            return Ok(caregivers);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+    public class CheckOutDto
+    {
+        public string Notes { get; set; } = string.Empty;
     }
 }

@@ -51,6 +51,12 @@ public class ScheduleDto
     public string? Notes { get; set; }
 }
 
+public class AssignScheduleDto
+{
+    public int RequestId { get; set; }
+    public int CaregiverId { get; set; }
+}
+
 public class CaregiverPatientDto : BE.DTOs.Family.PatientDto
 {
     public string? EmergencyContactName { get; set; }

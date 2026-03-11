@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { caregiverApi } from '@/lib/api';
+import { formatTimeSpan, formatDateToYYYYMMDD } from '@/lib/utils';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 
 const Dashboard = () => {
@@ -19,7 +20,7 @@ const Dashboard = () => {
                 setProfile(profileData);
 
                 // Fetch today's schedules
-                const today = new Date().toISOString().split('T')[0];
+                const today = formatDateToYYYYMMDD(new Date());
                 const schedulesData = await caregiverApi.getSchedules(today, today);
                 setSchedules(schedulesData);
             } catch (err) {
@@ -60,15 +61,7 @@ const Dashboard = () => {
         return acc + hours;
     }, 0);
 
-    const formatTime = (timeStr) => {
-        if (!timeStr) return '';
-        const parts = timeStr.split(':');
-        const hours = parseInt(parts[0]);
-        const minutes = parts[1];
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        const displayHours = hours % 12 || 12;
-        return `${displayHours}:${minutes} ${ampm}`;
-    };
+    const formatTime = (timeStr) => formatTimeSpan(timeStr);
 
     const handleCheckIn = async (scheduleId) => {
         try {
@@ -362,7 +355,7 @@ const Dashboard = () => {
             </div>
 
             <footer className="p-8 text-center text-stone-400 text-xs font-bold">
-                © 2024 HomeCare Systems Inc. All Rights Reserved. • <a className="hover:text-[#5fa5ba] underline transition-colors" href="#">Privacy Policy</a>
+                Â© 2024 HomeCare Systems Inc. All Rights Reserved. â€¢ <a className="hover:text-[#5fa5ba] underline transition-colors" href="#">Privacy Policy</a>
             </footer>
         </div>
     );

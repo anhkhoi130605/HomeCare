@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { familyApi, serviceApi, caregiverApi, contractApi } from '@/lib/api';
+import { formatDateToYYYYMMDD } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const CreateContract = () => {
@@ -106,8 +107,8 @@ const CreateContract = () => {
                 patientId: parseInt(selectedPatientId),
                 serviceId: parseInt(selectedService.id),
                 assignedCaregiverId: selectedCaregiverId ? parseInt(selectedCaregiverId) : null,
-                startDate: startDate.toISOString().split('T')[0],
-                endDate: endDate.toISOString().split('T')[0],
+                startDate: formatDateToYYYYMMDD(startDate),
+                endDate: formatDateToYYYYMMDD(endDate),
                 weeklySchedule: JSON.stringify({
                     days: selectedDays,
                     startTime: startTime,
