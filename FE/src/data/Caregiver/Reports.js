@@ -16,7 +16,7 @@ export const REPORTS_METRICS = {
     ],
     testimonials: [
         { quote: "Sarah is always on time and very attentive to my father's needs.", from: "Family of Arthur M.", rating: 5, primary: true },
-        { quote: "Very skilled with the medication administration.", from: "James W.", rating: 5, primary: false },
-        { quote: "Compassionate and always has a smile.", from: "Mrs. Thompson", rating: 4, primary: false }
+        { quote: "Very skilled with the medication administration.", from: "Eleanor Smith", rating: 5, primary: false },
+        { quote: "Compassionate and always has a smile.", from: "Martha Wilson", rating: 4, primary: false }
     ]
 };

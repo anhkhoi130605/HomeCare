@@ -180,7 +180,6 @@ public class ScheduleController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
-<<<<<<< HEAD
 
     [HttpPost("{id}/checkin")]
     [Authorize(Roles = "Caregiver")]
@@ -223,8 +222,6 @@ public class ScheduleController : ControllerBase
 public class CheckOutDto
 {
     public string Notes { get; set; } = string.Empty;
-=======
->>>>>>> origin/main
 }
 
 public class CheckConflictDto
