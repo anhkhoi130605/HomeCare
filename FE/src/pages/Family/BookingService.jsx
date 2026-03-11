@@ -14,6 +14,7 @@ const BookingService = () => {
     const [services, setServices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         const fetchServices = async () => {
@@ -98,6 +99,8 @@ const BookingService = () => {
                             className="w-full bg-white border border-stone-200 rounded-full py-3 pl-12 pr-4 focus:ring-2 focus:ring-[#99C5D3] focus:border-transparent outline-none text-stone-800 placeholder:text-stone-400 transition-all shadow-sm"
                             placeholder="Find a service..."
                             type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
                 </div>
@@ -147,9 +150,11 @@ const BookingService = () => {
                             </div>
                         </div>
 
-                        {/* Services List Items */}
                         <div className="divide-y divide-story-100">
-                            {services.filter(service => service.category === activeTab).map((service, index) => (
+                            {services
+                                .filter(service => service.category === activeTab)
+                                .filter(service => service.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                                .map((service, index) => (
                                 <div key={service.id} className="p-6 md:p-8 flex flex-col md:flex-row gap-6 items-start md:items-center hover:bg-stone-50 transition-colors group relative">
                                     {/* Thumbnail - Compact */}
                                     <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-stone-200 shrink-0 overflow-hidden relative shadow-inner">
@@ -212,20 +217,6 @@ const BookingService = () => {
                 </div>
             </ScrollAnimation>
 
-            {/* Floating Review Cart */}
-            <ScrollAnimation animation="scale-up" className="fixed bottom-8 right-8 z-50">
-                <div className="relative">
-                    <button className="flex items-center gap-4 bg-stone-900 text-white px-6 py-3 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all group border-2 border-white/20">
-                        <div className="flex items-center gap-3">
-                            <div className="relative">
-                                <span className="material-symbols-outlined">shopping_bag</span>
-                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-stone-900"></span>
-                            </div>
-                            <span className="font-bold tracking-wide text-sm">Review (2)</span>
-                        </div>
-                    </button>
-                </div>
-            </ScrollAnimation>
 
             {/* 
             <ServiceBookingModal
