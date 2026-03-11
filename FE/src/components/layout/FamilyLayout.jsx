@@ -88,12 +88,6 @@ const FamilyLayout = () => {
                     </div>
                     <div className="flex items-center gap-6">
                         <NotificationBell />
-                        <button
-                            className="w-10 h-10 flex items-center justify-center text-stone-400 hover:text-primary bg-white dark:bg-stone-800 rounded-full shadow-sm border border-stone-100/50 transition-all"
-                            onClick={() => document.documentElement.classList.toggle('dark')}
-                        >
-                            <span className="material-symbols-outlined">light_mode</span>
-                        </button>
                         <Link to="/family/profile" className="flex items-center gap-3.5 ml-2 border-l pl-6 border-stone-100 dark:border-stone-800 hover:opacity-80 transition-opacity group">
                             <div className="text-right hidden sm:block">
                                 <p className="text-sm font-bold text-stone-900 leading-tight group-hover:text-[#5fa5ba] transition-colors">{user?.fullName || 'User'}</p>

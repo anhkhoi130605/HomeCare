@@ -12,10 +12,12 @@ namespace BE.Controllers;
 public class PaymentController : ControllerBase
 {
     private readonly IPaymentService _paymentService;
+    private readonly IConfiguration _configuration;
 
-    public PaymentController(IPaymentService paymentService)
+    public PaymentController(IPaymentService paymentService, IConfiguration configuration)
     {
         _paymentService = paymentService;
+        _configuration = configuration;
     }
 
     private int GetFamilyId() => int.Parse(User.FindFirst("FamilyId")?.Value ?? "0");
@@ -146,20 +148,22 @@ public class PaymentController : ControllerBase
         try
         {
             var payment = await _paymentService.ProcessVnPayReturnAsync(vnPayReturn);
+            var frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:8080";
 
             if (payment == null)
             {
                 // Redirect to Frontend
-                return Redirect("http://localhost:8080/family/payments?status=error");
+                return Redirect($"{frontendUrl}/family/payments?status=error");
             }
 
             var status = payment.Status.ToString().ToLower();
-            return Redirect($"http://localhost:8080/family/payments?status={status}&paymentId={payment.Id}&careRequestId={payment.CareRequestId}");
+            return Redirect($"{frontendUrl}/family/payments?status={status}&paymentId={payment.Id}&careRequestId={payment.CareRequestId}");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"VNPay return error: {ex.Message}");
-            return Redirect("http://localhost:8080/family/payments?status=error");
+            var frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:8080";
+            return Redirect($"{frontendUrl}/family/payments?status=error");
         }
     }
 
