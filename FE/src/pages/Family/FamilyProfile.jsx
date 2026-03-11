@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+
 import { familyApi, authApi } from '@/lib/api';
 import { toast } from 'sonner';
 import AddMemberModal from './AddMemberModal';
-
+import { useOutletContext, useNavigate } from 'react-router-dom';
 const FamilyProfile = () => {
     const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -13,6 +13,7 @@ const FamilyProfile = () => {
     const fileInputRef = useRef(null);
 
     const context = useOutletContext();
+    const navigate = useNavigate();
     const [profileImage, setProfileImage] = context || useState(null);
     const user = authApi.getCurrentUser();
 
@@ -253,7 +254,13 @@ const FamilyProfile = () => {
                                 <p className="text-xs font-bold text-stone-400 mt-0.5">Manage your account password</p>
                             </div>
                         </div>
-                        <button className="bg-white border-2 border-stone-200 text-stone-600 px-6 py-2.5 rounded-full font-bold text-sm hover:border-[#5fa5ba] hover:text-[#5fa5ba] transition-all shadow-sm">Change</button>
+                       <button
+    type="button"
+    onClick={() => navigate("/family/change-password")}
+    className="bg-white border-2 border-stone-200 text-stone-600 px-6 py-2.5 rounded-full font-bold text-sm hover:border-[#5fa5ba] hover:text-[#5fa5ba] transition-all shadow-sm"
+>
+    Change
+</button>
                     </div>
                 </div>
             </section>

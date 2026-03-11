@@ -5,11 +5,18 @@ using Microsoft.IdentityModel.Tokens;
 using BE.Data;
 using BE.Services;
 using BE.Services.Interfaces;
+using System.Text.Encodings.Web;
+using BE.Models.Email;
 
 var builder = WebApplication.CreateBuilder(args);
-
+builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("Smtp"));
+builder.Services.AddScoped<IEmailService, EmailService>();
 // ===== SERVICES =====
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(o =>
+    {
+        o.JsonSerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

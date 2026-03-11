@@ -8,7 +8,7 @@ using BE.Data;
 using BE.DTOs;
 using BE.Models;
 using BE.Services.Interfaces;
-
+using BE.Helpers;
 namespace BE.Services;
 
 public class AuthService : IAuthService
@@ -193,45 +193,67 @@ public class AuthService : IAuthService
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
-    public async Task<bool> ForgotPasswordAsync(string email)
-    {
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower().Trim());
-        if (user == null) return false; // Or true to prevent enumeration
+public async Task<bool> ForgotPasswordAsync(string email)
+{
+    var normalized = email.ToLower().Trim();
 
-        var token = Guid.NewGuid().ToString("N");
-        user.ResetToken = token;
-        user.ResetTokenExpiry = DateTime.UtcNow.AddHours(1);
+    var user = await _context.Users
+        .FirstOrDefaultAsync(u => u.Email.ToLower() == normalized);
 
-        await _context.SaveChangesAsync();
+    // chống dò email (enumeration) // bổ sung về Secure
+    if (user == null) return true;
 
-        // In production, this link should point to the FE
-        // Example: http://localhost:5173/reset-password?token={token}&email={email}
-        var feUrl = _configuration["FrontendUrl"] ?? "http://localhost:5173";
-        var resetLink = $"{feUrl}/auth/reset-password?token={token}&email={WebUtility.UrlEncode(email)}";
+    var tokenRaw = JwtHelpers.NewSecureToken();
 
-        var subject = "Reset Your Password";
-        var body = $"<p>Click <a href='{resetLink}'>here</a> to reset your password.</p><p>Or copy this token: {token}</p>";
+    user.ResetToken = JwtHelpers.Sha256Hex(tokenRaw); // lưu HASH
+    user.ResetTokenExpiry = DateTime.UtcNow.AddMinutes(30);
+    user.ResetTokenUsedAt = null;
 
-        await _emailService.SendEmailAsync(email, subject, body);
+    await _context.SaveChangesAsync();
 
-        return true;
-    }
+    var feUrl = _configuration["FrontendUrl"] ?? "http://localhost:8080";
+    var resetLink = $"{feUrl}/auth/reset-password?token={tokenRaw}&email={WebUtility.UrlEncode(user.Email)}";
+
+    var subject = "Reset Your Password";
+    var body = $@"
+        <p>Click <a href='{resetLink}'>here</a> to reset your password.</p>
+        <p>This link expires in 30 minutes.</p>";
+
+    await _emailService.SendEmailAsync(user.Email, subject, body);
+
+    return true;
+}
 
     public async Task<bool> ResetPasswordAsync(ResetPasswordDto dto)
-    {
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == dto.Email.ToLower().Trim());
-        if (user == null) return false;
+{
+    var normalized = dto.Email.ToLower().Trim();
 
-        if (user.ResetToken != dto.Token || user.ResetTokenExpiry < DateTime.UtcNow)
-        {
-            return false;
-        }
+    var user = await _context.Users
+        .FirstOrDefaultAsync(u => u.Email.ToLower() == normalized);
 
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
-        user.ResetToken = null;
-        user.ResetTokenExpiry = null;
+    if (user == null) return false;
 
-        await _context.SaveChangesAsync();
-        return true;
-    }
+    if (string.IsNullOrWhiteSpace(user.ResetToken) || user.ResetTokenExpiry == null)
+        return false;
+
+    if (user.ResetTokenUsedAt != null)
+        return false;
+
+    if (user.ResetTokenExpiry < DateTime.UtcNow)
+        return false;
+
+    var incomingHash = JwtHelpers.Sha256Hex(dto.Token);
+    if (!string.Equals(user.ResetToken, incomingHash, StringComparison.OrdinalIgnoreCase))
+        return false;
+
+    user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+
+    // 1 lần dùng
+    user.ResetTokenUsedAt = DateTime.UtcNow;
+    user.ResetToken = null;
+    user.ResetTokenExpiry = null;
+
+    await _context.SaveChangesAsync();
+    return true;
+}
 }
