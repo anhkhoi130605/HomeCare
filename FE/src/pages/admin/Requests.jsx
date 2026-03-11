@@ -462,7 +462,11 @@ const Requests = () => {
                   <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
                   <div>
                     <p className="font-medium text-sm">Không có caregiver nào rảnh!</p>
-                    <p className="text-xs mt-1">Tất cả caregiver đều đã có lịch trùng giờ với yêu cầu này.</p>
+                    <p className="text-xs mt-1">
+                      {caregivers.length === 0 
+                        ? "Hiện không có caregiver nào đang ở trạng thái sẵn sàng (Online)." 
+                        : "Tất cả caregiver sẵn sàng đều đã có lịch trùng giờ với yêu cầu này."}
+                    </p>
                   </div>
                 </div>
               ) : (

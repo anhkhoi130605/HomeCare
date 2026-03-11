@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScrollAnimation from "@/components/ui/scroll-animation";
-import { caregiverApi, careLogApi } from '@/lib/api';
+import { caregiverApi, careLogApi, authApi } from '@/lib/api';
 import { formatDateToYYYYMMDD } from '@/lib/utils';
 
 const ActiveShift = () => {
@@ -15,11 +15,17 @@ const ActiveShift = () => {
     const [isCheckedIn, setIsCheckedIn] = useState(false);
     const [checkInTime, setCheckInTime] = useState(null);
 
+    const handleLogout = () => {
+        authApi.logout();
+        navigate('/login');
+    };
+
     // API-based patient data
     const [patients, setPatients] = useState([]);
     const [selectedPatientId, setSelectedPatientId] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [schedules, setSchedules] = useState([]);
     const [currentSchedule, setCurrentSchedule] = useState(null);
     const [medications, setMedications] = useState([]);
     const [emergencyContact, setEmergencyContact] = useState(null);
@@ -56,83 +62,80 @@ const ActiveShift = () => {
         fetchPatientDetails();
     }, [selectedPatientId]);
 
-    // Fetch caregiver's schedule to get patients and auto check-in
+    // Fetch caregiver's schedule to get patients
     useEffect(() => {
         const fetchScheduleData = async () => {
             try {
                 setLoading(true);
-                // Get today's schedules for the caregiver
                 const today = formatDateToYYYYMMDD(new Date());
-                const schedules = await caregiverApi.getSchedules(today, today);
+                const schedulesData = await caregiverApi.getSchedules(today, today);
+                setSchedules(schedulesData || []);
 
-                if (schedules && schedules.length > 0) {
-                    // Find a schedule that's not completed or cancelled
-                    const activeSchedule = schedules.find(s =>
-                        s.status === 'Scheduled' || s.status === 'InProgress'
-                    ) || schedules[0];
-
-                    // Extract unique patients from schedules
+                if (schedulesData && schedulesData.length > 0) {
                     const patientMap = new Map();
-                    schedules.forEach(s => {
-                        // Use patientId and patientName from ScheduleDto
+                    schedulesData.forEach(s => {
                         if (s.patientId && !patientMap.has(s.patientId)) {
                             patientMap.set(s.patientId, {
                                 id: s.patientId,
                                 name: s.patientName || 'Patient',
                                 image: 'https://images.unsplash.com/photo-1566616213894-2d4e1baee5d8?w=200',
                                 address: s.patientAddress || 'Patient Address',
-                                coordinates: '40.7128, -74.0060',
+                                coordinates: '40.7128, -74.0060', // Demo coordinates
                                 locationImage: 'https://maps.googleapis.com/maps/api/staticmap?center=40.7128,-74.0060&zoom=15&size=400x200&key=demo'
                             });
                         }
                     });
                     const patientsArray = Array.from(patientMap.values());
                     setPatients(patientsArray);
+                    
                     if (patientsArray.length > 0) {
                         setSelectedPatientId(patientsArray[0].id);
                     }
-                    setCurrentSchedule(activeSchedule);
-
-                    // Set check-in state based on current status
-                    if (activeSchedule.status === 'InProgress') {
-                        setIsCheckedIn(true);
-                        if (activeSchedule.checkInTime) {
-                            setCheckInTime(new Date(activeSchedule.checkInTime));
-                        }
-                    } else {
-                        setIsCheckedIn(false);
-                    }
                 } else {
-                    // Fallback: no schedules today
                     setPatients([{
                         id: 'demo',
                         name: 'Demo Patient',
                         image: 'https://images.unsplash.com/photo-1566616213894-2d4e1baee5d8?w=200',
                         address: 'No active shift',
                         coordinates: 'N/A',
-                        locationImage: 'https://maps.googleapis.com/maps/api/staticmap?center=40.7128,-74.0060&zoom=15&size=400x200&key=demo'
+                        locationImage: ''
                     }]);
                     setSelectedPatientId('demo');
                 }
             } catch (err) {
                 console.error('Failed to fetch schedules:', err);
                 setError(err.message);
-                // Fallback patient
-                setPatients([{
-                    id: 'demo',
-                    name: 'Demo Patient',
-                    image: 'https://images.unsplash.com/photo-1566616213894-2d4e1baee5d8?w=200',
-                    address: 'Demo Address',
-                    coordinates: 'N/A',
-                    locationImage: ''
-                }]);
-                setSelectedPatientId('demo');
             } finally {
                 setLoading(false);
             }
         };
         fetchScheduleData();
     }, []);
+
+    // Update currentSchedule and check-in state when selectedPatientId or schedules change
+    useEffect(() => {
+        if (!selectedPatientId || selectedPatientId === 'demo') return;
+
+        const patientSchedules = schedules.filter(s => s.patientId === parseInt(selectedPatientId));
+        if (patientSchedules.length > 0) {
+            // Find the most relevant schedule for this patient
+            // Prioritize InProgress, then Scheduled
+            const activeSchedule = patientSchedules.find(s => s.status === 'InProgress') || 
+                                   patientSchedules.find(s => s.status === 'Scheduled') || 
+                                   patientSchedules[0];
+
+            setCurrentSchedule(activeSchedule);
+
+            if (activeSchedule.status === 'InProgress') {
+                setIsCheckedIn(true);
+                if (activeSchedule.checkInTime) {
+                    setCheckInTime(new Date(activeSchedule.checkInTime));
+                }
+            } else {
+                setIsCheckedIn(false);
+            }
+        }
+    }, [selectedPatientId, schedules]);
 
     const currentPatient = patients.find(p => p.id === selectedPatientId) || patients[0] || {
         id: 'demo',
@@ -164,6 +167,20 @@ const ActiveShift = () => {
         hydration: 0
     });
     const [careNotes, setCareNotes] = useState('');
+    const [errors, setErrors] = useState({});
+
+    const validateForm = () => {
+        const newErrors = {};
+        if (!vitals.heartRate) newErrors.heartRate = true;
+        if (!vitals.temperature) newErrors.temperature = true;
+        if (!vitals.bloodPressure) newErrors.bloodPressure = true;
+        if (!nutrition.mealDescription) newErrors.mealDescription = true;
+        if (nutrition.hydration === 0) newErrors.hydration = true;
+        if (!careNotes) newErrors.careNotes = true;
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -223,23 +240,36 @@ const ActiveShift = () => {
     };
 
     const handleCompleteSession = async () => {
-        setIsActive(false);
-        setEndTime(new Date());
+        if (!validateForm()) return;
 
-        // Call check-out API if we have a valid schedule
-        if (currentSchedule?.id && currentSchedule.id !== 'demo') {
-            try {
-                // Pass careNotes as the shift summary
-                await caregiverApi.checkOut(currentSchedule.id, careNotes);
-                console.log('Checked out successfully for schedule:', currentSchedule.id);
-            } catch (checkOutErr) {
-                console.error('Check-out failed:', checkOutErr);
+        try {
+            const saveSuccess = await handleSaveLog();
+            if (!saveSuccess) {
+                console.error('Stopping session completion because log saving failed.');
+                return;
             }
-        }
+            
+            setIsActive(false);
+            setEndTime(new Date());
 
-        setIsCompleted(true);
-        setShowSaveNotify(true);
-        setTimeout(() => setShowSaveNotify(false), 3000);
+            // Call check-out API if we have a valid schedule
+            if (currentSchedule?.id && currentSchedule.id !== 'demo') {
+                try {
+                    // Pass careNotes as the shift summary
+                    await caregiverApi.checkOut(currentSchedule.id, careNotes);
+                    console.log('Checked out successfully for schedule:', currentSchedule.id);
+                } catch (checkOutErr) {
+                    console.error('Check-out failed:', checkOutErr);
+                }
+            }
+
+            setIsCompleted(true);
+            setShowSaveNotify(true);
+            setTimeout(() => setShowSaveNotify(false), 3000);
+        } catch (err) {
+            console.error('Failed to complete session:', err);
+            alert('An unexpected error occurred: ' + err.message);
+        }
     };
 
     const handleSaveLog = async () => {
@@ -252,25 +282,26 @@ const ActiveShift = () => {
 
         const careLogData = {
             scheduleId: currentSchedule?.id,
-            patientId: currentPatient.id !== 'demo' ? currentPatient.id : null,
+            patientId: currentPatient.id !== 'demo' ? parseInt(currentPatient.id) : null,
+            activities: careNotes || "Routine care provided.",
+            medicationsGiven: administeredMeds.map(m => m.name).join(', '),
+            mealsProvided: nutrition.mealDescription || null,
+            vitalSigns: `HR: ${vitals.heartRate || '--'}, Temp: ${vitals.temperature || '--'}, BP: ${vitals.bloodPressure || '--'}`,
+            patientMood: "Stable",
             notes: careNotes || "Routine care provided. Patient stable.",
-            vitals: {
-                heartRate: vitals.heartRate || null,
-                temperature: vitals.temperature || null,
-                bloodPressure: vitals.bloodPressure || null
-            },
-            medicationsAdministered: administeredMeds.map(m => m.name).join(', '),
-            mealDescription: nutrition.mealDescription || null,
-            hydrationMl: nutrition.hydration * 250 // Convert glasses to ml
+            isDraft: false
         };
 
         try {
             // 2. Submit to API
-            if (currentSchedule?.id) {
+            if (currentSchedule?.id && currentSchedule.id !== 'demo') {
                 await careLogApi.create(careLogData);
                 console.log("Log saved to API:", careLogData);
             } else {
                 console.log("Demo mode - log not saved:", careLogData);
+                if (currentSchedule?.id === 'demo') {
+                    return true; // Allow completion for demo
+                }
             }
 
             // 3. UI Notification
@@ -278,9 +309,11 @@ const ActiveShift = () => {
             setTimeout(() => {
                 setShowSaveNotify(false);
             }, 3000);
+            return true;
         } catch (err) {
             console.error('Failed to save care log:', err);
-            alert('Failed to save care log: ' + err.message);
+            alert('Failed to save care log: ' + (err.response?.data?.message || err.message));
+            return false;
         }
     };
 
@@ -305,7 +338,7 @@ const ActiveShift = () => {
                             CHECK IN NOW
                         </button>
                         <button
-                            onClick={() => navigate('/caregiver/schedule')}
+                            onClick={() => navigate('/caregiver/my-schedule')}
                             className="mt-8 text-stone-400 font-bold hover:text-stone-600 dark:hover:text-stone-300 transition-colors uppercase tracking-widest text-[10px]"
                         >
                             Back to Schedule
@@ -463,7 +496,7 @@ const ActiveShift = () => {
                                     <span className="material-symbols-outlined">dashboard</span>
                                     GO TO DASHBOARD
                                 </button>
-                                <button onClick={() => navigate('/caregiver/schedule')} className="flex-1 bg-white dark:bg-stone-800 hover:bg-stone-50 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 py-5 rounded-3xl font-bold transition-all flex items-center justify-center gap-2 border border-stone-200 dark:border-stone-700">
+                                <button onClick={() => navigate('/caregiver/my-schedule')} className="flex-1 bg-white dark:bg-stone-800 hover:bg-stone-50 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 py-5 rounded-3xl font-bold transition-all flex items-center justify-center gap-2 border border-stone-200 dark:border-stone-700">
                                     <span className="material-symbols-outlined">calendar_today</span>
                                     VIEW MY SCHEDULE
                                 </button>
@@ -518,6 +551,13 @@ const ActiveShift = () => {
                                 className="w-14 h-14 rounded-2xl object-cover shadow-lg ring-4 ring-white dark:ring-stone-800"
                                 src={patientDetails.image}
                             />
+                            <button
+                                onClick={handleLogout}
+                                className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all ml-2"
+                                title="Sign Out"
+                            >
+                                <span className="material-symbols-outlined text-2xl">logout</span>
+                            </button>
                         </div>
                     </div>
                 </header>
@@ -558,39 +598,48 @@ const ActiveShift = () => {
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                         <div className="space-y-3 group">
-                                            <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest ml-1 group-hover:text-[#5fa5ba] transition-colors">Heart Rate</label>
+                                            <div className="flex items-center justify-between ml-1">
+                                                <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest group-hover:text-[#5fa5ba] transition-colors">Heart Rate</label>
+                                                {errors.heartRate && <span className="text-red-500 text-[9px] font-bold">Information missed</span>}
+                                            </div>
                                             <div className="relative">
                                                 <input
                                                     type="text"
                                                     value={vitals.heartRate}
                                                     onChange={(e) => setVitals({ ...vitals, heartRate: e.target.value })}
-                                                    className="w-full px-6 py-5 rounded-2xl bg-stone-50 dark:bg-stone-950 border border-stone-100 dark:border-stone-800 focus:ring-2 focus:ring-[#5fa5ba] focus:border-transparent text-2xl font-black text-stone-700 transition-all placeholder:text-stone-300 outline-none"
+                                                    className={`w-full px-6 py-5 rounded-2xl bg-stone-50 dark:bg-stone-950 border border-stone-100 dark:border-stone-800 focus:ring-2 focus:ring-[#5fa5ba] focus:border-transparent text-2xl font-black text-stone-700 transition-all placeholder:text-stone-300 outline-none ${errors.heartRate ? 'border-red-300 bg-red-50/30' : ''}`}
                                                     placeholder="--"
                                                 />
                                                 <span className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs uppercase tracking-wider">BPM</span>
                                             </div>
                                         </div>
                                         <div className="space-y-3 group">
-                                            <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest ml-1 group-hover:text-[#5fa5ba] transition-colors">Temperature</label>
+                                            <div className="flex items-center justify-between ml-1">
+                                                <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest group-hover:text-[#5fa5ba] transition-colors">Temperature</label>
+                                                {errors.temperature && <span className="text-red-500 text-[9px] font-bold">Information missed</span>}
+                                            </div>
                                             <div className="relative">
                                                 <input
                                                     type="text"
                                                     value={vitals.temperature}
                                                     onChange={(e) => setVitals({ ...vitals, temperature: e.target.value })}
-                                                    className="w-full px-6 py-5 rounded-2xl bg-stone-50 dark:bg-stone-950 border border-stone-100 dark:border-stone-800 focus:ring-2 focus:ring-[#5fa5ba] focus:border-transparent text-2xl font-black text-stone-700 transition-all placeholder:text-stone-300 outline-none"
+                                                    className={`w-full px-6 py-5 rounded-2xl bg-stone-50 dark:bg-stone-950 border border-stone-100 dark:border-stone-800 focus:ring-2 focus:ring-[#5fa5ba] focus:border-transparent text-2xl font-black text-stone-700 transition-all placeholder:text-stone-300 outline-none ${errors.temperature ? 'border-red-300 bg-red-50/30' : ''}`}
                                                     placeholder="--"
                                                 />
                                                 <span className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs uppercase tracking-wider">Â°F</span>
                                             </div>
                                         </div>
                                         <div className="space-y-3 group">
-                                            <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest ml-1 group-hover:text-[#5fa5ba] transition-colors">Blood Pressure</label>
+                                            <div className="flex items-center justify-between ml-1">
+                                                <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest group-hover:text-[#5fa5ba] transition-colors">Blood Pressure</label>
+                                                {errors.bloodPressure && <span className="text-red-500 text-[9px] font-bold">Information missed</span>}
+                                            </div>
                                             <div className="relative">
                                                 <input
                                                     type="text"
                                                     value={vitals.bloodPressure}
                                                     onChange={(e) => setVitals({ ...vitals, bloodPressure: e.target.value })}
-                                                    className="w-full px-6 py-5 rounded-2xl bg-stone-50 dark:bg-stone-950 border border-stone-100 dark:border-stone-800 focus:ring-2 focus:ring-[#5fa5ba] focus:border-transparent text-2xl font-black text-stone-700 transition-all placeholder:text-stone-300 outline-none"
+                                                    className={`w-full px-6 py-5 rounded-2xl bg-stone-50 dark:bg-stone-950 border border-stone-100 dark:border-stone-800 focus:ring-2 focus:ring-[#5fa5ba] focus:border-transparent text-2xl font-black text-stone-700 transition-all placeholder:text-stone-300 outline-none ${errors.bloodPressure ? 'border-red-300 bg-red-50/30' : ''}`}
                                                     placeholder="120/80"
                                                 />
                                                 <span className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs uppercase tracking-wider">SYS/DIA</span>
@@ -650,16 +699,22 @@ const ActiveShift = () => {
                                         </div>
                                         <div className="space-y-8">
                                             <div className="space-y-3 group">
-                                                <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest ml-1 group-hover:text-[#5fa5ba] transition-colors">Meal Details</label>
+                                                <div className="flex items-center justify-between ml-1">
+                                                    <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest group-hover:text-[#5fa5ba] transition-colors">Meal Details</label>
+                                                    {errors.mealDescription && <span className="text-red-500 text-[9px] font-bold">Information missed</span>}
+                                                </div>
                                                 <textarea
                                                     value={nutrition.mealDescription}
                                                     onChange={(e) => setNutrition({ ...nutrition, mealDescription: e.target.value })}
-                                                    className="w-full p-6 rounded-3xl bg-stone-50 dark:bg-stone-900 border border-stone-100 dark:border-stone-800 focus:ring-2 focus:ring-[#5fa5ba] focus:border-transparent text-stone-700 font-medium text-sm min-h-[140px] transition-all outline-none resize-none"
+                                                    className={`w-full p-6 rounded-3xl bg-stone-50 dark:bg-stone-900 border border-stone-100 dark:border-stone-800 focus:ring-2 focus:ring-[#5fa5ba] focus:border-transparent text-stone-700 font-medium text-sm min-h-[140px] transition-all outline-none resize-none ${errors.mealDescription ? 'border-red-300 bg-red-50/30' : ''}`}
                                                     placeholder="Describe breakfast/lunch items consumed..."
                                                 ></textarea>
                                             </div>
                                             <div className="space-y-4">
-                                                <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest ml-1">Hydration (Glasses)</label>
+                                                <div className="flex items-center justify-between ml-1">
+                                                    <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Hydration (Glasses)</label>
+                                                    {errors.hydration && <span className="text-red-500 text-[9px] font-bold">Information missed</span>}
+                                                </div>
                                                 <div className="flex items-center gap-4">
                                                     <div className="flex gap-2.5">
                                                         {[1, 2, 3, 4, 5].map((num) => (
@@ -668,7 +723,7 @@ const ActiveShift = () => {
                                                                 onClick={() => setNutrition({ ...nutrition, hydration: num })}
                                                                 className={`w-12 h-12 rounded-2xl flex items-center justify-center font-extrabold text-lg transition-all ${nutrition.hydration === num
                                                                     ? 'bg-[#5fa5ba] text-white shadow-lg shadow-[#5fa5ba]/30'
-                                                                    : 'bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-400 hover:border-[#5fa5ba] hover:text-[#5fa5ba]'
+                                                                    : `bg-white dark:bg-stone-800 border ${errors.hydration ? 'border-red-200' : 'border-stone-200 dark:border-stone-700'} text-stone-400 hover:border-[#5fa5ba] hover:text-[#5fa5ba]`
                                                                     } `}
                                                             >
                                                                 {num}{num === 5 ? '+' : ''}
@@ -688,16 +743,19 @@ const ActiveShift = () => {
 
                             <ScrollAnimation animation="fade-up" delay={0.4}>
                                 <div className="group">
-                                    <div className="flex items-center gap-3 mb-8 text-stone-800 dark:text-stone-200">
-                                        <div className="w-10 h-10 rounded-xl bg-[#5fa5ba]/10 text-[#5fa5ba] flex items-center justify-center">
-                                            <span className="material-symbols-outlined text-2xl">edit_note</span>
+                                    <div className="flex items-center justify-between mb-8 text-stone-800 dark:text-stone-200">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-[#5fa5ba]/10 text-[#5fa5ba] flex items-center justify-center">
+                                                <span className="material-symbols-outlined text-2xl">edit_note</span>
+                                            </div>
+                                            <h3 className="font-bold text-xl">Care Notes & Observations</h3>
                                         </div>
-                                        <h3 className="font-bold text-xl">Care Notes & Observations</h3>
+                                        {errors.careNotes && <span className="text-red-500 text-[10px] font-bold uppercase tracking-widest">Information missed</span>}
                                     </div>
                                     <textarea
                                         value={careNotes}
                                         onChange={(e) => setCareNotes(e.target.value)}
-                                        className="w-full p-8 rounded-[2rem] bg-stone-50 dark:bg-stone-900 border border-stone-100 dark:border-stone-800 focus:ring-2 focus:ring-[#5fa5ba] focus:border-transparent text-lg font-medium text-stone-700 min-h-[220px] transition-all outline-none resize-none"
+                                        className={`w-full p-8 rounded-[2rem] bg-stone-50 dark:bg-stone-900 border border-stone-100 dark:border-stone-800 focus:ring-2 focus:ring-[#5fa5ba] focus:border-transparent text-lg font-medium text-stone-700 min-h-[220px] transition-all outline-none resize-none ${errors.careNotes ? 'border-red-300 bg-red-50/30' : ''}`}
                                         placeholder="Detailed observations about mood, mobility, sleep quality, or any incidents..."
                                     ></textarea>
                                 </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { caregiverApi } from '@/lib/api';
+import { Link, useNavigate } from 'react-router-dom';
+import { caregiverApi, authApi } from '@/lib/api';
 import { formatTimeSpan, formatDateToYYYYMMDD } from '@/lib/utils';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 
@@ -10,6 +10,12 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [checkingIn, setCheckingIn] = useState(null);
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        authApi.logout();
+        navigate('/login');
+    };
 
     useEffect(() => {
         const fetchData = async () => {
@@ -127,6 +133,13 @@ const Dashboard = () => {
                             />
                         </Link>
                     </div>
+                    <button
+                        onClick={handleLogout}
+                        className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        title="Sign Out"
+                    >
+                        <span className="material-symbols-outlined text-2xl">logout</span>
+                    </button>
                 </div>
             </header>
 

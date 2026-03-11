@@ -212,7 +212,9 @@ public class ScheduleService : IScheduleService
             query = query.Where(s => s.Id != excludeScheduleId.Value);
 
         // Check for time overlap: (existingStart < newEnd) AND (existingEnd > newStart)
+        // Only count Scheduled or InProgress shifts as conflicts
         var conflicting = await query
+            .Where(s => s.Status == ScheduleStatus.Scheduled || s.Status == ScheduleStatus.InProgress)
             .Where(s => s.StartTime < endTime && s.EndTime > startTime)
             .AnyAsync();
 
@@ -448,7 +450,7 @@ public class ScheduleService : IScheduleService
             ContractId = s.ContractId,
             CareRequestId = s.CareRequestId,
             ServiceName = s.CareRequest?.Service?.Name ?? s.Contract?.Service?.Name,
-            Date = s.Date,
+            Date = s.Date.ToString("yyyy-MM-dd"),
             StartTime = s.StartTime,
             EndTime = s.EndTime,
             Status = status.ToString(),

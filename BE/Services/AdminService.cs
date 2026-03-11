@@ -296,7 +296,7 @@ public class AdminService : IAdminService
         // Get active schedules count (today)
         var today = DateTime.Today;
         var activeSchedules = await _context.Schedules
-            .Where(s => caregiverIds.Contains(s.CaregiverId) && s.Date == today && s.Status != ScheduleStatus.Cancelled)
+            .Where(s => caregiverIds.Contains(s.CaregiverId) && s.Date.Date == today.Date && s.Status != ScheduleStatus.Cancelled)
             .GroupBy(s => s.CaregiverId)
             .Select(g => new { CaregiverId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.CaregiverId, x => x.Count);
@@ -306,7 +306,7 @@ public class AdminService : IAdminService
             Id = c.Id,
             FullName = c.FullName,
             Email = c.User.Email,
-            Phone = c.User.Phone,
+            Phone = c.User.Phone ?? "",
             Specialization = c.Specialization ?? "",
             ExperienceYears = c.ExperienceYears,
             HourlyRate = c.HourlyRate,
@@ -467,7 +467,7 @@ public class AdminService : IAdminService
             Id = caregiver.Id,
             FullName = caregiver.FullName,
             Email = caregiver.User.Email,
-            Phone = caregiver.User.Phone,
+            Phone = caregiver.User.Phone ?? "",
             Specialization = caregiver.Specialization ?? "",
             ExperienceYears = caregiver.ExperienceYears,
             HourlyRate = caregiver.HourlyRate,

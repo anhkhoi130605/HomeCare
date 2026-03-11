@@ -94,6 +94,13 @@ const Profile = () => {
                                 src={profile?.imageUrl || "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=100&h=100&fit=crop"}
                             />
                         </div>
+                        <button
+                            onClick={handleLogout}
+                            className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all ml-2"
+                            title="Sign Out"
+                        >
+                            <span className="material-symbols-outlined text-2xl">logout</span>
+                        </button>
                     </div>
                 </header>
             </ScrollAnimation>
@@ -257,16 +264,6 @@ const Profile = () => {
                         </div>
                     </section>
                 </ScrollAnimation>
-
-                <div className="pt-8 flex justify-center">
-                    <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-3 px-10 py-5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-2xl transition-all font-bold text-lg border-2 border-transparent hover:border-red-200 active:scale-95"
-                    >
-                        <span className="material-symbols-outlined text-2xl">logout</span>
-                        Sign Out
-                    </button>
-                </div>
             </div>
             <footer className="p-8 text-center text-stone-400 text-xs font-bold mt-auto mb-4">
                 Â© 2024 HomeCare Systems Inc. All Rights Reserved. â€¢ <a href="#" className="hover:text-[#5fa5ba] underline transition-colors">Privacy Policy</a>

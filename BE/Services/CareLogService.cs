@@ -19,11 +19,37 @@ public class CareLogService : ICareLogService
         var logs = await _context.CareLogs
             .Include(cl => cl.Caregiver)
             .Include(cl => cl.Patient)
-            .OrderByDescending(cl => cl.LoggedAt)
-            .Take(100) // Limit to recent 100 logs
             .ToListAsync();
 
-        return logs.Select(cl => MapToDto(cl)).ToList();
+        var dtos = logs.Select(cl => MapToDto(cl)).ToList();
+        var loggedScheduleIds = logs.Select(l => l.ScheduleId).ToHashSet();
+
+        // Include Completed Schedules without Logs
+        var extraSchedules = await _context.Schedules
+            .Where(s => s.Status == ScheduleStatus.Completed && !loggedScheduleIds.Contains(s.Id))
+            .Include(s => s.Caregiver)
+            .Include(s => s.Patient)
+            .OrderByDescending(s => s.Date)
+            .Take(100)
+            .ToListAsync();
+
+        foreach (var s in extraSchedules)
+        {
+            dtos.Add(new CareLogDto
+            {
+                Id = -s.Id, // Negative ID to signal virtual log from schedule
+                ScheduleId = s.Id,
+                CaregiverId = s.CaregiverId,
+                CaregiverName = s.Caregiver?.FullName ?? "",
+                PatientId = s.PatientId,
+                PatientName = s.Patient?.FullName ?? "",
+                Activities = s.Notes ?? "Completed shift log (Auto-generated entry)",
+                LoggedAt = s.CheckOutTime ?? s.Date.Date.Add(s.EndTime),
+                Status = "Submitted"
+            });
+        }
+
+        return dtos.OrderByDescending(d => d.LoggedAt).Take(100).ToList();
     }
 
     public async Task<List<CareLogDto>> GetByScheduleAsync(int scheduleId)
@@ -40,40 +66,126 @@ public class CareLogService : ICareLogService
 
     public async Task<List<CareLogDto>> GetByCaregiverAsync(int caregiverId, DateTime? from = null, DateTime? to = null)
     {
-        var query = _context.CareLogs
+        // 1. Fetch real CareLogs
+        var logsQuery = _context.CareLogs
             .Where(cl => cl.CaregiverId == caregiverId)
             .Include(cl => cl.Caregiver)
             .Include(cl => cl.Patient)
             .AsQueryable();
 
         if (from.HasValue)
-            query = query.Where(cl => cl.LoggedAt >= from.Value);
+            logsQuery = logsQuery.Where(cl => cl.LoggedAt >= from.Value);
         if (to.HasValue)
-            query = query.Where(cl => cl.LoggedAt <= to.Value.AddDays(1));
+            logsQuery = logsQuery.Where(cl => cl.LoggedAt <= to.Value.AddDays(1));
 
-        var logs = await query.OrderByDescending(cl => cl.LoggedAt).ToListAsync();
-        return logs.Select(cl => MapToDto(cl)).ToList();
+        var logs = await logsQuery.ToListAsync();
+        var dtos = logs.Select(cl => MapToDto(cl)).ToList();
+        var loggedScheduleIds = logs.Select(l => l.ScheduleId).ToHashSet();
+
+        // 2. Fetch Completed Schedules that don't have CareLogs to show them in history
+        var schedulesQuery = _context.Schedules
+            .Where(s => s.CaregiverId == caregiverId && s.Status == ScheduleStatus.Completed && !loggedScheduleIds.Contains(s.Id))
+            .Include(s => s.Caregiver)
+            .Include(s => s.Patient)
+            .AsQueryable();
+
+        if (from.HasValue) schedulesQuery = schedulesQuery.Where(s => s.Date >= from.Value);
+        if (to.HasValue) schedulesQuery = schedulesQuery.Where(s => s.Date <= to.Value);
+
+        var extraSchedules = await schedulesQuery.ToListAsync();
+        foreach (var s in extraSchedules)
+        {
+            dtos.Add(new CareLogDto
+            {
+                Id = -s.Id, // Negative ID to signal virtual log
+                ScheduleId = s.Id,
+                CaregiverId = s.CaregiverId,
+                CaregiverName = s.Caregiver?.FullName ?? "Unknown Caregiver",
+                PatientId = s.PatientId,
+                PatientName = s.Patient?.FullName ?? "Unknown Patient",
+                Activities = s.Notes ?? "Completed shift (Auto-generated log)",
+                LoggedAt = s.CheckOutTime ?? s.Date.Date.Add(s.EndTime),
+                Status = "Submitted"
+            });
+        }
+
+        return dtos.OrderByDescending(d => d.LoggedAt).ToList();
     }
 
     public async Task<List<CareLogDto>> GetByPatientAsync(int patientId, DateTime? from = null, DateTime? to = null)
     {
-        var query = _context.CareLogs
+        var logsQuery = _context.CareLogs
             .Where(cl => cl.PatientId == patientId)
             .Include(cl => cl.Caregiver)
             .Include(cl => cl.Patient)
             .AsQueryable();
 
         if (from.HasValue)
-            query = query.Where(cl => cl.LoggedAt >= from.Value);
+            logsQuery = logsQuery.Where(cl => cl.LoggedAt >= from.Value);
         if (to.HasValue)
-            query = query.Where(cl => cl.LoggedAt <= to.Value.AddDays(1));
+            logsQuery = logsQuery.Where(cl => cl.LoggedAt <= to.Value.AddDays(1));
 
-        var logs = await query.OrderByDescending(cl => cl.LoggedAt).ToListAsync();
-        return logs.Select(cl => MapToDto(cl)).ToList();
+        var logs = await logsQuery.ToListAsync();
+        var dtos = logs.Select(cl => MapToDto(cl)).ToList();
+        var loggedScheduleIds = logs.Select(l => l.ScheduleId).ToHashSet();
+
+        // 2. Fetch Completed Schedules that don't have CareLogs
+        var schedulesQuery = _context.Schedules
+            .Where(s => s.PatientId == patientId && s.Status == ScheduleStatus.Completed && !loggedScheduleIds.Contains(s.Id))
+            .Include(s => s.Caregiver)
+            .Include(s => s.Patient)
+            .AsQueryable();
+
+        if (from.HasValue) schedulesQuery = schedulesQuery.Where(s => s.Date >= from.Value);
+        if (to.HasValue) schedulesQuery = schedulesQuery.Where(s => s.Date <= to.Value);
+
+        var extraSchedules = await schedulesQuery.ToListAsync();
+        foreach (var s in extraSchedules)
+        {
+            dtos.Add(new CareLogDto
+            {
+                Id = -s.Id, // Negative ID to signal virtual log
+                ScheduleId = s.Id,
+                CaregiverId = s.CaregiverId,
+                CaregiverName = s.Caregiver?.FullName ?? "",
+                PatientId = s.PatientId,
+                PatientName = s.Patient?.FullName ?? "",
+                Activities = s.Notes ?? "Completed shift log (Auto-generated entry)",
+                LoggedAt = s.CheckOutTime ?? s.Date.Date.Add(s.EndTime),
+                Status = "Submitted"
+            });
+        }
+
+        return dtos.OrderByDescending(d => d.LoggedAt).ToList();
     }
 
     public async Task<CareLogDto?> GetByIdAsync(int id)
     {
+        // Special case for virtual logs (negative IDs signal schedule-based logs)
+        if (id < 0)
+        {
+            int scheduleId = -id;
+            var s = await _context.Schedules
+                .Include(s => s.Caregiver)
+                .Include(s => s.Patient)
+                .FirstOrDefaultAsync(s => s.Id == scheduleId);
+
+            if (s == null || s.Status != ScheduleStatus.Completed) return null;
+
+            return new CareLogDto
+            {
+                Id = id,
+                ScheduleId = s.Id,
+                CaregiverId = s.CaregiverId,
+                CaregiverName = s.Caregiver?.FullName ?? "Unknown",
+                PatientId = s.PatientId,
+                PatientName = s.Patient?.FullName ?? "Unknown",
+                Activities = s.Notes ?? "Completed shift log (Auto-generated entry)",
+                LoggedAt = s.CheckOutTime ?? s.Date.Date.Add(s.EndTime),
+                Status = "Submitted"
+            };
+        }
+
         var careLog = await _context.CareLogs
             .Include(cl => cl.Caregiver)
             .Include(cl => cl.Patient)
@@ -87,6 +199,9 @@ public class CareLogService : ICareLogService
         var schedule = await _context.Schedules.FindAsync(dto.ScheduleId);
         if (schedule == null)
             throw new ArgumentException("Schedule not found");
+
+        if (dto.PatientId != schedule.PatientId)
+            throw new ArgumentException("Patient ID does not match the schedule.");
 
         var careLog = new CareLog
         {
