@@ -1,6 +1,8 @@
-﻿// API Configuration
-const API_BASE_URL = 'http://localhost:58773/api';
-const API_TIMEOUT = 15000; // 15 seconds timeout
+
+// API Configuration
+const API_BASE_URL = (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE_URL) || 'http://localhost:5000/api';
+const API_TIMEOUT = 60000; // 60 seconds timeout for TiDB Cloud latency during startup
+
 
 // Custom error class for network errors
 export class NetworkError extends Error {
@@ -79,12 +81,12 @@ async function apiCall(endpoint, options = {}) {
 
         // Handle abort/timeout
         if (error.name === 'AbortError') {
-            throw new NetworkError('Háº¿t thá»i gian káº¿t ná»‘i. Vui lÃ²ng thá»­ láº¡i.');
+            throw new NetworkError('Hết thời gian kết nối. Vui lòng thử lại.');
         }
 
         // Handle network errors (no connection, DNS failure, etc.)
         if (error.name === 'TypeError' && error.message.includes('fetch')) {
-            throw new NetworkError('KhÃ´ng thá»ƒ káº¿t ná»‘i Ä‘áº¿n server. Vui lÃ²ng kiá»ƒm tra káº¿t ná»‘i máº¡ng hoáº·c server.');
+            throw new NetworkError('Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng hoặc server.');
         }
 
         // Re-throw API errors as-is
@@ -365,6 +367,13 @@ export const adminApi = {
     // Get all patients
     getPatients: async () => {
         return apiCall('/admin/patients');
+    },
+    // Create patient
+    createPatient: async (data) => {
+        return apiCall('/admin/patients', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
     },
 
     // Get all caregivers
@@ -758,6 +767,14 @@ export const careRequestApi = {
     delete: async (id) => {
         return apiCall(`/carerequest/${id}`, {
             method: 'DELETE',
+        });
+    },
+
+    // Refund request (admin)
+    refund: async (id, data) => {
+        return apiCall(`/carerequest/${id}/refund`, {
+            method: 'PUT',
+            body: JSON.stringify(data || {}),
         });
     },
 };

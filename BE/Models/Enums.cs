@@ -4,13 +4,18 @@ public enum UserRole
 {
     Admin,
     Caregiver,
-    Family
+    Family,
+    OperationAdmin
 }
 
 public enum RequestStatus
 {
     Pending,
+    AwaitingPayment,
     Approved,
+    Paid,
+    Assigned,
+    Completed,
     Rejected,
     Cancelled
 }
@@ -66,7 +71,7 @@ public enum IncidentStatus
 public enum PaymentStatus
 {
     Pending,
-    Completed,
+    Success,
     Failed,
     Refunded
 }

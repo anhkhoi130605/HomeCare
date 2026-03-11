@@ -107,14 +107,14 @@ const CreateRequest = () => {
                 patientId: parseInt(selectedPatientId),
                 requestedDate: requestedDate,
                 startTime: formattedStartTime,
-                endTime: formattedEndTime,
+                duration: parseInt(duration),
                 notes: notes || null,
                 requestType: requestType.toLowerCase() === 'one-time' ? 0 : 1,
                 address: careAddress
             };
 
-            await careRequestApi.create(payload);
-            toast.success("Care request created successfully!");
+            const createdRequest = await careRequestApi.create(payload);
+            toast.success("Care request created successfully! Please wait for admin approval.");
             navigate('/family/requests');
         } catch (error) {
             console.error("Failed to create request:", error);
@@ -212,7 +212,7 @@ const CreateRequest = () => {
                                     <p className="text-stone-500 font-medium text-sm mt-1">{selectedService.description}</p>
                                     <div className="flex items-center gap-2 mt-3">
                                         <span className="bg-[#E0F2F1] text-[#00695C] px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-                                            ${selectedService.pricePerHour || selectedService.price}/hour
+                                            {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(selectedService.pricePerHour || selectedService.price)}/giờ
                                         </span>
                                     </div>
                                 </div>
@@ -373,11 +373,11 @@ const CreateRequest = () => {
                         </h2>
                         <div className="flex justify-between items-end gap-12">
                             <div>
-                                <p className="text-4xl font-black">{duration} hours × ${selectedService?.pricePerHour || selectedService?.price || 0}</p>
+                                <p className="text-4xl font-black">{duration} giờ × {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(selectedService?.pricePerHour || selectedService?.price || 0)}</p>
                                 <p className="text-sm font-bold opacity-60 uppercase tracking-[2px] mt-2">Professional care rate</p>
                             </div>
                             <div className="text-right">
-                                <p className="text-5xl font-black">${totalPrice}</p>
+                                <p className="text-5xl font-black">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalPrice)}</p>
                                 <p className="text-xs font-bold opacity-60 uppercase tracking-[2px] mt-2">Total Estimated</p>
                             </div>
                         </div>

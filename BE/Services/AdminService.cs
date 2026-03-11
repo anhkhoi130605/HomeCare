@@ -53,7 +53,7 @@ public class AdminService : IAdminService
             .CountAsync();
 
         var monthlyRevenue = await _context.Payments
-            .Where(p => p.PaidAt >= thisMonth && p.Status == PaymentStatus.Completed)
+            .Where(p => p.PaidAt >= thisMonth && p.Status == PaymentStatus.Success)
             .SumAsync(p => p.Amount);
 
         var pendingPayments = await _context.Payments
@@ -263,7 +263,7 @@ public class AdminService : IAdminService
             ExperienceYears = c.ExperienceYears,
             HourlyRate = c.HourlyRate,
             IsAvailable = c.IsAvailable,
-            ImageUrl = c.ImageUrl,
+            ImageUrl = c.ImageUrl ?? "",
             Rating = ratings.GetValueOrDefault(c.Id)?.Rating ?? 0,
             ReviewCount = ratings.GetValueOrDefault(c.Id)?.Count ?? 0,
             TodaySchedules = activeSchedules.GetValueOrDefault(c.Id, 0),
@@ -276,7 +276,7 @@ public class AdminService : IAdminService
         var query = _context.Schedules
             .Include(s => s.Patient)
             .Include(s => s.Caregiver)
-            .Include(s => s.Contract).ThenInclude(c => c.Service)
+            .Include(s => s.Contract!).ThenInclude(c => c.Service)
             .AsQueryable();
 
         if (from.HasValue)
@@ -357,7 +357,7 @@ public class AdminService : IAdminService
             ExperienceYears = caregiver.ExperienceYears,
             HourlyRate = caregiver.HourlyRate,
             IsAvailable = caregiver.IsAvailable,
-            ImageUrl = caregiver.ImageUrl,
+            ImageUrl = caregiver.ImageUrl ?? "",
             Rating = 0,
             ReviewCount = 0,
             TodaySchedules = 0,
@@ -396,7 +396,7 @@ public class AdminService : IAdminService
             ExperienceYears = caregiver.ExperienceYears,
             HourlyRate = caregiver.HourlyRate,
             IsAvailable = caregiver.IsAvailable,
-            ImageUrl = caregiver.ImageUrl,
+            ImageUrl = caregiver.ImageUrl ?? "",
             Status = caregiver.IsAvailable ? "Online" : "Offline"
         };
     }

@@ -83,10 +83,10 @@ export default function PricingSection() {
                         {service.name}
                       </h3>
                       <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-black">${service.pricePerHour ?? service.PricePerHour ?? 0}</span>
+                        <span className="text-4xl font-black">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(service.pricePerHour ?? service.PricePerHour ?? 0)}</span>
                         <span className={`text-sm font-bold ${isPopular ? "text-[#0d8ca5]" : "text-[#9a734c]"
                           }`}>
-                          /hr
+                          /giờ
                         </span>
                       </div>
                       <p className={`text-xs mt-2 font-medium ${isPopular ? "text-[#0d8ca5]/80 italic" : "text-[#9a734c]"

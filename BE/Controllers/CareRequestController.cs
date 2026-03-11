@@ -18,7 +18,7 @@ public class CareRequestController : ControllerBase
 
     // GET /api/carerequest - Admin only
     [HttpGet]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<ActionResult<List<CareRequestDto>>> GetAll()
     {
         var requests = await _careRequestService.GetAllAsync();
@@ -39,7 +39,7 @@ public class CareRequestController : ControllerBase
 
     // GET /api/carerequest/family/{familyId}
     [HttpGet("family/{familyId}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<ActionResult<List<CareRequestDto>>> GetByFamily(int familyId)
     {
         var requests = await _careRequestService.GetByFamilyAsync(familyId);
@@ -77,7 +77,7 @@ public class CareRequestController : ControllerBase
 
     // PUT /api/carerequest/{id}/status
     [HttpPut("{id}/status")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<ActionResult<CareRequestDto>> UpdateStatus(int id, [FromBody] UpdateRequestStatusDto dto)
     {
         var request = await _careRequestService.UpdateStatusAsync(id, dto.Status, dto.AdminNotes);
@@ -87,7 +87,7 @@ public class CareRequestController : ControllerBase
 
     // PUT /api/carerequest/{id}/assign
     [HttpPut("{id}/assign")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<ActionResult<CareRequestDto>> AssignCaregiver(int id, [FromBody] AssignCaregiverDto dto)
     {
         var request = await _careRequestService.AssignCaregiverAsync(id, dto.CaregiverId);
@@ -95,9 +95,19 @@ public class CareRequestController : ControllerBase
         return Ok(request);
     }
 
+    // PUT /api/carerequest/{id}/refund
+    [HttpPut("{id}/refund")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
+    public async Task<ActionResult<CareRequestDto>> Refund(int id, [FromBody] UpdateRequestStatusDto dto)
+    {
+        var request = await _careRequestService.RefundAsync(id, dto.AdminNotes);
+        if (request == null) return NotFound();
+        return Ok(request);
+    }
+
     // DELETE /api/carerequest/{id}
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Admin,Family")]
+    [Authorize(Roles = "Admin,OperationAdmin,Family")]
     public async Task<IActionResult> Delete(int id)
     {
         var result = await _careRequestService.DeleteAsync(id);

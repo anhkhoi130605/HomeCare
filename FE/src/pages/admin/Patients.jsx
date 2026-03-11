@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import AdminHeader from "@/components/layout/AdminHeader";
 import { adminApi } from "@/lib/api";
+import AddPatientModal from "./AddPatientModal";
 
 const getRiskColor = (condition) => {
   if (!condition) return 'bg-gray-100 text-gray-800';
@@ -40,6 +41,7 @@ const Patients = () => {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isAddOpen, setIsAddOpen] = useState(false);
 
   useEffect(() => {
     const fetchPatients = async () => {
@@ -100,7 +102,7 @@ const Patients = () => {
               <Filter className="w-4 h-4" />
               Filters
             </Button>
-            <Button size="sm" className="gap-2">
+            <Button size="sm" className="gap-2" onClick={() => setIsAddOpen(true)}>
               <UserPlus className="w-4 h-4" />
               Add New Patient
             </Button>
@@ -210,6 +212,19 @@ const Patients = () => {
           </CardContent>
         </Card>
       </div>
+      <AddPatientModal
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        onSuccess={async () => {
+          try {
+            setLoading(true);
+            const data = await adminApi.getPatients();
+            setPatients(data || []);
+          } finally {
+            setLoading(false);
+          }
+        }}
+      />
     </div>
   );
 };

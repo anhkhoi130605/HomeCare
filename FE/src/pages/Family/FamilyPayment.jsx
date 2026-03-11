@@ -30,12 +30,12 @@ const FamilyPayment = () => {
         const paymentId = searchParams.get('paymentId');
 
         if (status) {
-            if (status === 'completed' || status === 'active') { // 'active' might be contract status, 'completed' is payment
-                toast.success("Payment Successful! Contract is now Active.");
+            if (status === 'success') {
+                toast.success("Thanh toán thành công! Yêu cầu của bạn đã được xác nhận.");
             } else if (status === 'failed' || status === 'error') {
-                toast.error("Payment Failed or Cancelled.");
+                toast.error("Thanh toán thất bại hoặc đã bị hủy.");
             } else {
-                toast.info(`Payment Status: ${status}`);
+                toast.info(`Trạng thái thanh toán: ${status}`);
             }
 
             // Clean up URL params without reloading
@@ -45,7 +45,7 @@ const FamilyPayment = () => {
 
     // Helper for Total Spent
     const totalSpent = payments
-        .filter(p => p.status === 'Completed')
+        .filter(p => p.status === 'Success')
         .reduce((sum, p) => sum + p.amount, 0);
 
     const pendingAmount = payments
@@ -54,10 +54,15 @@ const FamilyPayment = () => {
 
     const filteredPayments = payments.filter(p => {
         if (filter === 'All') return true;
-        if (filter === 'Completed') return p.status === 'Completed';
+        if (filter === 'Success') return p.status === 'Success';
         if (filter === 'Pending') return p.status === 'Pending';
+        if (filter === 'Failed') return p.status === 'Failed';
         return true;
     });
+
+    const formatVND = (amount) => {
+        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    };
 
     return (
         <div className="space-y-10 animate-fade-in-up pb-12 font-['Public_Sans']">
@@ -79,12 +84,12 @@ const FamilyPayment = () => {
                         <div className="bg-white/10 backdrop-blur-md p-6 rounded-[2rem] border border-white/20 flex gap-8 shadow-sm">
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Total Spent</p>
-                                <p className="text-3xl font-black text-white">${totalSpent.toLocaleString()}</p>
+                                <p className="text-3xl font-black text-white">{formatVND(totalSpent)}</p>
                             </div>
                             <div className="w-px bg-white/20"></div>
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Pending</p>
-                                <p className="text-3xl font-black text-[#5fa5ba] bg-white px-3 rounded-lg shadow-sm">${pendingAmount.toLocaleString()}</p>
+                                <p className="text-3xl font-black text-[#5fa5ba] bg-white px-3 rounded-lg shadow-sm">{formatVND(pendingAmount)}</p>
                             </div>
                         </div>
                     </div>
@@ -93,7 +98,7 @@ const FamilyPayment = () => {
 
             {/* Filter Tabs */}
             <div className="flex flex-wrap items-center gap-4">
-                {['All', 'Completed', 'Pending'].map((tab) => (
+                {['All', 'Success', 'Pending', 'Failed'].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setFilter(tab)}
@@ -117,18 +122,18 @@ const FamilyPayment = () => {
             ) : (
                 <div className="space-y-4">
                     {filteredPayments.map((item, idx) => {
-                        const status = item.status; // 'Completed', 'Pending', 'Failed'
+                        const status = item.status; // 'Success', 'Pending', 'Failed', 'Refunded'
 
                         return (
                             <ScrollAnimation animation="fade-up" delay={idx * 0.05} key={item.id}>
                                 <div className={`bg-white p-6 rounded-[2rem] border shadow-sm hover:shadow-lg transition-all flex flex-col md:flex-row items-center gap-6 group hover:-translate-y-0.5 ${status === 'Failed' ? 'border-red-100 ring-1 ring-red-50' : 'border-stone-100 hover:border-stone-300'
                                     }`}>
-                                    <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-2xl shadow-sm ${status === 'Completed' ? 'bg-[#E0F2F1] text-[#00695C]' :
+                                    <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-2xl shadow-sm ${status === 'Success' ? 'bg-[#E0F2F1] text-[#00695C]' :
                                             status === 'Failed' ? 'bg-red-50 text-red-600' :
                                                 'bg-orange-50 text-orange-600'
                                         }`}>
                                         <span className="material-symbols-outlined font-bold">
-                                            {status === 'Completed' ? 'check_circle' : status === 'Failed' ? 'error' : 'pending'}
+                                            {status === 'Success' ? 'check_circle' : status === 'Failed' ? 'error' : 'pending'}
                                         </span>
                                     </div>
 
@@ -145,8 +150,8 @@ const FamilyPayment = () => {
 
                                     <div className="flex items-center gap-8 w-full md:w-auto justify-between md:justify-start px-4 md:px-0">
                                         <div className="text-right">
-                                            <p className="font-black text-xl text-stone-900">${item.amount.toLocaleString()}</p>
-                                            <span className={`text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border ${status === 'Completed' ? 'bg-white text-[#00695C] border-[#B2EBF2]' :
+                                            <p className="font-black text-xl text-stone-900">{formatVND(item.amount)}</p>
+                                            <span className={`text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border ${status === 'Success' ? 'bg-white text-[#00695C] border-[#B2EBF2]' :
                                                     status === 'Failed' ? 'bg-red-600 text-white border-red-600 shadow-md shadow-red-200' :
                                                         'bg-white text-orange-600 border-orange-200'
                                                 }`}>

@@ -10,6 +10,7 @@ public interface ICareRequestService
     Task<CareRequestDto> CreateAsync(int familyId, CreateCareRequestDto dto);
     Task<CareRequestDto?> UpdateStatusAsync(int id, RequestStatus status, string? adminNotes = null);
     Task<CareRequestDto?> AssignCaregiverAsync(int id, int caregiverId);
+    Task<CareRequestDto?> RefundAsync(int id, string? adminNotes = null);
     Task<bool> DeleteAsync(int id);
 }
 
@@ -34,6 +35,8 @@ public class CareRequestDto
     public string? Address { get; set; }
     public string? AdminNotes { get; set; }
     public DateTime CreatedAt { get; set; }
+    public int Duration { get; set; }
+    public decimal TotalAmount { get; set; }
 }
 
 public class CreateCareRequestDto
@@ -43,7 +46,7 @@ public class CreateCareRequestDto
     public RequestType Type { get; set; }
     public DateTime RequestedDate { get; set; }
     public string StartTime { get; set; } = string.Empty; // "HH:mm"
-    public string EndTime { get; set; } = string.Empty;   // "HH:mm"
+    public int Duration { get; set; }
     public string? Notes { get; set; }
     public string? Address { get; set; }
 }

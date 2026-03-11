@@ -37,6 +37,8 @@ public class CareRequest
 
     public TimeSpan EndTime { get; set; }
 
+    public int Duration { get; set; } // Duration in hours
+
     [MaxLength(500)]
     public string? Notes { get; set; }
 
@@ -49,4 +51,9 @@ public class CareRequest
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime? UpdatedAt { get; set; }
+
+    // Navigation property
+    public Payment? Payment { get; set; }
+
+    public ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
 }

@@ -59,6 +59,8 @@ const Login = () => {
         const role = result.user?.role?.toLowerCase();
         if (role === "admin") {
           navigate("/admin");
+        } else if (role === "operationadmin") {
+          navigate("/operation-admin");
         } else if (role === "caregiver") {
           navigate("/caregiver");
         } else {

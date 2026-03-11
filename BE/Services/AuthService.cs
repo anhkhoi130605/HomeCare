@@ -121,6 +121,7 @@ public class AuthService : IAuthService
             UserRole.Family => user.Family?.FullName ?? "User",
             UserRole.Caregiver => user.Caregiver?.FullName ?? "Caregiver",
             UserRole.Admin => "Admin",
+            UserRole.OperationAdmin => "Operation Admin",
             _ => "User"
         };
 

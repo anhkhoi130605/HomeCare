@@ -58,7 +58,7 @@ public class ServiceController : ControllerBase
     /// Create new service package (Admin only)
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<ActionResult<ServicePackageDto>> Create([FromBody] CreateServicePackageDto dto)
     {
         try
@@ -76,7 +76,7 @@ public class ServiceController : ControllerBase
     /// Update service package (Admin only)
     /// </summary>
     [HttpPut("{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<ActionResult<ServicePackageDto>> Update(int id, [FromBody] UpdateServicePackageDto dto)
     {
         try
@@ -98,7 +98,7 @@ public class ServiceController : ControllerBase
     /// Delete (deactivate) service package (Admin only)
     /// </summary>
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<ActionResult> Delete(int id)
     {
         try

@@ -18,7 +18,7 @@ public class CareLogController : ControllerBase
 
     // GET /api/carelog - Get all care logs (admin)
     [HttpGet]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<ActionResult<List<CareLogDto>>> GetAll()
     {
         var logs = await _careLogService.GetAllAsync();
