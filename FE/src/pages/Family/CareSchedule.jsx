@@ -69,6 +69,7 @@ const CareSchedule = () => {
             time: s.startTime ? formatTimeSpan(s.startTime) : '09:00 AM',
             patient: s.patientName || s.patient?.name,
             isDone: s.status === 'Completed',
+            status: s.status,
             isToday: checkDate.toDateString() === new Date().toDateString()
         }));
     };
@@ -166,16 +167,19 @@ const CareSchedule = () => {
                             </div>
                         </div>
 
-                        {/* Event Type Legend */}
+                        {/* Event Status Legend */}
                         <div className="flex flex-wrap justify-center gap-4 md:gap-6 bg-stone-50 px-4 py-2 rounded-full border border-stone-100">
                             <div className="flex items-center gap-2 text-[10px] font-bold text-stone-500 uppercase tracking-widest">
-                                <span className="w-2 h-2 rounded-full bg-[#5fa5ba]"></span> Medical
+                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Done
                             </div>
                             <div className="flex items-center gap-2 text-[10px] font-bold text-stone-500 uppercase tracking-widest">
-                                <span className="w-2 h-2 rounded-full bg-orange-400"></span> Personal
+                                <span className="w-2 h-2 rounded-full bg-blue-500"></span> Upcoming
                             </div>
                             <div className="flex items-center gap-2 text-[10px] font-bold text-stone-500 uppercase tracking-widest">
-                                <span className="w-2 h-2 rounded-full bg-stone-300"></span> Off
+                                <span className="w-2 h-2 rounded-full bg-red-500"></span> Cancelled
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] font-bold text-stone-500 uppercase tracking-widest">
+                                <span className="w-2 h-2 rounded-full bg-stone-400"></span> Failed
                             </div>
                         </div>
                     </div>
@@ -219,30 +223,44 @@ const CareSchedule = () => {
                                         {/* Event Rendering */}
                                         {event ? (
                                             <Link to={`/family/schedule/detail/${event.id}`} className="flex-1">
-                                                {event.isDone ? (
+                                                {event.status === 'Completed' ? (
                                                     <div className="mt-1 flex items-center justify-center md:justify-start gap-1 p-1.5 md:p-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100/50 group-hover:border-emerald-200 transition-colors">
                                                         <div className="w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
                                                             <span className="material-symbols-outlined text-[12px] font-bold">check</span>
                                                         </div>
                                                         <span className="hidden md:block text-[11px] font-bold truncate line-through opacity-60">Completed</span>
                                                     </div>
+                                                ) : event.status === 'Cancelled' ? (
+                                                    <div className="mt-1 flex items-center justify-center md:justify-start gap-1 p-1.5 md:p-2 rounded-lg bg-red-50 text-red-700 border border-red-100/50 group-hover:border-red-200 transition-colors">
+                                                        <div className="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center shrink-0">
+                                                            <span className="material-symbols-outlined text-[12px] font-bold">block</span>
+                                                        </div>
+                                                        <span className="hidden md:block text-[11px] font-bold truncate line-through opacity-60 text-red-400">Cancelled</span>
+                                                    </div>
+                                                ) : event.status === 'Failed' ? (
+                                                    <div className="mt-1 flex items-center justify-center md:justify-start gap-1 p-1.5 md:p-2 rounded-lg bg-stone-50 text-stone-600 border border-stone-200/50 group-hover:border-stone-300 transition-colors">
+                                                        <div className="w-5 h-5 bg-stone-200 rounded-full flex items-center justify-center shrink-0">
+                                                            <span className="material-symbols-outlined text-[12px] font-bold">error</span>
+                                                        </div>
+                                                        <div className="hidden md:flex flex-col min-w-0">
+                                                            <span className="text-[10px] font-bold opacity-70 leading-tight">{event.time}</span>
+                                                            <span className="text-[11px] font-bold truncate leading-tight">{event.name}</span>
+                                                        </div>
+                                                    </div>
                                                 ) : (
-                                                    <div className={`mt-1 p-1.5 md:p-2 rounded-lg border flex flex-col md:flex-row items-start md:items-center gap-1.5 transition-all hover:shadow-md ${event.type === 'CONTRACT' ? 'bg-[#5fa5ba]/5 border-[#5fa5ba]/20 hover:border-[#5fa5ba]/40 text-[#00695C]' : 'bg-orange-50/50 border-orange-100 hover:border-orange-200 text-orange-700'}`}>
-                                                        <div className={`w-1.5 h-full rounded-full absolute left-0 top-0 bottom-0 ${event.type === 'CONTRACT' ? 'bg-[#5fa5ba]' : 'bg-orange-400'} md:hidden`}></div>
+                                                    <div className="mt-1 p-1.5 md:p-2 rounded-lg border flex flex-col md:flex-row items-start md:items-center gap-1.5 transition-all hover:shadow-md bg-blue-50 border-blue-200 text-blue-700">
+                                                        <div className="w-1.5 h-full rounded-full absolute left-0 top-0 bottom-0 bg-blue-500 md:hidden"></div>
 
                                                         {/* Event Icon Pill */}
-                                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${event.type === 'CONTRACT' ? 'bg-white text-[#5fa5ba] shadow-sm' : 'bg-white text-orange-500 shadow-sm'}`}>
+                                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${event.status === 'InProgress' ? 'bg-white text-blue-500 shadow-sm animate-pulse' : 'bg-white text-blue-500 shadow-sm'}`}>
                                                             <span className="material-symbols-outlined text-[14px]">
-                                                                {event.type === 'CONTRACT' ? 'stethoscope' : 'accessibility_new'}
+                                                                {event.status === 'InProgress' ? 'sync' : 'stethoscope'}
                                                             </span>
                                                         </div>
 
                                                         <div className="hidden md:flex flex-col min-w-0">
-                                                            <span className="text-[10px] font-bold opacity-70 leading-tight">{event.time || '09:00 AM'}</span>
+                                                            <span className="text-[10px] font-bold opacity-70 leading-tight">{event.time}</span>
                                                             <span className="text-[11px] font-bold truncate leading-tight">{event.name}</span>
-                                                            {event.patient && (
-                                                                <span className="text-[9px] text-stone-500 truncate leading-tight mt-0.5">For: {event.patient}</span>
-                                                            )}
                                                         </div>
                                                     </div>
                                                 )}
