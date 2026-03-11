@@ -4,6 +4,7 @@ using BE.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BE.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260305101231_AddResetTokenUsedAtToUsers")]
+    partial class AddResetTokenUsedAtToUsers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -99,9 +102,6 @@ namespace BE.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
-
-                    b.Property<int>("Duration")
-                        .HasColumnType("int");
 
                     b.Property<TimeSpan>("EndTime")
                         .HasColumnType("time(6)");
@@ -565,9 +565,6 @@ namespace BE.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<int?>("CareRequestId")
-                        .HasColumnType("int");
-
                     b.Property<int?>("ContractId")
                         .HasColumnType("int");
 
@@ -598,9 +595,6 @@ namespace BE.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CareRequestId")
-                        .IsUnique();
-
                     b.HasIndex("ContractId");
 
                     b.HasIndex("FamilyId");
@@ -615,9 +609,6 @@ namespace BE.Migrations
                         .HasColumnType("int");
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("CareRequestId")
-                        .HasColumnType("int");
 
                     b.Property<int>("CaregiverId")
                         .HasColumnType("int");
@@ -655,8 +646,6 @@ namespace BE.Migrations
                         .HasColumnType("longtext");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CareRequestId");
 
                     b.HasIndex("CaregiverId");
 
@@ -1019,10 +1008,6 @@ namespace BE.Migrations
 
             modelBuilder.Entity("BE.Models.Payment", b =>
                 {
-                    b.HasOne("BE.Models.CareRequest", "CareRequest")
-                        .WithOne("Payment")
-                        .HasForeignKey("BE.Models.Payment", "CareRequestId");
-
                     b.HasOne("BE.Models.Contract", "Contract")
                         .WithMany("Payments")
                         .HasForeignKey("ContractId");
@@ -1033,8 +1018,6 @@ namespace BE.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("CareRequest");
-
                     b.Navigation("Contract");
 
                     b.Navigation("Family");
@@ -1042,10 +1025,6 @@ namespace BE.Migrations
 
             modelBuilder.Entity("BE.Models.Schedule", b =>
                 {
-                    b.HasOne("BE.Models.CareRequest", "CareRequest")
-                        .WithMany("Schedules")
-                        .HasForeignKey("CareRequestId");
-
                     b.HasOne("BE.Models.Caregiver", "Caregiver")
                         .WithMany("Schedules")
                         .HasForeignKey("CaregiverId")
@@ -1063,20 +1042,11 @@ namespace BE.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("CareRequest");
-
                     b.Navigation("Caregiver");
 
                     b.Navigation("Contract");
 
                     b.Navigation("Patient");
-                });
-
-            modelBuilder.Entity("BE.Models.CareRequest", b =>
-                {
-                    b.Navigation("Payment");
-
-                    b.Navigation("Schedules");
                 });
 
             modelBuilder.Entity("BE.Models.Caregiver", b =>

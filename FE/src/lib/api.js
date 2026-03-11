@@ -1,6 +1,8 @@
+
 // API Configuration
 const API_BASE_URL = (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE_URL) || 'http://localhost:5000/api';
 const API_TIMEOUT = 60000; // 60 seconds timeout for TiDB Cloud latency during startup
+
 
 // Custom error class for network errors
 export class NetworkError extends Error {
@@ -112,6 +114,13 @@ export const authApi = {
         return apiCall('/auth/login', {
             method: 'POST',
             body: JSON.stringify(credentials),
+        });
+    },
+
+    loginWithGoogle: async (googleData) => {
+        return apiCall('/auth/google-login', {
+            method: 'POST',
+            body: JSON.stringify(googleData),
         });
     },
 

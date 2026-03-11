@@ -29,7 +29,7 @@ public class User
     public string? ResetToken { get; set; }
 
     public DateTime? ResetTokenExpiry { get; set; }
-
+    public DateTime? ResetTokenUsedAt { get; set; }
     // Navigation properties
     public Family? Family { get; set; }
     public Caregiver? Caregiver { get; set; }
