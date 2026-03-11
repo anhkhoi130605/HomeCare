@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { scheduleApi, familyApi } from '@/lib/api';
+import { formatTimeSpan } from '@/lib/utils';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 
 const CareSchedule = () => {
@@ -65,7 +66,7 @@ const CareSchedule = () => {
             day: day,
             name: s.serviceName || s.service?.name || 'Care Visit',
             type: 'CONTRACT',
-            time: s.startTime ? new Date(`2000-01-01T${s.startTime}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:00 AM',
+            time: s.startTime ? formatTimeSpan(s.startTime) : '09:00 AM',
             patient: s.patientName || s.patient?.name,
             isDone: s.status === 'Completed',
             isToday: checkDate.toDateString() === new Date().toDateString()

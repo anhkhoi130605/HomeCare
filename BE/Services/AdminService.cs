@@ -222,6 +222,11 @@ public class AdminService : IAdminService
             Age = CalculateAge(p.DateOfBirth),
             Gender = p.Gender ?? "Unknown",
             FamilyName = p.Family.FullName,
+            Address = !string.IsNullOrWhiteSpace(p.Address) 
+                ? p.Address 
+                : (!string.IsNullOrWhiteSpace(p.Family?.Address) 
+                    ? p.Family.Address 
+                    : "No address provided"),
             CaregiverName = caregivers.GetValueOrDefault(p.Id, "Unassigned"),
             MedicalHistory = p.MedicalHistory ?? "",
             CurrentCondition = p.CurrentCondition ?? "",
@@ -274,9 +279,10 @@ public class AdminService : IAdminService
     public async Task<List<AdminScheduleDto>> GetAllSchedulesAsync(DateTime? from = null, DateTime? to = null)
     {
         var query = _context.Schedules
-            .Include(s => s.Patient)
+            .Include(s => s.Patient).ThenInclude(p => p.Family)
             .Include(s => s.Caregiver)
             .Include(s => s.Contract!).ThenInclude(c => c.Service)
+            .Include(s => s.CareRequest!).ThenInclude(r => r.Service)
             .AsQueryable();
 
         if (from.HasValue)
@@ -286,20 +292,47 @@ public class AdminService : IAdminService
 
         var schedules = await query.OrderBy(s => s.Date).ThenBy(s => s.StartTime).ToListAsync();
 
-        return schedules.Select(s => new AdminScheduleDto
-        {
-            Id = s.Id,
-            PatientId = s.PatientId,
-            PatientName = s.Patient.FullName,
-            CaregiverId = s.CaregiverId,
-            CaregiverName = s.Caregiver.FullName,
-            CaregiverImage = s.Caregiver.ImageUrl,
-            ServiceName = s.Contract?.Service?.Name ?? "N/A",
-            Date = s.Date,
-            StartTime = s.StartTime.ToString(@"hh\:mm"),
-            EndTime = s.EndTime.ToString(@"hh\:mm"),
-            Status = s.Status.ToString(),
-            Notes = s.Notes
+        return schedules.Select(s => {
+            string finalAddress = "No address provided";
+            
+            if (!string.IsNullOrWhiteSpace(s.Patient?.Address))
+                finalAddress = s.Patient.Address;
+            else if (!string.IsNullOrWhiteSpace(s.CareRequest?.Address))
+                finalAddress = s.CareRequest.Address;
+            else if (!string.IsNullOrWhiteSpace(s.Contract?.Address))
+                finalAddress = s.Contract.Address;
+            else if (!string.IsNullOrWhiteSpace(s.Patient?.Family?.Address))
+                finalAddress = s.Patient.Family.Address;
+
+            var displayStatus = s.Status;
+            if (displayStatus == ScheduleStatus.Scheduled || displayStatus == ScheduleStatus.InProgress)
+            {
+                var now = DateTime.Now;
+                var shiftStart = s.Date.Date.Add(s.StartTime);
+                var shiftEnd = s.Date.Date.Add(s.EndTime);
+
+                if (displayStatus == ScheduleStatus.InProgress && shiftStart > now.AddMinutes(30))
+                    displayStatus = ScheduleStatus.Scheduled;
+                else if (shiftEnd < now.AddMinutes(-30))
+                    displayStatus = ScheduleStatus.Failed;
+            }
+
+            return new AdminScheduleDto
+            {
+                Id = s.Id,
+                PatientId = s.PatientId,
+                PatientName = s.Patient?.FullName ?? "Unknown",
+                PatientAddress = finalAddress,
+                CaregiverId = s.CaregiverId,
+                CaregiverName = s.Caregiver?.FullName ?? "Unassigned",
+                CaregiverImage = s.Caregiver?.ImageUrl,
+                ServiceName = s.CareRequest?.Service?.Name ?? s.Contract?.Service?.Name ?? "N/A",
+                Date = s.Date,
+                StartTime = s.StartTime.ToString(@"hh\:mm"),
+                EndTime = s.EndTime.ToString(@"hh\:mm"),
+                Status = displayStatus.ToString(),
+                Notes = s.Notes
+            };
         }).ToList();
     }
 
@@ -427,6 +460,7 @@ public class AdminPatientDto
     public int Age { get; set; }
     public string Gender { get; set; } = "";
     public string FamilyName { get; set; } = "";
+    public string Address { get; set; } = "";
     public string CaregiverName { get; set; } = "";
     public string MedicalHistory { get; set; } = "";
     public string CurrentCondition { get; set; } = "";
@@ -456,6 +490,7 @@ public class AdminScheduleDto
     public int Id { get; set; }
     public int PatientId { get; set; }
     public string PatientName { get; set; } = "";
+    public string PatientAddress { get; set; } = "";
     public int CaregiverId { get; set; }
     public string CaregiverName { get; set; } = "";
     public string? CaregiverImage { get; set; }

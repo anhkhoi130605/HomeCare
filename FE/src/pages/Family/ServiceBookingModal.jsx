@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { familyApi, careRequestApi } from '@/lib/api';
+import { formatDateToYYYYMMDD } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const ServiceBookingModal = ({ isOpen, onClose, service }) => {
@@ -9,7 +10,7 @@ const ServiceBookingModal = ({ isOpen, onClose, service }) => {
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         patient_id: '',
-        date: new Date().toISOString().split('T')[0],
+        date: formatDateToYYYYMMDD(new Date()),
         start_time: '09:00',
         duration: 2,
         special_note: ''

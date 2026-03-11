@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { caregiverApi, careLogApi, feedbackApi, scheduleApi } from '../../lib/api';
+import { formatDateToYYYYMMDD } from '@/lib/utils';
 
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -65,7 +66,7 @@ const Reports = () => {
                     for (let i = 6; i >= 0; i--) {
                         const d = new Date(today);
                         d.setDate(today.getDate() - i);
-                        const dateStr = d.toISOString().split('T')[0];
+                        const dateStr = formatDateToYYYYMMDD(d);
                         const dayName = days[d.getDay()];
                         activityMap[dateStr] = { day: dayName, hours: 0, target: 8 }; // Target 8h dummy
                         weekData.push({ date: dateStr, day: dayName, hours: 0, target: 8 });

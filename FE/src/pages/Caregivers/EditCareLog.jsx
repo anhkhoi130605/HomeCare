@@ -101,7 +101,7 @@ const EditCareLog = () => {
                     <span className="material-symbols-outlined text-6xl text-red-400 mb-4">error</span>
                     <h2 className="text-2xl font-bold text-stone-800 dark:text-white mb-2">Log Not Found</h2>
                     <p className="text-stone-500 mb-4">{error}</p>
-                    <Link to="/caregiver/care-logs" className="text-[#5fa5ba] font-bold">← Back to Care Logs</Link>
+                    <Link to="/caregiver/care-logs" className="text-[#5fa5ba] font-bold">â† Back to Care Logs</Link>
                 </div>
             </div>
         );

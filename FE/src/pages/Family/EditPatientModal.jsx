@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { familyApi } from '@/lib/api';
+import { formatDateToYYYYMMDD } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const EditPatientModal = ({ isOpen, onClose, patient, onPatientUpdated }) => {
@@ -18,7 +19,7 @@ const EditPatientModal = ({ isOpen, onClose, patient, onPatientUpdated }) => {
         if (patient) {
             setFormData({
                 fullName: patient.fullName || '',
-                dateOfBirth: patient.dateOfBirth ? new Date(patient.dateOfBirth).toISOString().split('T')[0] : '',
+                dateOfBirth: patient.dateOfBirth ? formatDateToYYYYMMDD(new Date(patient.dateOfBirth)) : '',
                 gender: patient.gender || '',
                 address: patient.address || '',
                 emergencyContact: patient.emergencyContact || '',

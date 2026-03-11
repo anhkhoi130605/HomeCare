@@ -1,6 +1,7 @@
 using BE.Data;
 using BE.DTOs.Caregiver;
 using BE.Models;
+using BE.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace BE.Services;
@@ -17,6 +18,9 @@ public interface IScheduleService
     Task<bool> HasConflictAsync(int caregiverId, DateTime date, TimeSpan startTime, TimeSpan endTime, int? excludeScheduleId = null);
     Task<bool> HasRequestConflictAsync(int caregiverId, int requestId);
     Task<ScheduleGenerationResult> GenerateSchedulesFromContractAsync(int contractId);
+    Task<ScheduleDto?> CheckInAsync(int scheduleId);
+    Task<ScheduleDto?> CheckOutAsync(int scheduleId, string notes);
+    Task<ScheduleDto> AssignFromRequestAsync(AssignScheduleDto dto);
 }
 
 public class ScheduleGenerationResult
@@ -56,16 +60,18 @@ public class UpdateScheduleDto
 public class ScheduleService : IScheduleService
 {
     private readonly ApplicationDbContext _context;
+    private readonly INotificationService _notificationService;
 
-    public ScheduleService(ApplicationDbContext context)
+    public ScheduleService(ApplicationDbContext context, INotificationService notificationService)
     {
         _context = context;
+        _notificationService = notificationService;
     }
 
     public async Task<List<ScheduleDto>> GetAllSchedulesAsync(DateTime? from = null, DateTime? to = null)
     {
         var query = _context.Schedules
-            .Include(s => s.Patient)
+            .Include(s => s.Patient).ThenInclude(p => p.Family)
             .Include(s => s.Caregiver)
             .Include(s => s.Contract!).ThenInclude(c => c.Service)
             .Include(s => s.CareRequest!).ThenInclude(r => r.Service)
@@ -84,7 +90,7 @@ public class ScheduleService : IScheduleService
     public async Task<List<ScheduleDto>> GetSchedulesByCaregiverAsync(int caregiverId, DateTime? from = null, DateTime? to = null)
     {
         var query = _context.Schedules
-            .Include(s => s.Patient)
+            .Include(s => s.Patient).ThenInclude(p => p.Family)
             .Include(s => s.Caregiver)
             .Include(s => s.Contract!).ThenInclude(c => c.Service)
             .Include(s => s.CareRequest!).ThenInclude(r => r.Service)
@@ -103,7 +109,7 @@ public class ScheduleService : IScheduleService
     public async Task<List<ScheduleDto>> GetSchedulesByPatientAsync(int patientId, DateTime? from = null, DateTime? to = null)
     {
         var query = _context.Schedules
-            .Include(s => s.Patient)
+            .Include(s => s.Patient).ThenInclude(p => p.Family)
             .Include(s => s.Caregiver)
             .Include(s => s.Contract!).ThenInclude(c => c.Service)
             .Include(s => s.CareRequest!).ThenInclude(r => r.Service)
@@ -122,7 +128,7 @@ public class ScheduleService : IScheduleService
     public async Task<ScheduleDto?> GetScheduleByIdAsync(int id)
     {
         var schedule = await _context.Schedules
-            .Include(s => s.Patient)
+            .Include(s => s.Patient).ThenInclude(p => p.Family)
             .Include(s => s.Caregiver)
             .Include(s => s.Contract!).ThenInclude(c => c.Service)
             .Include(s => s.CareRequest!).ThenInclude(r => r.Service)
@@ -320,14 +326,118 @@ public class ScheduleService : IScheduleService
         }
     }
 
+    public async Task<ScheduleDto?> CheckInAsync(int scheduleId)
+    {
+        var schedule = await _context.Schedules.FindAsync(scheduleId);
+        if (schedule == null) return null;
+
+        // Time guard: Only allow check-in within 30 minutes of start time
+        var now = DateTime.Now;
+        var shiftStart = schedule.Date.Date.Add(schedule.StartTime);
+        if (now < shiftStart.AddMinutes(-30))
+        {
+            throw new InvalidOperationException("You can only check in up to 30 minutes before the shift starts.");
+        }
+
+        schedule.CheckInTime = DateTime.UtcNow;
+        schedule.Status = ScheduleStatus.InProgress;
+
+        await _context.SaveChangesAsync();
+
+        return await GetScheduleByIdAsync(scheduleId);
+    }
+
+    public async Task<ScheduleDto?> CheckOutAsync(int scheduleId, string notes)
+    {
+        var schedule = await _context.Schedules.FindAsync(scheduleId);
+        if (schedule == null) return null;
+
+        schedule.CheckOutTime = DateTime.UtcNow;
+        schedule.Status = ScheduleStatus.Completed;
+        schedule.Notes = notes;
+
+        await _context.SaveChangesAsync();
+
+        return await GetScheduleByIdAsync(scheduleId);
+    }
+
+    public async Task<ScheduleDto> AssignFromRequestAsync(AssignScheduleDto dto)
+    {
+        var request = await _context.CareRequests
+            .Include(r => r.Patient)
+            .FirstOrDefaultAsync(r => r.Id == dto.RequestId);
+
+        if (request == null)
+            throw new KeyNotFoundException("Request not found");
+
+        var schedule = new Schedule
+        {
+            PatientId = request.PatientId,
+            CaregiverId = dto.CaregiverId,
+            CareRequestId = request.Id,
+            Date = request.RequestedDate,
+            StartTime = request.StartTime,
+            EndTime = request.EndTime,
+            Status = ScheduleStatus.Scheduled
+        };
+
+        _context.Schedules.Add(schedule);
+        
+        // Update request status to Assigned
+        request.Status = RequestStatus.Assigned;
+
+        await _context.SaveChangesAsync();
+
+        // Notify caregiver
+        var caregiver = await _context.Caregivers.FindAsync(dto.CaregiverId);
+        if (caregiver != null)
+        {
+            await _notificationService.CreateNotificationAsync(
+                caregiver.UserId,
+                "New Shift Assigned",
+                $"You have been assigned a new shift for {request.Patient?.FullName} on {request.RequestedDate:MMM dd, yyyy}.",
+                "Schedule",
+                schedule.Id
+            );
+        }
+
+        return (await GetScheduleByIdAsync(schedule.Id))!;
+    }
+
     private static ScheduleDto MapToDto(Schedule s)
     {
+        var status = s.Status;
+        
+        // Dynamic "Failed" status for display if shift is past its end time and not completed
+        if (status == ScheduleStatus.Scheduled || status == ScheduleStatus.InProgress)
+        {
+            var now = DateTime.Now;
+            var shiftStartDateTime = s.Date.Date.Add(s.StartTime);
+            var shiftEndDateTime = s.Date.Date.Add(s.EndTime);
+            
+            // 1. Safety check for premature InProgress (from previous auto-checkin bugs)
+            if (status == ScheduleStatus.InProgress && shiftStartDateTime > now.AddMinutes(30))
+            {
+                status = ScheduleStatus.Scheduled;
+            }
+            
+            // 2. Dynamic "Failed" status if shift is past its end time and not completed
+            if (shiftEndDateTime < now.AddMinutes(-30) && status != ScheduleStatus.Completed)
+            {
+                status = ScheduleStatus.Failed;
+            }
+        }
+
         return new ScheduleDto
         {
             Id = s.Id,
             PatientId = s.PatientId,
             PatientName = s.Patient?.FullName ?? "",
-            PatientAddress = s.Patient?.Address ?? "",
+            PatientAddress = !string.IsNullOrWhiteSpace(s.Patient?.Address) ? s.Patient.Address 
+                : (!string.IsNullOrWhiteSpace(s.CareRequest?.Address) ? s.CareRequest.Address
+                : (!string.IsNullOrWhiteSpace(s.Contract?.Address) ? s.Contract.Address
+                : (!string.IsNullOrWhiteSpace(s.Patient?.Family?.Address) ? s.Patient.Family.Address 
+                : "No address provided"))),
             CaregiverId = s.CaregiverId,
             CaregiverName = s.Caregiver?.FullName,
             ContractId = s.ContractId,
@@ -336,7 +446,7 @@ public class ScheduleService : IScheduleService
             Date = s.Date,
             StartTime = s.StartTime,
             EndTime = s.EndTime,
-            Status = s.Status.ToString(),
+            Status = status.ToString(),
             CheckInTime = s.CheckInTime,
             CheckOutTime = s.CheckOutTime,
             Notes = s.Notes

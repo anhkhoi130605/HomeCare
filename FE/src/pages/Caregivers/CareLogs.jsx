@@ -274,7 +274,7 @@ const CareLogs = () => {
                 </ScrollAnimation>
 
                 <footer className="p-8 text-center text-stone-400 text-xs font-bold mt-auto">
-                    © 2024 HomeCare Systems Inc. All Rights Reserved. • <a href="#" className="hover:text-[#5fa5ba] underline transition-colors">Privacy Policy</a>
+                    Â© 2024 HomeCare Systems Inc. All Rights Reserved. â€¢ <a href="#" className="hover:text-[#5fa5ba] underline transition-colors">Privacy Policy</a>
                 </footer>
             </div>
         </div>
