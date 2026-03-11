@@ -261,14 +261,14 @@ public class AuthService : IAuthService
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email),
             new Claim(ClaimTypes.Role, user.Role.ToString()),
-            new Claim("userId", user.Id.ToString())
+            new Claim("UserId", user.Id.ToString())
         };
 
         if (familyId.HasValue)
-            claims.Add(new Claim("familyId", familyId.Value.ToString()));
+            claims.Add(new Claim("FamilyId", familyId.Value.ToString()));
 
         if (caregiverId.HasValue)
-            claims.Add(new Claim("caregiverId", caregiverId.Value.ToString()));
+            claims.Add(new Claim("CaregiverId", caregiverId.Value.ToString()));
 
         var expireMinutes = int.Parse(jwtSettings["ExpireMinutes"] ?? "60");
 

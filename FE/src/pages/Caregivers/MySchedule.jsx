@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import ScrollAnimation from "@/components/ui/scroll-animation";
-import { caregiverApi } from '@/lib/api';
+import { caregiverApi, authApi } from '@/lib/api';
 import { formatTimeSpan, formatDateToYYYYMMDD } from '@/lib/utils';
 
 const MySchedule = () => {
@@ -11,6 +11,12 @@ const MySchedule = () => {
     const [selectedShift, setSelectedShift] = useState(null);
     const [loading, setLoading] = useState(true);
     const [profile, setProfile] = useState(null);
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        authApi.logout();
+        navigate('/login');
+    };
 
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -229,6 +235,13 @@ const MySchedule = () => {
                                     src={profile?.imageUrl || "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=100&h=100&fit=crop"}
                                 />
                             </Link>
+                            <button
+                                onClick={handleLogout}
+                                className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all ml-2"
+                                title="Sign Out"
+                            >
+                                <span className="material-symbols-outlined text-2xl">logout</span>
+                            </button>
                         </div>
                     </div>
                 </header>

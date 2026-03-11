@@ -123,7 +123,7 @@ public class CareLogController : ControllerBase
 
     private int? GetCaregiverId()
     {
-        var caregiverIdClaim = User.FindFirst("CaregiverId")?.Value;
+        var caregiverIdClaim = User.Claims.FirstOrDefault(c => c.Type.Equals("CaregiverId", StringComparison.OrdinalIgnoreCase))?.Value;
         if (caregiverIdClaim != null && int.TryParse(caregiverIdClaim, out var id))
             return id;
         return null;

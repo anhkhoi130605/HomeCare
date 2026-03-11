@@ -144,8 +144,8 @@ public class CareRequestService : ICareRequestService
         var existingSchedule = await _context.Schedules.FirstOrDefaultAsync(s => s.CareRequestId == id);
         var hasConflict = await _context.Schedules
             .Where(s => s.CaregiverId == caregiverId)
-            .Where(s => s.Date == request.RequestedDate.Date)
-            .Where(s => s.Status != ScheduleStatus.Cancelled)
+            .Where(s => s.Date.Date == request.RequestedDate.Date)
+            .Where(s => s.Status == ScheduleStatus.Scheduled || s.Status == ScheduleStatus.InProgress)
             .Where(s => existingSchedule != null ? s.Id != existingSchedule.Id : true)
             .Where(s => s.StartTime < request.EndTime && s.EndTime > request.StartTime)
             .AnyAsync();

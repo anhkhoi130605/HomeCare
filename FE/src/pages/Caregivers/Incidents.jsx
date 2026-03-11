@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import ScrollAnimation from "@/components/ui/scroll-animation";
-import { incidentApi, caregiverApi, scheduleApi } from '../../lib/api';
+import { incidentApi, caregiverApi, scheduleApi, authApi } from '../../lib/api';
 
 const ReportIncidentModal = ({ isOpen, onClose, patients, onSubmit }) => {
     const [formData, setFormData] = useState({
@@ -150,6 +150,12 @@ const Incidents = () => {
     const [patients, setPatients] = useState([]); // List of patients for dropdown
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        authApi.logout();
+        navigate('/login');
+    };
 
     useEffect(() => {
         const fetchData = async () => {
@@ -270,6 +276,13 @@ const Incidents = () => {
                                 />
                             </Link>
                         </div>
+                        <button
+                            onClick={handleLogout}
+                            className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all ml-2"
+                            title="Sign Out"
+                        >
+                            <span className="material-symbols-outlined text-2xl">logout</span>
+                        </button>
                     </div>
                 </header>
             </ScrollAnimation>

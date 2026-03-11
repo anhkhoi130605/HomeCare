@@ -65,15 +65,6 @@ const CaregiverLayout = () => {
                     ))}
                 </nav>
 
-                <div className="p-6 border-t border-stone-100 dark:border-stone-800">
-                    <button
-                        onClick={handleLogout}
-                        className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all font-bold whitespace-nowrap overflow-hidden ${isSidebarOpen ? '' : 'justify-center'}`}
-                    >
-                        <span className="material-symbols-outlined text-2xl shrink-0">logout</span>
-                        <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 w-0'}`}>Sign Out</span>
-                    </button>
-                </div>
             </aside>
 
             {/* Main Content */}

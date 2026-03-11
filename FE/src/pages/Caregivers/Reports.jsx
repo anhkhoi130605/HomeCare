@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { caregiverApi, careLogApi, feedbackApi, scheduleApi } from '../../lib/api';
+import { caregiverApi, careLogApi, feedbackApi, scheduleApi, authApi } from '../../lib/api';
 import { formatDateToYYYYMMDD } from '@/lib/utils';
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -31,6 +31,12 @@ const Reports = () => {
     const [feedbacks, setFeedbacks] = useState([]);
     const [monthlySummaries, setMonthlySummaries] = useState([]); // Could be derived
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        authApi.logout();
+        navigate('/login');
+    };
 
     useEffect(() => {
         const fetchData = async () => {
@@ -166,6 +172,13 @@ const Reports = () => {
                     <Link to="/caregiver/profile" className="group">
                         <img alt="Caregiver profile" className="w-12 h-12 rounded-2xl object-cover shadow-lg ring-2 ring-white dark:ring-stone-800 group-hover:ring-[#5fa5ba] transition-all cursor-pointer" src={profile?.imageUrl || 'https://via.placeholder.com/48'} />
                     </Link>
+                    <button
+                        onClick={handleLogout}
+                        className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all ml-2"
+                        title="Sign Out"
+                    >
+                        <span className="material-symbols-outlined text-2xl">logout</span>
+                    </button>
                 </div>
             </header>
 

@@ -1,12 +1,18 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import ScrollAnimation from "@/components/ui/scroll-animation";
-import { careLogApi, caregiverApi } from '../../lib/api';
+import { careLogApi, caregiverApi, authApi } from '../../lib/api';
 
 const CareLogs = () => {
     const [careLogs, setCareLogs] = useState([]);
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        authApi.logout();
+        navigate('/login');
+    };
     const [error, setError] = useState(null);
 
     // State for filters
@@ -125,6 +131,13 @@ const CareLogs = () => {
                                 <img alt="Caregiver profile" className="w-12 h-12 rounded-2xl object-cover shadow-lg ring-2 ring-white dark:ring-stone-800 group-hover:ring-[#5fa5ba] transition-all cursor-pointer" src={profile?.imageUrl || 'https://via.placeholder.com/48'} />
                             </Link>
                         </div>
+                        <button
+                            onClick={handleLogout}
+                            className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                            title="Sign Out"
+                        >
+                            <span className="material-symbols-outlined text-2xl">logout</span>
+                        </button>
                     </div>
                 </header>
             </ScrollAnimation>

@@ -17,8 +17,8 @@ public class CaregiverController : ControllerBase
         _caregiverService = caregiverService;
     }
 
-    private int GetUserId() => int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
-    private int GetCaregiverId() => int.Parse(User.FindFirst("CaregiverId")?.Value ?? "0");
+    private int GetUserId() => int.Parse(User.Claims.FirstOrDefault(c => c.Type.Equals("UserId", StringComparison.OrdinalIgnoreCase) || c.Type == ClaimTypes.NameIdentifier)?.Value ?? "0");
+    private int GetCaregiverId() => int.Parse(User.Claims.FirstOrDefault(c => c.Type.Equals("CaregiverId", StringComparison.OrdinalIgnoreCase))?.Value ?? "0");
 
     /// <summary>
     /// Get all caregivers (public - for families to view)

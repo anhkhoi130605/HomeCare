@@ -139,8 +139,8 @@ public class CaregiverService : ICaregiverService
     {
         var query = _context.Schedules
             .Include(s => s.Patient).ThenInclude(p => p.Family)
-            .Include(s => s.Contract).ThenInclude(c => c.Service)
-            .Include(s => s.CareRequest).ThenInclude(r => r.Service)
+            .Include(s => s.Contract).ThenInclude(c => c!.Service)
+            .Include(s => s.CareRequest).ThenInclude(r => r!.Service)
             .Where(s => s.CaregiverId == caregiverId);
 
         if (from.HasValue)
@@ -190,7 +190,7 @@ public class CaregiverService : ICaregiverService
             ContractId = s.ContractId,
             CareRequestId = s.CareRequestId,
             ServiceName = s.CareRequest?.Service?.Name ?? s.Contract?.Service?.Name,
-            Date = s.Date,
+            Date = s.Date.ToString("yyyy-MM-dd"),
             StartTime = s.StartTime,
             EndTime = s.EndTime,
             Status = status.ToString(),
@@ -205,8 +205,8 @@ public class CaregiverService : ICaregiverService
         var schedule = await _context.Schedules
             .Include(s => s.Patient).ThenInclude(p => p.Family)
             .Include(s => s.Patient)
-            .Include(s => s.Contract).ThenInclude(c => c.Service)
-            .Include(s => s.CareRequest).ThenInclude(r => r.Service)
+            .Include(s => s.Contract).ThenInclude(c => c!.Service)
+            .Include(s => s.CareRequest).ThenInclude(r => r!.Service)
             .FirstOrDefaultAsync(s => s.Id == scheduleId && s.CaregiverId == caregiverId);
 
         if (schedule == null) return null;
@@ -231,8 +231,8 @@ public class CaregiverService : ICaregiverService
     {
         var schedule = await _context.Schedules
             .Include(s => s.Patient).ThenInclude(p => p.Family)
-            .Include(s => s.Contract).ThenInclude(c => c.Service)
-            .Include(s => s.CareRequest).ThenInclude(r => r.Service)
+            .Include(s => s.Contract).ThenInclude(c => c!.Service)
+            .Include(s => s.CareRequest).ThenInclude(r => r!.Service)
             .FirstOrDefaultAsync(s => s.Id == scheduleId && s.CaregiverId == caregiverId);
 
         if (schedule == null) return null;
@@ -268,8 +268,8 @@ public class CaregiverService : ICaregiverService
                 ? patient.Address 
                 : (patient.Family?.Address ?? ""),
             CreatedAt = patient.CreatedAt,
-            EmergencyContactName = patient.Family.EmergencyContact ?? patient.Family.FullName,
-            EmergencyContactPhone = patient.Family.User.Phone
+            EmergencyContactName = patient.Family?.EmergencyContact ?? patient.Family?.FullName,
+            EmergencyContactPhone = patient.Family?.User.Phone
         };
     }
 
@@ -292,8 +292,9 @@ public class CaregiverService : ICaregiverService
         foreach (var caregiver in allCaregivers)
         {
             // 2. Check for schedule conflicts
+            // Only count Scheduled or InProgress shifts as conflicts for availability
             var hasConflict = await _context.Schedules
-                .Where(s => s.CaregiverId == caregiver.Id && s.Date == request.RequestedDate.Date && s.Status != ScheduleStatus.Cancelled)
+                .Where(s => s.CaregiverId == caregiver.Id && s.Date.Date == request.RequestedDate.Date && (s.Status == ScheduleStatus.Scheduled || s.Status == ScheduleStatus.InProgress))
                 .Where(s => s.StartTime < request.EndTime && s.EndTime > request.StartTime)
                 .AnyAsync();
 
