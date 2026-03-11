@@ -54,7 +54,7 @@ const Requests = () => {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [selectedCaregiver, setSelectedCaregiver] = useState('');
-  const [conflict, setConflict] = useState(false);
+  const [availableCaregivers, setAvailableCaregivers] = useState([]);
   const [checkingConflict, setCheckingConflict] = useState(false);
 
   useEffect(() => {
@@ -107,6 +107,7 @@ const Requests = () => {
     try {
       setProcessing(selectedRequest.id);
       const updated = await careRequestApi.assignCaregiver(selectedRequest.id, parseInt(selectedCaregiver));
+      toast.success('Đã gán caregiver thành công!');
       setRequests(prev => prev.map(r => r.id === selectedRequest.id ? {
         ...r,
         status: updated?.status || 'Assigned',
@@ -117,7 +118,8 @@ const Requests = () => {
       setSelectedCaregiver('');
     } catch (error) {
       console.error("Failed to assign:", error);
-      alert("Failed to assign caregiver: " + error.message);
+      const msg = error?.data?.message || error?.message || 'Lỗi không xác định';
+      toast.error('Không thể gán caregiver: ' + msg);
     } finally {
       setProcessing(null);
     }
@@ -137,27 +139,30 @@ const Requests = () => {
     }
   };
 
-  const openAssignModal = (request) => {
+  const openAssignModal = async (request) => {
     if (!canManage) return;
     setSelectedRequest(request);
     setSelectedCaregiver('');
-    setConflict(false);
+    setAvailableCaregivers([]);
+    setCheckingConflict(true);
     setShowAssignModal(true);
-  };
 
-  const handleCaregiverChange = async (caregiverId) => {
-    setSelectedCaregiver(caregiverId);
-    if (!caregiverId || !selectedRequest) {
-      setConflict(false);
-      return;
-    }
-
+    // Check conflicts for all caregivers in parallel
     try {
-      setCheckingConflict(true);
-      const result = await scheduleApi.checkRequestConflict(selectedRequest.id, parseInt(caregiverId));
-      setConflict(result.hasConflict);
+      const results = await Promise.all(
+        caregivers.map(async (cg) => {
+          try {
+            const result = await scheduleApi.checkRequestConflict(request.id, cg.id);
+            return { ...cg, hasConflict: result.hasConflict };
+          } catch {
+            return { ...cg, hasConflict: false }; // If check fails, assume available
+          }
+        })
+      );
+      setAvailableCaregivers(results.filter(cg => !cg.hasConflict));
     } catch (error) {
-      console.error("Failed to check conflict:", error);
+      console.error("Failed to check conflicts:", error);
+      setAvailableCaregivers(caregivers); // Fallback: show all
     } finally {
       setCheckingConflict(false);
     }
@@ -433,55 +438,61 @@ const Requests = () => {
         <Dialog open={showAssignModal} onOpenChange={setShowAssignModal}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Assign Caregiver</DialogTitle>
+              <DialogTitle>Gán Caregiver</DialogTitle>
             </DialogHeader>
             <div className="py-4">
               {selectedRequest && (
                 <div className="mb-4 p-3 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">Request for:</p>
+                  <p className="text-sm text-muted-foreground">Yêu cầu cho:</p>
                   <p className="font-medium">{selectedRequest.patientName}</p>
                   <p className="text-sm">{selectedRequest.serviceName}</p>
-                </div>
-              )}
-              <label className="text-sm font-medium mb-2 block">Select Caregiver</label>
-              <select
-                value={selectedCaregiver}
-                onChange={(e) => handleCaregiverChange(e.target.value)}
-                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${conflict ? 'border-amber-500 bg-amber-50' : 'border-border'
-                  }`}
-              >
-                <option value="">Choose a caregiver...</option>
-                {caregivers.map((cg) => (
-                  <option key={cg.id} value={cg.id}>
-                    {cg.fullName} - {cg.specialization} ({cg.rating?.toFixed(1) || '0.0'} ⭐)
-                  </option>
-                ))}
-              </select>
-              {checkingConflict && (
-                <p className="text-xs text-muted-foreground mt-1 animate-pulse">Checking availability...</p>
-              )}
-              {conflict && (
-                <div className="mt-3 p-3 bg-amber-100 border border-amber-200 rounded-lg flex items-start gap-2 text-amber-800">
-                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                  <p className="text-xs">
-                    <strong>Schedule Conflict:</strong> This caregiver already has a shift that overlaps with this request's time.
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatDate(selectedRequest.requestedDate)} • {formatTimeSpan(selectedRequest.startTime)} - {formatTimeSpan(selectedRequest.endTime)}
                   </p>
                 </div>
               )}
-              {caregivers.length === 0 && (
-                <p className="text-sm text-muted-foreground mt-2">No available caregivers</p>
+
+              {checkingConflict ? (
+                <div className="flex items-center gap-2 p-4 text-center justify-center">
+                  <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-sm text-muted-foreground">Đang kiểm tra lịch trùng...</p>
+                </div>
+              ) : availableCaregivers.length === 0 ? (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-red-700">
+                  <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-medium text-sm">Không có caregiver nào rảnh!</p>
+                    <p className="text-xs mt-1">Tất cả caregiver đều đã có lịch trùng giờ với yêu cầu này.</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <label className="text-sm font-medium mb-2 block">Chọn Caregiver ({availableCaregivers.length} rảnh / {caregivers.length} tổng)</label>
+                  <select
+                    value={selectedCaregiver}
+                    onChange={(e) => setSelectedCaregiver(e.target.value)}
+                    className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  >
+                    <option value="">Chọn caregiver...</option>
+                    {availableCaregivers.map((cg) => (
+                      <option key={cg.id} value={cg.id}>
+                        {cg.fullName} - {cg.specialization} ({cg.rating?.toFixed(1) || '0.0'} ⭐)
+                      </option>
+                    ))}
+                  </select>
+                </>
               )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAssignModal(false)}>
-                Cancel
+                Hủy
               </Button>
               <Button
                 onClick={handleAssign}
-                disabled={!selectedCaregiver || processing}
+                disabled={!selectedCaregiver || processing || checkingConflict || availableCaregivers.length === 0}
                 className="bg-primary"
               >
-                {processing ? "Assigning..." : "Assign Caregiver"}
+                {processing ? "Đang gán..." : "Gán Caregiver"}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -152,7 +152,7 @@ public class ScheduleController : ControllerBase
     }
 
     [HttpGet("check-request-conflict/{requestId}/{caregiverId}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<IActionResult> CheckRequestConflict(int requestId, int caregiverId)
     {
         var hasConflict = await _scheduleService.HasRequestConflictAsync(caregiverId, requestId);
