@@ -148,20 +148,12 @@ public class CaregiverController : ControllerBase
     /// </summary>
     [HttpPost("schedules/{scheduleId}/check-out")]
     [Authorize(Roles = "Caregiver")]
-<<<<<<< HEAD
     public async Task<ActionResult<ScheduleDto>> CheckOut(int scheduleId, [FromBody] CheckOutDto dto)
-=======
-    public async Task<ActionResult<ScheduleDto>> CheckOut(int scheduleId)
->>>>>>> origin/main
     {
         try
         {
             var caregiverId = GetCaregiverId();
-<<<<<<< HEAD
             var schedule = await _caregiverService.CheckOutAsync(caregiverId, scheduleId, dto.Notes);
-=======
-            var schedule = await _caregiverService.CheckOutAsync(caregiverId, scheduleId);
->>>>>>> origin/main
             if (schedule == null)
                 return NotFound(new { message = "Schedule not found" });
             return Ok(schedule);
