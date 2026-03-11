@@ -370,6 +370,11 @@ public class ScheduleService : IScheduleService
         if (request == null)
             throw new KeyNotFoundException("Request not found");
 
+        // Check for schedule conflicts before assigning
+        var hasConflict = await HasConflictAsync(dto.CaregiverId, request.RequestedDate, request.StartTime, request.EndTime);
+        if (hasConflict)
+            throw new InvalidOperationException("Lịch bị trùng! Caregiver này đã có lịch làm việc trùng giờ trong ngày được yêu cầu.");
+
         var schedule = new Schedule
         {
             PatientId = request.PatientId,
