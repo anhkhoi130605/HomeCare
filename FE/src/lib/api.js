@@ -91,6 +91,10 @@ async function apiCall(endpoint, options = {}) {
 
         // Re-throw API errors as-is
         if (error instanceof ApiError) {
+            if (error.status === 401) {
+                authApi.logout();
+                window.location.reload();
+            }
             throw error;
         }
 
@@ -416,8 +420,23 @@ export const adminApi = {
     // Toggle user status
     toggleUserStatus: async (userId, isActive) => {
         return apiCall(`/admin/users/${userId}/status`, {
-            method: 'PATCH',
-            body: JSON.stringify(isActive),
+            method: 'PUT',
+            body: JSON.stringify({ isActive }),
+        });
+    },
+
+    // Create user
+    createUser: async (data) => {
+        return apiCall('/admin/users', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    },
+
+    // Delete user
+    deleteUser: async (userId) => {
+        return apiCall(`/admin/users/${userId}`, {
+            method: 'DELETE',
         });
     },
 
@@ -475,6 +494,14 @@ export const paymentApi = {
     getVnPayUrl: async (paymentId) => {
         return apiCall(`/payment/${paymentId}/vnpay-url`, {
             method: 'POST',
+        });
+    },
+    
+    // Add or update internal note (admin)
+    addNote: async (paymentId, note) => {
+        return apiCall(`/payment/${paymentId}/note`, {
+            method: 'PUT',
+            body: JSON.stringify({ note }),
         });
     },
 };

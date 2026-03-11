@@ -189,7 +189,6 @@ const Contracts = () => {
                                         <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Family</th>
                                         <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Patient</th>
                                         <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Duration</th>
-                                        <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Value</th>
                                         <th className="text-left p-4 text-xs font-medium text-primary uppercase tracking-wider">Status</th>
                                         <th className="text-right p-4 text-xs font-medium text-primary uppercase tracking-wider">Actions</th>
                                     </tr>
@@ -219,9 +218,6 @@ const Contracts = () => {
                                                     <p>{formatDate(contract.startDate)}</p>
                                                     <p className="text-muted-foreground">to {formatDate(contract.endDate)}</p>
                                                 </div>
-                                            </td>
-                                            <td className="p-4">
-                                                <span className="font-medium">{formatCurrency(contract.totalAmount)}</span>
                                             </td>
                                             <td className="p-4">
                                                 <Badge className={`${getStatusClass(contract.status)} border`}>

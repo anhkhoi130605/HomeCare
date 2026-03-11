@@ -17,6 +17,7 @@ export const menuItems = [
   { icon: AlertTriangle, label: "Incidents", path: "/operation-admin/incidents", roles: ["OperationAdmin"] },
   { icon: ClipboardList, label: "Contracts", path: "/admin/contracts", roles: ["Admin"] },
   { icon: ClipboardList, label: "Contracts", path: "/operation-admin/contracts", roles: ["OperationAdmin"] },
+  { icon: FileText, label: "Payments", path: "/admin/payments", roles: ["Admin"] },
   { icon: BarChart3, label: "Reports", path: "/admin/reports", roles: ["Admin"] },
   { icon: BarChart3, label: "Reports", path: "/operation-admin/reports", roles: ["OperationAdmin"] },
 ];

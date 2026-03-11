@@ -8,6 +8,7 @@ const AdminSidebar = ({ sidebarOpen = true }) => {
   const location = useLocation();
   const user = authApi.getCurrentUser();
   const userRole = user?.role; // Backend role e.g. "Admin", "OperationAdmin"
+  const displayName = user?.fullName || user?.email?.split('@')[0] || "User";
 
   const filteredMenuItems = menuItems.filter(item => 
     !item.roles || item.roles.includes(userRole)
@@ -27,7 +28,7 @@ const AdminSidebar = ({ sidebarOpen = true }) => {
           {sidebarOpen && (
             <div>
               <span className="text-lg font-bold block leading-tight">HomeCare</span>
-              <span className="text-xs text-muted-foreground">{userRole === "OperationAdmin" ? "Operations" : "Admin Workspace"}</span>
+              <span className="text-xs text-muted-foreground">{displayName}</span>
             </div>
           )}
         </Link>

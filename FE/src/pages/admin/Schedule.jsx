@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { adminApi, authApi } from "@/lib/api";
+import { adminApi, authApi, scheduleApi } from "@/lib/api";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatDateToYYYYMMDD } from "@/lib/utils";
 
 const timeSlots = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
@@ -30,6 +31,7 @@ const getStatusColor = (status) => {
 const Schedule = () => {
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     const today = new Date();
     const day = today.getDay();
@@ -38,6 +40,20 @@ const Schedule = () => {
   });
   const user = authApi.getCurrentUser();
   const canManage = user?.role === "OperationAdmin" || user?.role === "Admin";
+  const getScheduleAddress = (s) => s.address || s.patientAddress || s.patient?.address || "";
+
+  const [showNewShift, setShowNewShift] = useState(false);
+  const [patients, setPatients] = useState([]);
+  const [caregivers, setCaregivers] = useState([]);
+  const [form, setForm] = useState({
+    patientId: "",
+    caregiverId: "",
+    date: "",
+    startTime: "",
+    endTime: "",
+    notes: ""
+  });
+  const [conflictMsg, setConflictMsg] = useState("");
 
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const date = new Date(currentWeekStart);
@@ -81,6 +97,74 @@ const Schedule = () => {
     const newDate = new Date(currentWeekStart);
     newDate.setDate(newDate.getDate() + (direction * 7));
     setCurrentWeekStart(newDate);
+  };
+
+  const openNewShift = async () => {
+    try {
+      setCreating(false);
+      setConflictMsg("");
+      setForm({
+        patientId: "",
+        caregiverId: "",
+        date: formatDateToYYYYMMDD(new Date()),
+        startTime: "09:00",
+        endTime: "11:00",
+        notes: ""
+      });
+      const [p, c] = await Promise.all([adminApi.getPatients(), adminApi.getCaregivers()]);
+      setPatients(Array.isArray(p) ? p : []);
+      setCaregivers(Array.isArray(c) ? c : []);
+      setShowNewShift(true);
+    } catch (e) {
+      console.error("Failed to load resources for new shift:", e);
+    }
+  };
+
+  const submitNewShift = async () => {
+    setConflictMsg("");
+    // Basic validation
+    if (!form.patientId || !form.caregiverId || !form.date || !form.startTime || !form.endTime) {
+      setConflictMsg("Vui lòng điền đầy đủ thông tin bắt buộc.");
+      return;
+    }
+    try {
+      setCreating(true);
+      // Optional conflict check
+      const check = await scheduleApi.checkConflict({
+        caregiverId: parseInt(form.caregiverId, 10),
+        date: form.date,
+        startTime: form.startTime.length === 5 ? `${form.startTime}:00` : form.startTime,
+        endTime: form.endTime.length === 5 ? `${form.endTime}:00` : form.endTime
+      });
+      if (check?.hasConflict) {
+        setConflictMsg("Ca mới trùng với lịch hiện có của caregiver này.");
+        setCreating(false);
+        return;
+      }
+      // Create
+      await scheduleApi.create({
+        patientId: parseInt(form.patientId, 10),
+        caregiverId: parseInt(form.caregiverId, 10),
+        date: form.date,
+        startTime: form.startTime.length === 5 ? `${form.startTime}:00` : form.startTime,
+        endTime: form.endTime.length === 5 ? `${form.endTime}:00` : form.endTime,
+        notes: form.notes || ""
+      });
+      // Refresh list of schedules for current week
+      const endDate = new Date(currentWeekStart);
+      endDate.setDate(endDate.getDate() + 6);
+      const data = await adminApi.getSchedules(
+        formatDateToYYYYMMDD(currentWeekStart),
+        formatDateToYYYYMMDD(endDate)
+      );
+      setSchedules(data || []);
+      setShowNewShift(false);
+    } catch (e) {
+      console.error("Failed to create schedule:", e);
+      setConflictMsg(e?.message || "Không thể tạo ca mới, vui lòng thử lại.");
+    } finally {
+      setCreating(false);
+    }
   };
 
   // Map schedules to grid positions
@@ -270,6 +354,11 @@ const Schedule = () => {
                                   </Avatar>
                                   <span className="text-[10px] truncate font-medium">{schedule.caregiverName?.split(' ')[0]}</span>
                                 </div>
+                              {getScheduleAddress(schedule) && (
+                                <div className="mt-1.5 text-[10px] text-muted-foreground truncate">
+                                  {getScheduleAddress(schedule)}
+                                </div>
+                              )}
                               </div>
                             );
                           })}
@@ -297,7 +386,7 @@ const Schedule = () => {
 
           <div className="flex items-center gap-2 mb-4">
             {canManage && (
-              <Button className="flex-1 gap-2">
+              <Button className="flex-1 gap-2" onClick={openNewShift}>
                 <Plus className="w-4 h-4" />
                 New Shift
               </Button>
@@ -331,6 +420,9 @@ const Schedule = () => {
                       <Clock className="w-3 h-3" />
                       <span>{schedule.date?.split('T')[0]} • {schedule.startTime} - {schedule.endTime}</span>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs">{schedule.serviceName}</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -361,6 +453,74 @@ const Schedule = () => {
           </div>
         </div>
       </div>
+
+      <Dialog open={showNewShift} onOpenChange={setShowNewShift}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Tạo Ca Mới</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium">Bệnh nhân</label>
+                <select
+                  className="w-full border rounded-md h-9 px-2 mt-1"
+                  value={form.patientId}
+                  onChange={(e) => setForm({ ...form, patientId: e.target.value })}
+                >
+                  <option value="">Chọn bệnh nhân</option>
+                  {patients.map(p => (
+                    <option key={p.id} value={p.id}>{p.fullName}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Caregiver</label>
+                <select
+                  className="w-full border rounded-md h-9 px-2 mt-1"
+                  value={form.caregiverId}
+                  onChange={(e) => setForm({ ...form, caregiverId: e.target.value })}
+                >
+                  <option value="">Chọn caregiver</option>
+                  {caregivers.map(c => (
+                    <option key={c.id} value={c.id}>{c.fullName}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-sm font-medium">Ngày</label>
+                <Input type="date" className="mt-1" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Bắt đầu</label>
+                <Input type="time" className="mt-1" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Kết thúc</label>
+                <Input type="time" className="mt-1" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Ghi chú</label>
+              <textarea
+                className="w-full border rounded-md p-2 mt-1 min-h-[72px] text-sm"
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                placeholder="Thông tin lưu ý cho ca trực..."
+              />
+            </div>
+            {conflictMsg ? (
+              <div className="text-sm text-red-600">{conflictMsg}</div>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewShift(false)}>Hủy</Button>
+            <Button onClick={submitNewShift} disabled={creating}>{creating ? "Đang tạo..." : "Tạo ca"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

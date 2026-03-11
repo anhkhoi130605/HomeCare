@@ -1,21 +1,35 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { notificationApi } from '../../lib/api';
 import { Bell, CheckCircle } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { toast } from "@/components/ui/sonner";
 
 const NotificationBell = () => {
     const [notifications, setNotifications] = useState([]);
     const [isOpen, setIsOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const prevUnreadCount = useRef(0);
 
     const fetchNotifications = async () => {
         try {
             const data = await notificationApi.getMy();
+            const newUnread = data.filter(n => !n.isRead).length;
             setNotifications(data);
-            setUnreadCount(data.filter(n => !n.isRead).length);
+            setUnreadCount(newUnread);
+            if (newUnread > prevUnreadCount.current) {
+                const latestUnread = data.find(n => !n.isRead) || data[0];
+                toast(`Có ${newUnread - prevUnreadCount.current} thông báo mới`, {
+                    description: latestUnread ? `${latestUnread.title} — ${latestUnread.message}` : 'Kiểm tra hộp thông báo',
+                    action: {
+                        label: 'Xem',
+                        onClick: () => setIsOpen(true),
+                    },
+                });
+            }
+            prevUnreadCount.current = newUnread;
         } catch (error) {
             console.error("Failed to fetch notifications", error);
         }
@@ -44,6 +58,7 @@ const NotificationBell = () => {
             await notificationApi.markAllRead();
             setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
             setUnreadCount(0);
+            prevUnreadCount.current = 0;
         } catch (error) {
             console.error("Failed to mark all read", error);
         }

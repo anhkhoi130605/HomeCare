@@ -49,3 +49,8 @@ public class PaymentUrlResult
     public int PaymentId { get; set; }
     public string PaymentUrl { get; set; } = null!;
 }
+
+public class UpdatePaymentNoteDto
+{
+    public string? Note { get; set; }
+}
