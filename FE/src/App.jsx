@@ -66,7 +66,6 @@ const OperationReports = lazy(() => import("./pages/operation-admin/Reports"));
 const FamilyLayout = lazy(() => import("./components/layout/FamilyLayout"));
 const FamilyDashboard = lazy(() => import("./pages/Family/FamilyDashboard"));
 const FamilyWelcome = lazy(() => import("./pages/Family/Welcome"));
-
 const FamilyPatientList = lazy(() => import("./pages/Family/PatientList"));
 const FamilySchedule = lazy(() => import("./pages/Family/CareSchedule"));
 const FamilyBooking = lazy(() => import("./pages/Family/BookingService"));
@@ -170,7 +169,6 @@ const App = () => (
               <Route path="/caregiver" element={<CaregiverLayout />}>
                 <Route index element={<CaregiverDashboard />} />
                 <Route path="dashboard" element={<CaregiverDashboard />} />
-
                 <Route path="active-shift" element={<ActiveShift />} />
                 <Route path="care-logs" element={<CareLogs />} />
                 <Route path="care-logs/:id" element={<CareLogDetails />} />

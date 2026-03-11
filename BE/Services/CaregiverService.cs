@@ -204,6 +204,7 @@ public class CaregiverService : ICaregiverService
     {
         var schedule = await _context.Schedules
             .Include(s => s.Patient).ThenInclude(p => p.Family)
+            .Include(s => s.Patient)
             .Include(s => s.Contract).ThenInclude(c => c.Service)
             .Include(s => s.CareRequest).ThenInclude(r => r.Service)
             .FirstOrDefaultAsync(s => s.Id == scheduleId && s.CaregiverId == caregiverId);
@@ -230,6 +231,30 @@ public class CaregiverService : ICaregiverService
     {
         var schedule = await _context.Schedules
             .Include(s => s.Patient).ThenInclude(p => p.Family)
+        return new ScheduleDto
+        {
+            Id = schedule.Id,
+            PatientId = schedule.PatientId,
+            PatientName = schedule.Patient.FullName,
+            PatientAddress = schedule.Patient.Address,
+            CaregiverId = schedule.CaregiverId,
+            ContractId = schedule.ContractId,
+            CareRequestId = schedule.CareRequestId,
+            ServiceName = schedule.CareRequest?.Service?.Name ?? schedule.Contract?.Service?.Name,
+            Date = schedule.Date,
+            StartTime = schedule.StartTime,
+            EndTime = schedule.EndTime,
+            Status = schedule.Status.ToString(),
+            CheckInTime = schedule.CheckInTime,
+            CheckOutTime = schedule.CheckOutTime,
+            Notes = schedule.Notes
+        };
+    }
+
+    public async Task<ScheduleDto?> CheckOutAsync(int caregiverId, int scheduleId)
+    {
+        var schedule = await _context.Schedules
+            .Include(s => s.Patient)
             .Include(s => s.Contract).ThenInclude(c => c.Service)
             .Include(s => s.CareRequest).ThenInclude(r => r.Service)
             .FirstOrDefaultAsync(s => s.Id == scheduleId && s.CaregiverId == caregiverId);
@@ -245,6 +270,28 @@ public class CaregiverService : ICaregiverService
         return MapToDto(schedule);
     }
 
+
+        await _context.SaveChangesAsync();
+
+        return new ScheduleDto
+        {
+            Id = schedule.Id,
+            PatientId = schedule.PatientId,
+            PatientName = schedule.Patient.FullName,
+            PatientAddress = schedule.Patient.Address,
+            CaregiverId = schedule.CaregiverId,
+            ContractId = schedule.ContractId,
+            CareRequestId = schedule.CareRequestId,
+            ServiceName = schedule.CareRequest?.Service?.Name ?? schedule.Contract?.Service?.Name,
+            Date = schedule.Date,
+            StartTime = schedule.StartTime,
+            EndTime = schedule.EndTime,
+            Status = schedule.Status.ToString(),
+            CheckInTime = schedule.CheckInTime,
+            CheckOutTime = schedule.CheckOutTime,
+            Notes = schedule.Notes
+        };
+    }
     public async Task<CaregiverPatientDto?> GetPatientAsync(int patientId)
     {
         var patient = await _context.Patients

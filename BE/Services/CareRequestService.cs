@@ -238,8 +238,13 @@ public class CareRequestService : ICareRequestService
             Type = r.Type.ToString(),
             Status = r.Status.ToString(),
             RequestedDate = r.RequestedDate,
+<<<<<<< HEAD
             StartTime = r.StartTime.ToString(),
             EndTime = r.EndTime.ToString(),
+=======
+            StartTime = r.StartTime.ToString(@"hh\:mm"),
+            EndTime = r.EndTime.ToString(@"hh\:mm"),
+>>>>>>> origin/main
             Notes = r.Notes,
             Address = r.Address,
             AdminNotes = r.AdminNotes,
