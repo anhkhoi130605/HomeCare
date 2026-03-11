@@ -7,6 +7,7 @@ public interface IAuthService
 {
     Task<AuthResponseDto> RegisterAsync(RegisterDto dto);
     Task<AuthResponseDto> LoginAsync(LoginDto dto);
+    Task<AuthResponseDto> LoginWithGoogleAsync(GoogleLoginDto dto);
     Task<bool> EmailExistsAsync(string email);
     Task<User?> GetUserByIdAsync(int userId);
     Task<bool> ForgotPasswordAsync(string email);

@@ -117,6 +117,13 @@ export const authApi = {
         });
     },
 
+    loginWithGoogle: async (googleData) => {
+        return apiCall('/auth/google-login', {
+            method: 'POST',
+            body: JSON.stringify(googleData),
+        });
+    },
+
     checkEmail: async (email) => {
         return apiCall(`/auth/check-email?email=${encodeURIComponent(email)}`);
     },

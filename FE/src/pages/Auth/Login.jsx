@@ -87,10 +87,32 @@ const Login = () => {
       // 2. Lấy mã Token để gửi cho Backend .NET sau này
       const token = await user.getIdToken();
       console.log("Đăng nhập Google thành công:", user.email);
-      console.log("Token:", token);
+      
+      // 3. Gọi backend để đồng bộ thông tin và lấy JWT của hệ thống
+      const resultBE = await authApi.loginWithGoogle({
+        email: user.email,
+        fullName: user.displayName || "User",
+        token: token
+      });
 
-      // 3. Tạm thời điều hướng để kiểm tra tính năng
-      navigate("/family/dashboard");
+      if (resultBE.success) {
+        // Lưu thông tin đăng nhập từ backend (JWT, User Info)
+        authApi.saveAuthData(resultBE);
+
+        // Redirect based on role
+        const role = resultBE.user?.role?.toLowerCase();
+        if (role === "admin") {
+          navigate("/admin");
+        } else if (role === "operationadmin") {
+          navigate("/operation-admin");
+        } else if (role === "caregiver") {
+          navigate("/caregiver");
+        } else {
+          navigate("/family/dashboard");
+        }
+      } else {
+        setError(resultBE.message || "Không thể đồng bộ với server.");
+      }
     } catch (err) {
       console.error("Lỗi Google Auth:", err);
       setError("Không thể đăng nhập bằng Google. Vui lòng thử lại.");

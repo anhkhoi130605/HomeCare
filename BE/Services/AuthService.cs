@@ -148,6 +148,95 @@ public class AuthService : IAuthService
         };
     }
 
+    public async Task<AuthResponseDto> LoginWithGoogleAsync(GoogleLoginDto dto)
+    {
+        var user = await _context.Users
+            .Include(u => u.Family)
+            .Include(u => u.Caregiver)
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == dto.Email.ToLower().Trim());
+
+        if (user == null)
+        {
+            // Auto-register Google user as Family role
+            user = new User
+            {
+                Email = dto.Email.ToLower().Trim(),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()), // Random password
+                Role = UserRole.Family,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            var family = new Family
+            {
+                UserId = user.Id,
+                FullName = dto.FullName,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.Families.Add(family);
+            await _context.SaveChangesAsync();
+            
+            user.Family = family;
+        }
+        else
+        {
+            // Sync Name if it was "User" or empty
+            if (user.Role == UserRole.Family && user.Family != null)
+            {
+                if (string.IsNullOrEmpty(user.Family.FullName) || user.Family.FullName == "User")
+                {
+                    user.Family.FullName = dto.FullName;
+                    await _context.SaveChangesAsync();
+                }
+            }
+            else if (user.Role == UserRole.Caregiver && user.Caregiver != null)
+            {
+                if (string.IsNullOrEmpty(user.Caregiver.FullName) || user.Caregiver.FullName == "Caregiver")
+                {
+                    user.Caregiver.FullName = dto.FullName;
+                    await _context.SaveChangesAsync();
+                }
+            }
+        }
+
+        if (!user.IsActive)
+        {
+            return new AuthResponseDto { Success = false, Message = "Account is deactivated" };
+        }
+
+        string fullName = user.Role switch
+        {
+            UserRole.Family => user.Family?.FullName ?? "User",
+            UserRole.Caregiver => user.Caregiver?.FullName ?? "Caregiver",
+            UserRole.Admin => "Admin",
+            UserRole.OperationAdmin => "Operation Admin",
+            _ => "User"
+        };
+
+        var familyId = user.Family?.Id;
+        var caregiverId = user.Caregiver?.Id;
+        var token = GenerateJwtToken(user, familyId, caregiverId);
+
+        return new AuthResponseDto
+        {
+            Success = true,
+            Message = "Google login successful",
+            Token = token,
+            User = new UserInfoDto
+            {
+                Id = user.Id,
+                Email = user.Email,
+                Phone = user.Phone,
+                Role = user.Role.ToString(),
+                FullName = fullName,
+                FamilyId = familyId,
+                CaregiverId = caregiverId
+            }
+        };
+    }
+
     public async Task<bool> EmailExistsAsync(string email)
     {
         return await _context.Users.AnyAsync(u => u.Email.ToLower() == email.ToLower().Trim());
