@@ -85,14 +85,20 @@ public class CareRequestController : ControllerBase
         return Ok(request);
     }
 
-    // PUT /api/carerequest/{id}/assign
     [HttpPut("{id}/assign")]
     [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<ActionResult<CareRequestDto>> AssignCaregiver(int id, [FromBody] AssignCaregiverDto dto)
     {
-        var request = await _careRequestService.AssignCaregiverAsync(id, dto.CaregiverId);
-        if (request == null) return NotFound();
-        return Ok(request);
+        try
+        {
+            var request = await _careRequestService.AssignCaregiverAsync(id, dto.CaregiverId);
+            if (request == null) return NotFound();
+            return Ok(request);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
     // PUT /api/carerequest/{id}/refund
