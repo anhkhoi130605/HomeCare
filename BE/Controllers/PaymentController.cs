@@ -137,6 +137,25 @@ public class PaymentController : ControllerBase
     }
 
     /// <summary>
+    /// Update internal note (description) for a payment (Admin only)
+    /// </summary>
+    [HttpPut("{paymentId}/note")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
+    public async Task<ActionResult<PaymentDto>> UpdateNote(int paymentId, [FromBody] UpdatePaymentNoteDto body)
+    {
+        try
+        {
+            var updated = await _paymentService.UpdateNoteAsync(paymentId, body.Note);
+            if (updated == null) return NotFound(new { message = "Payment not found" });
+            return Ok(updated);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// VNPay return callback (public endpoint)
     /// </summary>
     [HttpGet("vnpay-return")]

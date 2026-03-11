@@ -20,7 +20,7 @@ public class ScheduleController : ControllerBase
     /// Get all schedules (admin only)
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
     public async Task<ActionResult<IEnumerable<ScheduleDto>>> GetAll(
         [FromQuery] DateTime? from = null,
         [FromQuery] DateTime? to = null)
@@ -43,6 +43,15 @@ public class ScheduleController : ControllerBase
         return Ok(schedules);
     }
 
+    [HttpGet("caregiver/{caregiverId}/today")]
+    [Authorize]
+    public async Task<ActionResult<IEnumerable<ScheduleDto>>> GetTodayByCaregiver(int caregiverId)
+    {
+        var today = DateTime.Today;
+        var schedules = await _scheduleService.GetSchedulesByCaregiverAsync(caregiverId, today, today);
+        return Ok(schedules);
+    }
+
     /// <summary>
     /// Get schedules by patient
     /// </summary>
@@ -54,6 +63,15 @@ public class ScheduleController : ControllerBase
         [FromQuery] DateTime? to = null)
     {
         var schedules = await _scheduleService.GetSchedulesByPatientAsync(patientId, from, to);
+        return Ok(schedules);
+    }
+
+    [HttpGet("patient/{patientId}/today")]
+    [Authorize]
+    public async Task<ActionResult<IEnumerable<ScheduleDto>>> GetTodayByPatient(int patientId)
+    {
+        var today = DateTime.Today;
+        var schedules = await _scheduleService.GetSchedulesByPatientAsync(patientId, today, today);
         return Ok(schedules);
     }
 
@@ -162,6 +180,48 @@ public class ScheduleController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    [HttpPost("{id}/checkin")]
+    [Authorize(Roles = "Caregiver")]
+    public async Task<IActionResult> CheckIn(int id)
+    {
+        var schedule = await _scheduleService.CheckInAsync(id);
+        if (schedule == null) return NotFound();
+        return Ok(schedule);
+    }
+
+    [HttpPost("{id}/checkout")]
+    [Authorize(Roles = "Caregiver")]
+    public async Task<IActionResult> CheckOut(int id, [FromBody] CheckOutDto dto)
+    {
+        var schedule = await _scheduleService.CheckOutAsync(id, dto.Notes);
+        if (schedule == null) return NotFound();
+        return Ok(schedule);
+    }
+
+    [HttpPost("assign-from-request")]
+    [Authorize(Roles = "OperationAdmin,Admin")]
+    public async Task<IActionResult> AssignFromRequest([FromBody] AssignScheduleDto dto)
+    {
+        try
+        {
+            var schedule = await _scheduleService.AssignFromRequestAsync(dto);
+            return Ok(schedule);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+}
+
+public class CheckOutDto
+{
+    public string Notes { get; set; } = string.Empty;
 }
 
 public class CheckConflictDto

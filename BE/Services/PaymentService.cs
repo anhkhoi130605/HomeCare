@@ -18,6 +18,7 @@ public interface IPaymentService
     Task<CreatePaymentResult> CreatePaymentAsync(int familyId, CreatePaymentDto dto);
     Task<string> GenerateVnPayUrlAsync(int paymentId, string ipAddress);
     Task<PaymentDto?> ProcessVnPayReturnAsync(VnPayReturnDto vnPayReturn);
+    Task<PaymentDto?> UpdateNoteAsync(int paymentId, string? note);
 }
 
 public class PaymentService : IPaymentService
@@ -282,6 +283,21 @@ public class PaymentService : IPaymentService
             }
         }
 
+        await _context.SaveChangesAsync();
+
+        return MapToDto(payment);
+    }
+
+    public async Task<PaymentDto?> UpdateNoteAsync(int paymentId, string? note)
+    {
+        var payment = await _context.Payments
+            .Include(p => p.Family)
+            .Include(p => p.Contract)
+            .FirstOrDefaultAsync(p => p.Id == paymentId);
+
+        if (payment == null) return null;
+
+        payment.Description = note ?? "";
         await _context.SaveChangesAsync();
 
         return MapToDto(payment);

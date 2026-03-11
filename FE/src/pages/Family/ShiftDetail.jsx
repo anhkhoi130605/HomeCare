@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { ChevronLeft, Clock, Calendar, Activity, ClipboardList, MapPin, Phone } from 'lucide-react';
+import { formatTimeSpan } from '@/lib/utils';
 import { Link, useParams } from 'react-router-dom';
 import { scheduleApi, careLogApi } from '@/lib/api';
 import ScrollAnimation from "@/components/ui/scroll-animation";
@@ -33,19 +35,7 @@ const ShiftDetail = () => {
         fetchDetails();
     }, [id]);
 
-    const formatTime = (timeStr) => {
-        if (!timeStr) return '--:--';
-        // Handle TimeSpan format "HH:mm:ss"
-        const parts = timeStr.split(':');
-        if (parts.length >= 2) {
-            const hours = parseInt(parts[0]);
-            const minutes = parts[1];
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            const displayHours = hours % 12 || 12;
-            return `${displayHours}:${minutes} ${ampm}`;
-        }
-        return timeStr;
-    };
+    const formatTime = (timeStr) => formatTimeSpan(timeStr);
 
     const formatDate = (dateStr) => {
         if (!dateStr) return '';
@@ -121,13 +111,15 @@ const ShiftDetail = () => {
                                 </div>
                                 <div className="flex flex-col items-center lg:items-end gap-6 w-full lg:w-auto">
                                     <div className={`px-8 py-3 rounded-full font-bold text-xs flex items-center gap-2 uppercase tracking-widest border ${shift.status === 'Completed'
-                                            ? 'bg-[#E0F2F1] text-[#00695C] border-[#B2EBF2]'
+                                        ? 'bg-[#E0F2F1] text-[#00695C] border-[#B2EBF2]'
+                                        : shift.status === 'Failed'
+                                            ? 'bg-rose-50 text-rose-600 border-rose-100'
                                             : 'bg-amber-50 text-amber-600 border-amber-100'
                                         }`}>
                                         <span className="material-symbols-outlined text-base">
-                                            {shift.status === 'Completed' ? 'check_circle' : 'pending'}
+                                            {shift.status === 'Completed' ? 'check_circle' : (shift.status === 'Failed' ? 'error' : 'pending')}
                                         </span>
-                                        {shift.status}
+                                        {shift.status === 'Failed' ? 'Not Completed' : (shift.status === 'Scheduled' ? 'Upcoming' : shift.status)}
                                     </div>
                                     <button className="w-full lg:w-auto flex items-center justify-center gap-3 px-10 py-4 rounded-full bg-[#5fa5ba] text-white font-bold hover:bg-[#4d8ca0] transition-all shadow-lg shadow-[#5fa5ba]/20 text-md">
                                         <span className="material-symbols-outlined text-xl">chat</span>

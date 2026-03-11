@@ -80,7 +80,7 @@ const CareLogDetails = () => {
                     <span className="material-symbols-outlined text-6xl text-red-400 mb-4">error</span>
                     <h2 className="text-2xl font-bold text-stone-800 dark:text-white mb-2">Log Not Found</h2>
                     <p className="text-stone-500 mb-4">{error}</p>
-                    <Link to="/caregiver/care-logs" className="text-[#5fa5ba] font-bold">← Back to Care Logs</Link>
+                    <Link to="/caregiver/care-logs" className="text-[#5fa5ba] font-bold">â† Back to Care Logs</Link>
                 </div>
             </div>
         );
@@ -100,7 +100,7 @@ const CareLogDetails = () => {
                     <div>
                         <h1 className="text-3xl font-extrabold text-stone-900 dark:text-white tracking-tight">Care Log Details</h1>
                         <p className="text-sm font-medium text-stone-500 mt-1">
-                            <span className="font-bold text-[#5fa5ba]">{logData.patientName}</span> • {formatDateTime(logData.loggedAt)}
+                            <span className="font-bold text-[#5fa5ba]">{logData.patientName}</span> â€¢ {formatDateTime(logData.loggedAt)}
                         </p>
                     </div>
                 </div>
@@ -150,7 +150,7 @@ const CareLogDetails = () => {
                                 <div className="bg-stone-50 dark:bg-stone-900/50 p-6 rounded-[2rem] border border-stone-100 dark:border-stone-800 flex items-center justify-between">
                                     <div>
                                         <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1.5">Temperature</p>
-                                        <p className="text-4xl font-extrabold text-stone-800 dark:text-white">{vitals.temperature} <span className="text-sm text-stone-400 font-bold">°C</span></p>
+                                        <p className="text-4xl font-extrabold text-stone-800 dark:text-white">{vitals.temperature} <span className="text-sm text-stone-400 font-bold">Â°C</span></p>
                                     </div>
                                     <span className="material-symbols-outlined text-emerald-500 text-3xl">check_circle</span>
                                 </div>

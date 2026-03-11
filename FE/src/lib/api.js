@@ -89,6 +89,10 @@ async function apiCall(endpoint, options = {}) {
 
         // Re-throw API errors as-is
         if (error instanceof ApiError) {
+            if (error.status === 401) {
+                authApi.logout();
+                window.location.reload();
+            }
             throw error;
         }
 
@@ -278,21 +282,27 @@ export const caregiverApi = {
 
     // Check-in (caregiver)
     checkIn: async (scheduleId) => {
-        return apiCall(`/caregiver/schedules/${scheduleId}/check-in`, {
+        return apiCall(`/schedule/${scheduleId}/checkin`, {
             method: 'POST',
         });
     },
 
     // Check-out (caregiver)
-    checkOut: async (scheduleId) => {
-        return apiCall(`/caregiver/schedules/${scheduleId}/check-out`, {
+    checkOut: async (scheduleId, notes = '') => {
+        return apiCall(`/schedule/${scheduleId}/checkout`, {
             method: 'POST',
+            body: JSON.stringify({ notes }),
         });
     },
 
     // Get patient details (caregiver)
     getPatient: async (patientId) => {
         return apiCall(`/caregiver/patients/${patientId}`);
+    },
+
+    // Matching Engine (Admin/OperationAdmin)
+    matchRequest: async (requestId) => {
+        return apiCall(`/caregiver/match-request/${requestId}`);
     },
 };
 
@@ -477,6 +487,14 @@ export const paymentApi = {
             method: 'POST',
         });
     },
+    
+    // Add or update internal note (admin)
+    addNote: async (paymentId, note) => {
+        return apiCall(`/payment/${paymentId}/note`, {
+            method: 'PUT',
+            body: JSON.stringify({ note }),
+        });
+    },
 };
 
 // ========== CONTRACT API ==========
@@ -585,6 +603,24 @@ export const scheduleApi = {
     // Check conflict for a care request (admin)
     checkRequestConflict: async (requestId, caregiverId) => {
         return apiCall(`/schedule/check-request-conflict/${requestId}/${caregiverId}`);
+    },
+
+    // Assign caregiver from request (OperationAdmin)
+    assignFromRequest: async (requestId, caregiverId) => {
+        return apiCall('/schedule/assign-from-request', {
+            method: 'POST',
+            body: JSON.stringify({ requestId, caregiverId }),
+        });
+    },
+
+    // Get today's schedule for patient
+    getTodayByPatient: async (patientId) => {
+        return apiCall(`/schedule/patient/${patientId}/today`);
+    },
+
+    // Get today's schedule for caregiver
+    getTodayByCaregiver: async (caregiverId) => {
+        return apiCall(`/schedule/caregiver/${caregiverId}/today`);
     },
 };
 

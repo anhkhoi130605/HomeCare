@@ -2,18 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 import { caregiverApi, careLogApi } from '@/lib/api';
-
-
+import { formatDateToYYYYMMDD } from '@/lib/utils';
 
 const ActiveShift = () => {
     const navigate = useNavigate();
+    const [timer, setTimer] = useState(6135); // Initial mock time: 01:42:15
     const [isActive, setIsActive] = useState(true);
     const [isCompleted, setIsCompleted] = useState(false);
-    const [timer, setTimer] = useState(0);
     const [startTime, setStartTime] = useState(null);
     const [endTime, setEndTime] = useState(null);
     const [showSaveNotify, setShowSaveNotify] = useState(false);
     const [isCheckedIn, setIsCheckedIn] = useState(false);
+    const [checkInTime, setCheckInTime] = useState(null);
 
     // API-based patient data
     const [patients, setPatients] = useState([]);
@@ -62,7 +62,7 @@ const ActiveShift = () => {
             try {
                 setLoading(true);
                 // Get today's schedules for the caregiver
-                const today = new Date().toISOString().split('T')[0];
+                const today = formatDateToYYYYMMDD(new Date());
                 const schedules = await caregiverApi.getSchedules(today, today);
 
                 if (schedules && schedules.length > 0) {
@@ -93,17 +93,14 @@ const ActiveShift = () => {
                     }
                     setCurrentSchedule(activeSchedule);
 
-                    // Auto check-in if schedule is still 'Scheduled'
-                    if (activeSchedule.status === 'Scheduled') {
-                        try {
-                            await caregiverApi.checkIn(activeSchedule.id);
-                            setIsCheckedIn(true);
-                            console.log('Checked in successfully for schedule:', activeSchedule.id);
-                        } catch (checkInErr) {
-                            console.error('Check-in failed:', checkInErr);
-                        }
-                    } else if (activeSchedule.status === 'InProgress') {
+                    // Set check-in state based on current status
+                    if (activeSchedule.status === 'InProgress') {
                         setIsCheckedIn(true);
+                        if (activeSchedule.checkInTime) {
+                            setCheckInTime(new Date(activeSchedule.checkInTime));
+                        }
+                    } else {
+                        setIsCheckedIn(false);
                     }
                 } else {
                     // Fallback: no schedules today
@@ -169,20 +166,25 @@ const ActiveShift = () => {
     const [careNotes, setCareNotes] = useState('');
 
     useEffect(() => {
-        setStartTime(new Date()); // Record start time
         const interval = setInterval(() => {
-            if (isActive) {
-                setTimer(prev => prev + 1);
+            if (isActive && isCheckedIn) {
+                const start = checkInTime || new Date();
+                if (!checkInTime) setCheckInTime(start);
+
+                const diff = Math.floor((new Date() - start) / 1000);
+                setTimer(diff > 0 ? diff : 0);
             }
         }, 1000);
         return () => clearInterval(interval);
-    }, [isActive]);
+    }, [isActive, isCheckedIn, checkInTime]);
+
 
     const formatTime = (totalSeconds) => {
         const hrs = Math.floor(totalSeconds / 3600);
         const mins = Math.floor((totalSeconds % 3600) / 60);
         const secs = totalSeconds % 60;
-        return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')} `;
+
+        return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
     const handleMedCheck = (index) => {
@@ -204,6 +206,22 @@ const ActiveShift = () => {
         return count || 0; // Default to 0 if empty
     };
 
+    const handleCheckIn = async () => {
+        if (currentSchedule?.id && currentSchedule.id !== 'demo') {
+            try {
+                await caregiverApi.checkIn(currentSchedule.id);
+                setIsCheckedIn(true);
+                setCheckInTime(new Date());
+            } catch (err) {
+                console.error('Manual Check-in failed:', err);
+                alert(err.response?.data?.message || 'Check-in failed. Please ensure it is time to start your shift.');
+            }
+        } else {
+            setIsCheckedIn(true);
+            setCheckInTime(new Date());
+        }
+    };
+
     const handleCompleteSession = async () => {
         setIsActive(false);
         setEndTime(new Date());
@@ -211,7 +229,8 @@ const ActiveShift = () => {
         // Call check-out API if we have a valid schedule
         if (currentSchedule?.id && currentSchedule.id !== 'demo') {
             try {
-                await caregiverApi.checkOut(currentSchedule.id);
+                // Pass careNotes as the shift summary
+                await caregiverApi.checkOut(currentSchedule.id, careNotes);
                 console.log('Checked out successfully for schedule:', currentSchedule.id);
             } catch (checkOutErr) {
                 console.error('Check-out failed:', checkOutErr);
@@ -266,6 +285,37 @@ const ActiveShift = () => {
     };
 
     // Render "Session Completed" Summary View with User's Custom Design
+    if (!isCheckedIn) {
+        return (
+            <div className="flex-1 flex flex-col items-center justify-center bg-background-light dark:bg-stone-950 h-screen font-manrope">
+                <ScrollAnimation animation="fade-up">
+                    <div className="text-center max-w-md p-10 bg-white dark:bg-stone-900 rounded-[3rem] shadow-2xl border border-stone-100 dark:border-stone-800">
+                        <div className="w-24 h-24 bg-[#5fa5ba]/10 text-[#5fa5ba] rounded-3xl flex items-center justify-center mx-auto mb-8 transform -rotate-6">
+                            <span className="material-symbols-outlined text-5xl">login</span>
+                        </div>
+                        <h2 className="text-4xl font-extrabold text-stone-800 dark:text-white mb-4 tracking-tight">Ready to Start?</h2>
+                        <p className="text-stone-500 dark:text-stone-400 mb-10 font-medium leading-relaxed">
+                            You are scheduled to care for <span className="text-stone-800 dark:text-white font-bold">{currentSchedule?.patientName || 'your patient'}</span>.
+                            Click below to officially check-in and begin your shift log.
+                        </p>
+                        <button
+                            onClick={handleCheckIn}
+                            className="w-full bg-[#5fa5ba] hover:bg-[#4d8ca0] text-white py-6 rounded-[2rem] font-black text-xl transition-all shadow-2xl shadow-[#5fa5ba]/30 hover:scale-[1.02] active:scale-95 uppercase tracking-widest"
+                        >
+                            CHECK IN NOW
+                        </button>
+                        <button
+                            onClick={() => navigate('/caregiver/schedule')}
+                            className="mt-8 text-stone-400 font-bold hover:text-stone-600 dark:hover:text-stone-300 transition-colors uppercase tracking-widest text-[10px]"
+                        >
+                            Back to Schedule
+                        </button>
+                    </div>
+                </ScrollAnimation>
+            </div>
+        );
+    }
+
     if (isCompleted) {
         return (
             <div className="flex-1 h-screen flex flex-col bg-slate-50 dark:bg-slate-900 font-manrope overflow-hidden relative">
@@ -335,7 +385,7 @@ const ActiveShift = () => {
                                     <span className="text-sm font-semibold text-teal-800 dark:text-teal-300">Checkout Location Verified</span>
                                 </div>
                                 <div className="text-[10px] font-mono text-teal-600 dark:text-teal-400 bg-white/50 dark:bg-stone-800/50 px-3 py-1 rounded-full border border-teal-100/50 dark:border-teal-700/50">
-                                    GPS: {patientDetails.coordinates} • {endTime ? endTime.toLocaleTimeString() : 'Now'}
+                                    GPS: {patientDetails.coordinates} â€¢ {endTime ? endTime.toLocaleTimeString() : 'Now'}
                                 </div>
                             </div>
                         </ScrollAnimation>
@@ -360,7 +410,7 @@ const ActiveShift = () => {
                                             </div>
                                             <div>
                                                 <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">Temperature</p>
-                                                <p className="text-lg font-semibold text-stone-700 dark:text-stone-200">{vitals.temperature || '--'} <span className="text-sm font-normal text-stone-400">°F</span></p>
+                                                <p className="text-lg font-semibold text-stone-700 dark:text-stone-200">{vitals.temperature || '--'} <span className="text-sm font-normal text-stone-400">Â°F</span></p>
                                             </div>
                                             <div>
                                                 <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">Blood Pressure</p>
@@ -433,7 +483,7 @@ const ActiveShift = () => {
                     <div className="flex items-center gap-6">
                         <div className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-full dark:bg-red-900/20 dark:text-red-400 border border-red-100 dark:border-red-900/30 shadow-sm shadow-red-100">
                             <span className="w-2.5 h-2.5 bg-red-600 rounded-full animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.5)]"></span>
-                            <span className="text-xs font-black uppercase tracking-widest">Live Shift</span>
+                            <span className="text-xs font-black uppercase tracking-widest">In Progress</span>
                         </div>
                         <div>
                             {/* PATIENT SELECTOR */}
@@ -530,7 +580,7 @@ const ActiveShift = () => {
                                                     className="w-full px-6 py-5 rounded-2xl bg-stone-50 dark:bg-stone-950 border border-stone-100 dark:border-stone-800 focus:ring-2 focus:ring-[#5fa5ba] focus:border-transparent text-2xl font-black text-stone-700 transition-all placeholder:text-stone-300 outline-none"
                                                     placeholder="--"
                                                 />
-                                                <span className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs uppercase tracking-wider">°F</span>
+                                                <span className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs uppercase tracking-wider">Â°F</span>
                                             </div>
                                         </div>
                                         <div className="space-y-3 group">
@@ -698,15 +748,7 @@ const ActiveShift = () => {
                             </div>
                         </div>
 
-                        <button
-                            onClick={handleCompleteSession}
-                            className="w-full bg-stone-900 dark:bg-[#5fa5ba] hover:bg-black dark:hover:bg-[#4d8ca0] text-white py-6 rounded-[2rem] font-bold text-xl shadow-2xl transition-all flex flex-col items-center justify-center gap-1 group border-4 border-transparent hover:border-[#5fa5ba]/50 cursor-pointer"
-                        >
-                            <div className="flex items-center gap-3">
-                                <span className="material-symbols-outlined text-3xl group-hover:translate-x-2 transition-transform">logout</span>
-                                COMPLETE SESSION
-                            </div>
-                        </button>
+                        {/* Redundant COMPLETE SESSION button removed */}
 
                         {/* Emergency Info below button to ensure button availability */}
                         <div className="bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/30 rounded-[2.5rem] p-8">

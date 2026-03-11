@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { careRequestApi, familyApi } from '../../lib/api';
+import { formatTimeSpan } from '@/lib/utils';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 
 const Request = () => {
@@ -132,17 +133,17 @@ const Request = () => {
                                         </div>
                                         <p className="text-stone-400 font-bold text-sm">
                                             {req.patientName} <span className="mx-2 text-stone-300">•</span>
-                                            {req.startTime} - {req.endTime}
+                                            {formatTimeSpan(req.startTime)} - {formatTimeSpan(req.endTime)}
                                         </p>
                                     </div>
                                 </div>
                                 <div className="text-right w-full md:w-auto">
                                     <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">REQUESTED DATE</p>
                                     <p className="font-bold text-stone-800">{formatDate(req.requestedDate)}</p>
-                                    
+
                                     {req.status === 'AwaitingPayment' && (
-                                        <Link 
-                                            to={`/family/payment/${req.id}?type=request`} 
+                                        <Link
+                                            to={`/family/payment/${req.id}?type=request`}
                                             className="mt-2 inline-flex items-center gap-1 px-4 py-2 bg-amber-500 text-white rounded-lg font-bold text-xs shadow-md shadow-amber-500/20 hover:bg-amber-600 transition-all uppercase tracking-wider"
                                         >
                                             <span className="material-symbols-outlined text-[14px]">payment</span>
