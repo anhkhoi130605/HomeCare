@@ -28,7 +28,7 @@ public class CareRequestDto
     public string? AssignedCaregiverName { get; set; }
     public string Type { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
-    public DateTime RequestedDate { get; set; }
+    public string RequestedDate { get; set; } = null!;
     public string? StartTime { get; set; } = string.Empty;
     public string? EndTime { get; set; } = string.Empty;
     public string? Notes { get; set; }

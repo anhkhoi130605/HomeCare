@@ -237,7 +237,7 @@ public class CareRequestService : ICareRequestService
             AssignedCaregiverName = r.AssignedCaregiver?.FullName,
             Type = r.Type.ToString(),
             Status = r.Status.ToString(),
-            RequestedDate = r.RequestedDate,
+            RequestedDate = r.RequestedDate.ToString("yyyy-MM-dd"),
             StartTime = r.StartTime.ToString(@"hh\:mm"),
             EndTime = r.EndTime.ToString(@"hh\:mm"),
             Notes = r.Notes,

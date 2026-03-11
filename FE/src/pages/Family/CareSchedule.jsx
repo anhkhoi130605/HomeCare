@@ -55,12 +55,13 @@ const CareSchedule = () => {
         const checkDate = new Date(year, month, day);
 
         return schedules.filter(s => {
-            const scheduleDate = new Date(s.date);
-            // Normalize both dates to midnight local time for robust comparison
-            const checkDay = new Date(year, month, day);
-            const d = new Date(scheduleDate.getFullYear(), scheduleDate.getMonth(), scheduleDate.getDate());
+            // Robust parsing: s.date is "YYYY-MM-DD"
+            const dateParts = s.date.split('T')[0].split('-');
+            const sY = parseInt(dateParts[0]);
+            const sM = parseInt(dateParts[1]) - 1; // Month is 0-indexed in JS Date
+            const sD = parseInt(dateParts[2]);
 
-            return d.getTime() === checkDay.getTime();
+            return sY === year && sM === month && sD === day;
         }).map(s => ({
             id: s.id,
             day: day,
@@ -218,40 +219,39 @@ const CareSchedule = () => {
                                     </div>
 
                                     {/* Event Rendering */}
-                                    {event ? (
-                                        <Link to={`/family/schedule/detail/${event.id}`} className="flex-1">
-                                            {event.isDone ? (
-                                                <div className="mt-1 flex items-center justify-center md:justify-start gap-1 p-1.5 md:p-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100/50 group-hover:border-emerald-200 transition-colors">
-                                                    <div className="w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
-                                                        <span className="material-symbols-outlined text-[12px] font-bold">check</span>
-                                                    </div>
-                                                    <span className="hidden md:block text-[11px] font-bold truncate line-through opacity-60">Completed</span>
-                                                </div>
-                                            ) : (
-                                                <div className={`mt-1 p-1.5 md:p-2 rounded-lg border flex flex-col md:flex-row items-start md:items-center gap-1.5 transition-all hover:shadow-md ${event.type === 'CONTRACT' ? 'bg-[#5fa5ba]/5 border-[#5fa5ba]/20 hover:border-[#5fa5ba]/40 text-[#00695C]' : 'bg-orange-50/50 border-orange-100 hover:border-orange-200 text-orange-700'}`}>
-                                                    <div className={`w-1.5 h-full rounded-full absolute left-0 top-0 bottom-0 ${event.type === 'CONTRACT' ? 'bg-[#5fa5ba]' : 'bg-orange-400'} md:hidden`}></div>
-
-                                                    {/* Event Icon Pill */}
-                                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${event.type === 'CONTRACT' ? 'bg-white text-[#5fa5ba] shadow-sm' : 'bg-white text-orange-500 shadow-sm'}`}>
-                                                        <span className="material-symbols-outlined text-[14px]">
-                                                            {event.type === 'CONTRACT' ? 'stethoscope' : 'accessibility_new'}
-                                                        </span>
-                                                    </div>
-
-                                                    <div className="hidden md:flex flex-col min-w-0">
-                                                        <span className="text-[10px] font-bold opacity-70 leading-tight">{event.time || '09:00 AM'}</span>
-                                                        <span className="text-[11px] font-bold truncate leading-tight">{event.name}</span>
+                                    <div className="flex-1 flex flex-col gap-1.5 overflow-y-auto px-1 max-h-[110px] custom-scrollbar">
+                                        {dayEvents.length > 0 ? (
+                                            dayEvents.map(event => (
+                                                <Link key={event.id} to={`/family/schedule/detail/${event.id}`} 
+                                                    className={`group/event p-1.5 rounded-xl border transition-all hover:shadow-md relative overflow-hidden ${
+                                                        event.isDone 
+                                                        ? 'bg-emerald-50/50 border-emerald-100 text-emerald-800' 
+                                                        : event.type === 'CONTRACT' 
+                                                            ? 'bg-[#5fa5ba]/5 border-[#5fa5ba]/20 text-[#00695C] hover:bg-[#5fa5ba]/10' 
+                                                            : 'bg-orange-50/50 border-orange-100 text-orange-700 hover:bg-orange-100/50'
+                                                    }`}>
+                                                    <div className="flex flex-col min-w-0">
+                                                        <div className="flex items-center justify-between gap-1 mb-0.5">
+                                                            <span className="text-[8px] font-black uppercase tracking-tighter opacity-60">{event.time}</span>
+                                                            {event.isDone && <span className="material-symbols-outlined text-[10px] font-bold text-emerald-600">check_circle</span>}
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <span className={`text-[10px] font-bold truncate ${event.isDone ? 'line-through opacity-50' : ''}`}>{event.name}</span>
+                                                        </div>
                                                         {event.patient && (
-                                                            <span className="text-[9px] text-stone-500 truncate leading-tight mt-0.5">For: {event.patient}</span>
+                                                            <div className="flex items-center gap-1 opacity-70">
+                                                                <span className="text-[8px] font-medium truncate italic">For: {event.patient}</span>
+                                                            </div>
                                                         )}
                                                     </div>
-                                                </div>
-                                            )}
-                                        </Link>
-                                    ) : (
-                                        // Empty state click target
-                                        <Link to="/family/booking" className="flex-1 hidden group-hover:block w-full h-full cursor-cell"></Link>
-                                    )}
+                                                </Link>
+                                            ))
+                                        ) : (
+                                            <Link to="/family/booking" className="flex-1 hidden group-hover:flex items-center justify-center opacity-20 hover:opacity-100 transition-opacity">
+                                                <span className="material-symbols-outlined text-stone-300">add</span>
+                                            </Link>
+                                        )}
+                                    </div>
 
                                     {/* Quick Add Button (Hover) */}
                                     <Link to="/family/booking" className="absolute bottom-2 right-2 w-7 h-7 rounded-full bg-white border border-stone-200 text-stone-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-[#5fa5ba] hover:text-white hover:border-[#5fa5ba] shadow-sm z-20">

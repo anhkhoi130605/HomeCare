@@ -443,7 +443,7 @@ public class ScheduleService : IScheduleService
             ContractId = s.ContractId,
             CareRequestId = s.CareRequestId,
             ServiceName = s.CareRequest?.Service?.Name ?? s.Contract?.Service?.Name,
-            Date = s.Date,
+            Date = s.Date.ToString("yyyy-MM-dd"),
             StartTime = s.StartTime,
             EndTime = s.EndTime,
             Status = status.ToString(),
