@@ -9,6 +9,7 @@ const FamilyContract = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [stats, setStats] = useState({ active: 0, pending: 0, nextRenewal: null });
+    const getContractAddress = (c) => c.address || c.careAddress || c.patientAddress || c.patient?.address || '';
 
     useEffect(() => {
         const fetchContracts = async () => {
@@ -184,7 +185,7 @@ const FamilyContract = () => {
                                             <td className="px-8 py-6">
                                                 <div className="flex items-center gap-2 text-stone-500 font-medium text-xs">
                                                     <span className="material-symbols-outlined text-sm">location_on</span>
-                                                    <span className="truncate max-w-[150px]">{c.address || 'N/A'}</span>
+                                                    <span className="truncate max-w-[150px]">{getContractAddress(c) || 'No address provided'}</span>
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6 font-medium text-stone-500 text-sm">{c.serviceName || c.service?.name || 'Care Service'}</td>
@@ -268,7 +269,7 @@ const FamilyContract = () => {
 
                                     <div className="flex items-center gap-2 bg-stone-50 p-3 rounded-xl border border-stone-100">
                                         <span className="material-symbols-outlined text-stone-400 text-sm">location_on</span>
-                                        <p className="text-[10px] font-bold text-stone-500 truncate">{c.address || 'No address provided'}</p>
+                                            <p className="text-[10px] font-bold text-stone-500 truncate">{c.address || 'No address provided'}</p>
                                     </div>
 
                                     {c.status === 'Approved' && (

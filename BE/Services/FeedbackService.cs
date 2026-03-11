@@ -1,5 +1,6 @@
 using BE.Data;
 using BE.Models;
+using BE.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace BE.Services;
@@ -49,10 +50,12 @@ public class CaregiverRatingDto
 public class FeedbackService : IFeedbackService
 {
     private readonly ApplicationDbContext _context;
+    private readonly INotificationService _notificationService;
 
-    public FeedbackService(ApplicationDbContext context)
+    public FeedbackService(ApplicationDbContext context, INotificationService notificationService)
     {
         _context = context;
+        _notificationService = notificationService;
     }
 
     public async Task<List<FeedbackDto>> GetFeedbackByCaregiverAsync(int caregiverId)
@@ -117,6 +120,31 @@ public class FeedbackService : IFeedbackService
 
         _context.Feedbacks.Add(feedback);
         await _context.SaveChangesAsync();
+
+        var caregiver = await _context.Caregivers
+            .Include(c => c.User)
+            .FirstOrDefaultAsync(c => c.Id == dto.CaregiverId);
+
+        // Notify Family
+        await _notificationService.CreateNotificationAsync(
+            userId,
+            "Feedback Submitted",
+            $"Gửi đánh giá thành công cho {caregiver?.FullName ?? "Caregiver"}.",
+            "Feedback",
+            feedback.Id
+        );
+
+        // Notify Caregiver
+        if (caregiver != null)
+        {
+            await _notificationService.CreateNotificationAsync(
+                caregiver.UserId,
+                "New Feedback",
+                $"Bạn nhận được một đánh giá mới từ {family.FullName}.",
+                "Feedback",
+                feedback.Id
+            );
+        }
 
         return (await GetFeedbackByIdAsync(feedback.Id))!;
     }

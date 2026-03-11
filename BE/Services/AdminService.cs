@@ -13,6 +13,8 @@ public interface IAdminService
     Task<List<UserDto>> GetAllUsersAsync(string? role = null);
     Task<UserDto?> GetUserAsync(int userId);
     Task<bool> ToggleUserStatusAsync(int userId, bool isActive);
+    Task<bool> DeleteUserAsync(int userId);
+    Task<UserDto> CreateUserAsync(CreateUserAdminDto dto);
     Task<List<AdminPatientDto>> GetAllPatientsAsync();
     Task<List<AdminCaregiverDto>> GetAllCaregiversAsync();
     Task<List<AdminScheduleDto>> GetAllSchedulesAsync(DateTime? from = null, DateTime? to = null);
@@ -190,6 +192,47 @@ public class AdminService : IAdminService
         user.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<bool> DeleteUserAsync(int userId)
+    {
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null) return false;
+
+        _context.Users.Remove(user);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<UserDto> CreateUserAsync(CreateUserAdminDto dto)
+    {
+        // Check if email already exists
+        var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+        if (existingUser != null)
+            throw new InvalidOperationException("Email already exists");
+
+        var user = new User
+        {
+            Email = dto.Email,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+            Phone = dto.Phone,
+            Role = Enum.Parse<UserRole>(dto.Role, ignoreCase: true),
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync();
+
+        return new UserDto
+        {
+            Id = user.Id,
+            Email = user.Email,
+            Phone = user.Phone,
+            Role = user.Role.ToString(),
+            IsActive = user.IsActive,
+            CreatedAt = user.CreatedAt
+        };
     }
 
     public async Task<List<AdminPatientDto>> GetAllPatientsAsync()
@@ -526,5 +569,13 @@ public class UpdateCaregiverAdminDto
     public string? ImageUrl { get; set; }
     public string? Bio { get; set; }
     public bool? IsAvailable { get; set; }
+}
+
+public class CreateUserAdminDto
+{
+    public string Email { get; set; } = "";
+    public string Password { get; set; } = "";
+    public string? Phone { get; set; }
+    public string Role { get; set; } = "Family";
 }
 

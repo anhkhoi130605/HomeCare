@@ -124,6 +124,66 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
+    /// Create a new user
+    /// </summary>
+    [HttpPost("users")]
+    public async Task<ActionResult<UserDto>> CreateUser([FromBody] CreateUserAdminDto dto)
+    {
+        try
+        {
+            var user = await _adminService.CreateUserAsync(dto);
+            return CreatedAtAction(nameof(GetUser), new { userId = user.Id }, user);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Toggle user status (block/unblock)
+    /// </summary>
+    [HttpPut("users/{userId}/status")]
+    public async Task<ActionResult> ToggleUserStatus(int userId, [FromBody] ToggleStatusDto dto)
+    {
+        try
+        {
+            var result = await _adminService.ToggleUserStatusAsync(userId, dto.IsActive);
+            if (!result)
+                return NotFound(new { message = "User not found" });
+            return Ok(new { message = "User status updated successfully" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Delete user
+    /// </summary>
+    [HttpDelete("users/{userId}")]
+    public async Task<ActionResult> DeleteUser(int userId)
+    {
+        try
+        {
+            var result = await _adminService.DeleteUserAsync(userId);
+            if (!result)
+                return NotFound(new { message = "User not found" });
+            return Ok(new { message = "User deleted successfully" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    public class ToggleStatusDto
+    {
+        public bool IsActive { get; set; }
+    }
+
+    /// <summary>
     /// Get all patients
     /// </summary>
     [HttpGet("patients")]

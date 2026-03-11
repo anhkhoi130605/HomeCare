@@ -64,7 +64,7 @@ const Login = () => {
         } else if (role === "caregiver") {
           navigate("/caregiver");
         } else {
-          navigate("/family/dashboard");
+          navigate("/family");
         }
       } else {
         setError(result.message || "Login failed");
@@ -108,7 +108,7 @@ const Login = () => {
         } else if (role === "caregiver") {
           navigate("/caregiver");
         } else {
-          navigate("/family/dashboard");
+          navigate("/family");
         }
       } else {
         setError(resultBE.message || "Không thể đồng bộ với server.");
@@ -131,7 +131,7 @@ const Login = () => {
       console.log("Đăng nhập Facebook thành công:", user.displayName);
       console.log("Token FB:", token);
       
-      navigate("/family/dashboard");
+      navigate("/family");
     } catch (err) {
       console.error("Lỗi Facebook Auth:", err);
       // Lỗi phổ biến của FB: Trùng email với Google

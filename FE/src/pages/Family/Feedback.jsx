@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Star, Send, CheckCircle, Clock, ArrowLeft } from 'lucide-react';
-import { feedbackApi, familyApi } from '@/lib/api';
+import { feedbackApi, familyApi, scheduleApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -29,22 +29,30 @@ const Feedback = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [myFeedbacks, schedulesData] = await Promise.all([
-                feedbackApi.getMyFeedbacks().catch(() => []),
-                familyApi.getSchedules().catch(() => [])
-            ]);
+            const myFeedbacks = await feedbackApi.getMyFeedbacks().catch(() => []);
             setFeedbacks(myFeedbacks || []);
 
-            // Extract unique caregivers from schedules
+            // 1. Get all patients first (same pattern as CareSchedule)
+            const patients = await familyApi.getPatients().catch(() => []);
+
+            // 2. Fetch schedules for all patients to find caregivers
             const caregiverMap = new Map();
-            (schedulesData || []).forEach(s => {
-                if (s.caregiverId && !caregiverMap.has(s.caregiverId)) {
-                    caregiverMap.set(s.caregiverId, {
-                        id: s.caregiverId,
-                        name: s.caregiverName || 'Caregiver'
+            for (const patient of patients) {
+                try {
+                    const patientSchedules = await scheduleApi.getByPatient(patient.id);
+                    (patientSchedules || []).forEach(s => {
+                        if (s.caregiverId && !caregiverMap.has(s.caregiverId)) {
+                            caregiverMap.set(s.caregiverId, {
+                                id: s.caregiverId,
+                                name: s.caregiverName || 'Caregiver'
+                            });
+                        }
                     });
+                } catch (e) {
+                    console.warn(`Failed to fetch schedules for patient ${patient.id} in Feedback`);
                 }
-            });
+            }
+
             setCaregivers(Array.from(caregiverMap.values()));
         } catch (error) {
             console.error("Failed to fetch data:", error);
