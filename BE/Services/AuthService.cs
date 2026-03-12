@@ -253,7 +253,8 @@ public class AuthService : IAuthService
     private string GenerateJwtToken(User user, int? familyId, int? caregiverId)
     {
         var jwtSettings = _configuration.GetSection("Jwt");
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]!));
+        var keyStr = jwtSettings["Key"] ?? throw new InvalidOperationException("JWT Key is not configured. Please check appsettings.Jwt.json and ensure the app was restarted.");
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(keyStr));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var claims = new List<Claim>

@@ -110,6 +110,16 @@ public class CareLogController : ControllerBase
         if (log == null) return NotFound();
         return Ok(log);
     }
+    
+    // POST /api/carelog/{id}/send-summary
+    [HttpPost("{id}/send-summary")]
+    [Authorize(Roles = "Admin,OperationAdmin")]
+    public async Task<IActionResult> SendSummary(int id)
+    {
+        var result = await _careLogService.SendSummaryToFamilyAsync(id);
+        if (!result) return NotFound(new { message = "Care log not found or family not linked" });
+        return Ok(new { message = "Summary sent successfully to family" });
+    }
 
     // DELETE /api/carelog/{id}
     [HttpDelete("{id}")]

@@ -126,10 +126,8 @@ const MySchedule = () => {
         const shiftStart = new Date(now);
         shiftStart.setHours(hours, minutes, 0, 0);
 
-        // Allow check-in from 30 minutes before
-        const checkInWindowStart = new Date(shiftStart.getTime() - 30 * 60000);
-
-        return now >= checkInWindowStart;
+        // STRICT: Only allow check-in at or after the shift start time
+        return now >= shiftStart;
     };
 
     const getDisplayStatus = (schedule) => {
@@ -150,7 +148,12 @@ const MySchedule = () => {
         };
 
         const start = parseTime(startTime);
-        const end = parseTime(endTime);
+        let end = parseTime(endTime);
+        
+        // Handle shifts crossing midnight
+        if (end <= start) {
+            end.setDate(end.getDate() + 1);
+        }
 
         // Logic for Upcoming vs InProgress vs Not Completed
         if (now < new Date(start.getTime() - 30 * 60000)) {
@@ -372,7 +375,7 @@ const MySchedule = () => {
                                         )}
                                     </div>
                                     {canCheckIn(selectedShift) && (
-                                        <Link to="/caregiver/active-shift" className="w-full mt-8 bg-[#5fa5ba] hover:bg-[#4d8ca0] text-white py-5 rounded-2xl font-bold text-sm shadow-xl shadow-[#5fa5ba]/20 transition-all flex items-center justify-center gap-2 group hover:scale-[1.02]">
+                                        <Link to={`/caregiver/active-shift?scheduleId=${selectedShift.id}`} className="w-full mt-8 bg-[#5fa5ba] hover:bg-[#4d8ca0] text-white py-5 rounded-2xl font-bold text-sm shadow-xl shadow-[#5fa5ba]/20 transition-all flex items-center justify-center gap-2 group hover:scale-[1.02]">
                                             <span className="material-symbols-outlined text-xl group-hover:translate-x-1 transition-transform">login</span>
                                             QUICK CHECK-IN
                                         </Link>

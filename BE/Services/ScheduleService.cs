@@ -454,8 +454,8 @@ public class ScheduleService : IScheduleService
             StartTime = s.StartTime,
             EndTime = s.EndTime,
             Status = status.ToString(),
-            CheckInTime = s.CheckInTime,
-            CheckOutTime = s.CheckOutTime,
+            CheckInTime = s.CheckInTime.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(s.CheckInTime.Value, DateTimeKind.Utc)) : null,
+            CheckOutTime = s.CheckOutTime.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(s.CheckOutTime.Value, DateTimeKind.Utc)) : null,
             Notes = s.Notes
         };
     }

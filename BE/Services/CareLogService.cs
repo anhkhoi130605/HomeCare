@@ -8,10 +8,17 @@ namespace BE.Services;
 public class CareLogService : ICareLogService
 {
     private readonly ApplicationDbContext _context;
+    private readonly INotificationService _notificationService;
+    private readonly IHealthReportService _healthReportService;
 
-    public CareLogService(ApplicationDbContext context)
+    public CareLogService(
+        ApplicationDbContext context, 
+        INotificationService notificationService,
+        IHealthReportService healthReportService)
     {
         _context = context;
+        _notificationService = notificationService;
+        _healthReportService = healthReportService;
     }
 
     public async Task<List<CareLogDto>> GetAllAsync()
@@ -44,7 +51,9 @@ public class CareLogService : ICareLogService
                 PatientId = s.PatientId,
                 PatientName = s.Patient?.FullName ?? "",
                 Activities = s.Notes ?? "Completed shift log (Auto-generated entry)",
-                LoggedAt = s.CheckOutTime ?? s.Date.Date.Add(s.EndTime),
+                LoggedAt = s.CheckOutTime.HasValue 
+                    ? new DateTimeOffset(DateTime.SpecifyKind(s.CheckOutTime.Value, DateTimeKind.Utc)) 
+                    : new DateTimeOffset(DateTime.SpecifyKind(s.Date.Date.Add(s.EndTime), DateTimeKind.Utc)),
                 Status = "Submitted"
             });
         }
@@ -104,7 +113,9 @@ public class CareLogService : ICareLogService
                 PatientId = s.PatientId,
                 PatientName = s.Patient?.FullName ?? "Unknown Patient",
                 Activities = s.Notes ?? "Completed shift (Auto-generated log)",
-                LoggedAt = s.CheckOutTime ?? s.Date.Date.Add(s.EndTime),
+                LoggedAt = s.CheckOutTime.HasValue 
+                    ? new DateTimeOffset(DateTime.SpecifyKind(s.CheckOutTime.Value, DateTimeKind.Utc)) 
+                    : new DateTimeOffset(DateTime.SpecifyKind(s.Date.Date.Add(s.EndTime), DateTimeKind.Utc)),
                 Status = "Submitted"
             });
         }
@@ -151,7 +162,9 @@ public class CareLogService : ICareLogService
                 PatientId = s.PatientId,
                 PatientName = s.Patient?.FullName ?? "",
                 Activities = s.Notes ?? "Completed shift log (Auto-generated entry)",
-                LoggedAt = s.CheckOutTime ?? s.Date.Date.Add(s.EndTime),
+                LoggedAt = s.CheckOutTime.HasValue 
+                    ? new DateTimeOffset(DateTime.SpecifyKind(s.CheckOutTime.Value, DateTimeKind.Utc)) 
+                    : new DateTimeOffset(DateTime.SpecifyKind(s.Date.Date.Add(s.EndTime), DateTimeKind.Utc)),
                 Status = "Submitted"
             });
         }
@@ -181,7 +194,9 @@ public class CareLogService : ICareLogService
                 PatientId = s.PatientId,
                 PatientName = s.Patient?.FullName ?? "Unknown",
                 Activities = s.Notes ?? "Completed shift log (Auto-generated entry)",
-                LoggedAt = s.CheckOutTime ?? s.Date.Date.Add(s.EndTime),
+                LoggedAt = s.CheckOutTime.HasValue 
+                    ? new DateTimeOffset(DateTime.SpecifyKind(s.CheckOutTime.Value, DateTimeKind.Utc)) 
+                    : new DateTimeOffset(DateTime.SpecifyKind(s.Date.Date.Add(s.EndTime), DateTimeKind.Utc)),
                 Status = "Submitted"
             };
         }
@@ -227,11 +242,41 @@ public class CareLogService : ICareLogService
 
         await _context.SaveChangesAsync();
 
-        // Reload with navigation properties
+        // Load with navigation properties for the DTO and Logic
+        var patient = await _context.Patients
+            .Include(p => p.Family)
+            .FirstOrDefaultAsync(p => p.Id == careLog.PatientId);
+        
         await _context.Entry(careLog).Reference(c => c.Caregiver).LoadAsync();
-        await _context.Entry(careLog).Reference(c => c.Patient).LoadAsync();
+        careLog.Patient = patient!;
 
         return MapToDto(careLog, dto.IsDraft);
+    }
+
+    private async Task CreateHealthReportAndNotify(CareLog careLog, int familyUserId)
+    {
+        // 1. Notify Family
+        await _notificationService.CreateNotificationAsync(
+            familyUserId,
+            "New Care Log Submitted",
+            $"Caregiver {careLog.Caregiver?.FullName ?? "Someone"} has submitted a new care log for {careLog.Patient?.FullName ?? "your patient"}.",
+            "CareLog",
+            careLog.Id
+        );
+
+        // 2. Create an automatic Health Report entry
+        await _healthReportService.CreateAsync(new CreateHealthReportDto
+        {
+            PatientId = careLog.PatientId,
+            CaregiverId = careLog.CaregiverId,
+            ReportType = "Daily Shift Summary",
+            Period = "Today",
+            Status = "Stable",
+            HealthScore = 100,
+            VitalsData = careLog.VitalSigns,
+            Notes = careLog.Activities,
+            ReportDate = careLog.LoggedAt
+        });
     }
 
     public async Task<CareLogDto?> UpdateAsync(int id, UpdateCareLogDto dto)
@@ -253,6 +298,51 @@ public class CareLogService : ICareLogService
         await _context.SaveChangesAsync();
 
         return MapToDto(careLog, dto.IsDraft ?? false);
+    }
+
+    public async Task<bool> SendSummaryToFamilyAsync(int careLogId)
+    {
+        CareLog? careLog = null;
+
+        if (careLogId < 0)
+        {
+            // Handle virtual log
+            int scheduleId = -careLogId;
+            var s = await _context.Schedules
+                .Include(s => s.Caregiver)
+                .Include(s => s.Patient)
+                    .ThenInclude(p => p.Family)
+                .FirstOrDefaultAsync(s => s.Id == scheduleId);
+
+            if (s == null || s.Patient?.Family == null) return false;
+
+            // Create a temporary CareLog entity to satisfy the notification method
+            careLog = new CareLog
+            {
+                Id = careLogId,
+                ScheduleId = s.Id,
+                CaregiverId = s.CaregiverId,
+                Caregiver = s.Caregiver,
+                PatientId = s.PatientId,
+                Patient = s.Patient,
+                Activities = s.Notes ?? "Completed shift log (Auto-generated entry)",
+                LoggedAt = s.CheckOutTime ?? s.Date
+            };
+        }
+        else
+        {
+            careLog = await _context.CareLogs
+                .Include(cl => cl.Caregiver)
+                .Include(cl => cl.Patient)
+                    .ThenInclude(p => p.Family)
+                .FirstOrDefaultAsync(cl => cl.Id == careLogId);
+        }
+
+        if (careLog == null || careLog.Patient?.Family == null)
+            return false;
+
+        await CreateHealthReportAndNotify(careLog, careLog.Patient.Family.UserId);
+        return true;
     }
 
     public async Task<bool> DeleteAsync(int id)
@@ -281,7 +371,7 @@ public class CareLogService : ICareLogService
             VitalSigns = cl.VitalSigns,
             PatientMood = cl.PatientMood,
             Notes = cl.Notes,
-            LoggedAt = cl.LoggedAt,
+            LoggedAt = new DateTimeOffset(DateTime.SpecifyKind(cl.LoggedAt, DateTimeKind.Utc)),
             Status = isDraft ? "Draft" : "Submitted"
         };
     }

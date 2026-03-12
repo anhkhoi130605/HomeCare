@@ -162,16 +162,16 @@ public class PaymentController : ControllerBase
     /// </summary>
     [HttpGet("vnpay-return")]
     [AllowAnonymous]
-    public async Task<ActionResult> VnPayReturn([FromQuery] VnPayReturnDto vnPayReturn)
+    public async Task<ActionResult> VnPayReturn()
     {
         try
         {
-            var payment = await _paymentService.ProcessVnPayReturnAsync(vnPayReturn);
+            var queryParams = Request.Query.ToDictionary(x => x.Key, x => x.Value.ToString());
+            var payment = await _paymentService.ProcessVnPayReturnAsync(queryParams);
             var frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:8080";
 
             if (payment == null)
             {
-                // Redirect to Frontend
                 return Redirect($"{frontendUrl}/family/payments?status=error");
             }
 
@@ -191,15 +191,16 @@ public class PaymentController : ControllerBase
     /// </summary>
     [HttpGet("vnpay-ipn")]
     [AllowAnonymous]
-    public async Task<ActionResult> VnPayIpn([FromQuery] VnPayReturnDto vnPayReturn)
+    public async Task<ActionResult> VnPayIpn()
     {
         try
         {
-            var payment = await _paymentService.ProcessVnPayReturnAsync(vnPayReturn);
+            var queryParams = Request.Query.ToDictionary(x => x.Key, x => x.Value.ToString());
+            var payment = await _paymentService.ProcessVnPayReturnAsync(queryParams);
 
             if (payment == null)
             {
-                return Ok(new { RspCode = "01", Message = "Order not found" });
+                return Ok(new { RspCode = "01", Message = "Order not found or invalid signature" });
             }
 
             return Ok(new { RspCode = "00", Message = "Confirm Success" });

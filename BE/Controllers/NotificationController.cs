@@ -46,6 +46,12 @@ public class NotificationController : ControllerBase
 
     private int GetUserId()
     {
-        return int.Parse(User.FindFirst("userId")!.Value);
+        var userIdClaim = User.Claims.FirstOrDefault(c => c.Type.Equals("UserId", StringComparison.OrdinalIgnoreCase))?.Value;
+        if (userIdClaim == null)
+        {
+            // Fallback to NameIdentifier if UserId claim is not found
+            userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        }
+        return int.Parse(userIdClaim!);
     }
 }

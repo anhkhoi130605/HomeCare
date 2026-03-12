@@ -9,6 +9,12 @@ using System.Text.Encodings.Web;
 using BE.Models.Email;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Load JWT configurations from separate file
+builder.Configuration
+    .SetBasePath(builder.Environment.ContentRootPath)
+    .AddJsonFile("appsettings.Jwt.json", optional: false, reloadOnChange: true);
+
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("Smtp"));
 builder.Services.AddScoped<IEmailService, EmailService>();
 // ===== SERVICES =====
@@ -32,7 +38,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
-var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
+var jwtKey = jwtSettings["Key"] ?? throw new InvalidOperationException("JWT Key is missing in appsettings.Jwt.json");
+var key = Encoding.UTF8.GetBytes(jwtKey);
 
 builder.Services.AddAuthentication(options =>
 {

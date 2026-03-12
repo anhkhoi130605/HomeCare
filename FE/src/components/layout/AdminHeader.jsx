@@ -12,7 +12,7 @@ const AdminHeader = ({ breadcrumb, searchPlaceholder = "Search..." }) => {
     <header className="h-16 bg-background border-b border-border flex items-center justify-between px-6">
       <div className="flex items-center gap-4">
         <nav className="text-sm text-muted-foreground">
-          <span>Admin</span>
+          <span>{user?.role === 'OperationAdmin' ? 'Operation Admin' : 'Admin'}</span>
           <span className="mx-2">›</span>
           <span className="text-foreground font-medium">{breadcrumb}</span>
         </nav>

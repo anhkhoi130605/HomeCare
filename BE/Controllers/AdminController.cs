@@ -201,6 +201,65 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
+    /// Create a new patient
+    /// </summary>
+    [HttpPost("patients")]
+    public async Task<ActionResult<AdminPatientDto>> CreatePatient([FromBody] CreatePatientAdminDto dto)
+    {
+        try
+        {
+            var patient = await _adminService.CreatePatientAsync(dto);
+            return CreatedAtAction(nameof(GetAllPatients), new { id = patient.Id }, patient);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Update a patient
+    /// </summary>
+    [HttpPut("patients/{patientId}")]
+    public async Task<ActionResult<AdminPatientDto>> UpdatePatient(int patientId, [FromBody] UpdatePatientAdminDto dto)
+    {
+        try
+        {
+            var patient = await _adminService.UpdatePatientAsync(patientId, dto);
+            if (patient == null)
+                return NotFound(new { message = "Patient not found" });
+            return Ok(patient);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Delete a patient
+    /// </summary>
+    [HttpDelete("patients/{patientId}")]
+    public async Task<ActionResult> DeletePatient(int patientId)
+    {
+        try
+        {
+            var result = await _adminService.DeletePatientAsync(patientId);
+            if (!result)
+                return NotFound(new { message = "Patient not found" });
+            return Ok(new { message = "Patient deleted successfully" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Get all caregivers
     /// </summary>
     [HttpGet("caregivers")]

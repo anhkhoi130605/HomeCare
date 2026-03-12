@@ -101,15 +101,15 @@ public class HealthReportController : ControllerBase
 
     private int? GetFamilyId()
     {
-        var familyIdClaim = User.FindFirst("FamilyId")?.Value;
-        if (familyIdClaim != null && int.TryParse(familyIdClaim, out var id))
+        var claim = User.FindFirst("FamilyId");
+        if (claim != null && int.TryParse(claim.Value, out var id))
             return id;
         return null;
     }
 
     private int? GetCaregiverId()
     {
-        var caregiverIdClaim = User.FindFirst("CaregiverId")?.Value;
+        var caregiverIdClaim = User.Claims.FirstOrDefault(c => c.Type.Equals("CaregiverId", StringComparison.OrdinalIgnoreCase))?.Value;
         if (caregiverIdClaim != null && int.TryParse(caregiverIdClaim, out var id))
             return id;
         return null;

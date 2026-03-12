@@ -169,7 +169,7 @@ const Reports = () => {
                       <td className="p-3">
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <Clock className="w-4 h-4" />
-                          {formatTime(log.createdAt)}
+                          {formatTime(log.loggedAt || log.createdAt)}
                         </div>
                       </td>
                       <td className="p-3">
@@ -177,7 +177,7 @@ const Reports = () => {
                       </td>
                       <td className="p-3 text-right">
                         <Button variant="outline" size="sm" className="gap-1" asChild>
-                          <Link to={`/admin/reports/care-log/${log.id}`}>
+                          <Link to={`${window.location.pathname.startsWith('/operation-admin') ? '/operation-admin' : '/admin'}/reports/care-log/${log.id}`}>
                             <Eye className="w-3 h-3" />
                             View Log
                           </Link>

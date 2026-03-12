@@ -11,6 +11,7 @@ public interface ICareLogService
     Task<CareLogDto?> GetByIdAsync(int id);
     Task<CareLogDto> CreateAsync(int caregiverId, CreateCareLogDto dto);
     Task<CareLogDto?> UpdateAsync(int id, UpdateCareLogDto dto);
+    Task<bool> SendSummaryToFamilyAsync(int careLogId);
     Task<bool> DeleteAsync(int id);
 }
 
@@ -29,7 +30,7 @@ public class CareLogDto
     public string? VitalSigns { get; set; }
     public string? PatientMood { get; set; }
     public string? Notes { get; set; }
-    public DateTime LoggedAt { get; set; }
+    public DateTimeOffset LoggedAt { get; set; }
     public string Status { get; set; } = "Submitted"; // Submitted or Draft
 }
 

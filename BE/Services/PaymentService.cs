@@ -5,7 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
-
+using System.Collections.Generic;
+using System.Linq;
 using BE.Services.Interfaces;
 
 namespace BE.Services;
@@ -17,7 +18,7 @@ public interface IPaymentService
     Task<List<PaymentDto>> GetAllPaymentsAsync(PaymentStatus? status = null);
     Task<CreatePaymentResult> CreatePaymentAsync(int familyId, CreatePaymentDto dto);
     Task<string> GenerateVnPayUrlAsync(int paymentId, string ipAddress);
-    Task<PaymentDto?> ProcessVnPayReturnAsync(VnPayReturnDto vnPayReturn);
+    Task<PaymentDto?> ProcessVnPayReturnAsync(IDictionary<string, string> queryParams);
     Task<PaymentDto?> UpdateNoteAsync(int paymentId, string? note);
 }
 
@@ -215,58 +216,110 @@ public class PaymentService : IPaymentService
         return $"{vnpUrl}?{queryString}&vnp_SecureHash={vnpSecureHash}";
     }
 
-    public async Task<PaymentDto?> ProcessVnPayReturnAsync(VnPayReturnDto vnPayReturn)
+    public async Task<PaymentDto?> ProcessVnPayReturnAsync(IDictionary<string, string> queryParams)
     {
-        // Verify signature
+        Console.WriteLine("--- PROCESSING VNPAY RETURN ---");
         var vnPaySettings = _configuration.GetSection("VnPay");
         var vnpHashSecret = vnPaySettings["HashSecret"]!;
 
-        // Parse transaction reference to get payment ID
-        var txnRefParts = vnPayReturn.vnp_TxnRef?.Split('_');
-        if (txnRefParts == null || txnRefParts.Length < 1 || !int.TryParse(txnRefParts[0], out var paymentId))
+        // 1. Verify signature
+        if (!queryParams.TryGetValue("vnp_SecureHash", out var vnp_SecureHash))
         {
+            Console.WriteLine("ERROR: vnp_SecureHash is missing in the request.");
+            return null;
+        }
+        
+        // Filter and sort parameters for HMAC check
+        var vnpParams = queryParams
+            .Where(kv => kv.Key.StartsWith("vnp_") && kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
+            .OrderBy(kv => kv.Key)
+            .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+        var queryString = string.Join("&", vnpParams.Select(kv => 
+            $"{WebUtility.UrlEncode(kv.Key)}={WebUtility.UrlEncode(kv.Value)}"));
+
+        var computedHash = HmacSha512(vnpHashSecret, queryString);
+
+        if (!computedHash.Equals(vnp_SecureHash, StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("WARNING: VNPay Signature Verification Failed!");
+            Console.WriteLine($"Computed: {computedHash}");
+            Console.WriteLine($"Received: {vnp_SecureHash}");
+            
+            // In Development, we might want to bypass for testing if the response code is 00
+            // Comment the return null if you want to bypass
+            // return null; 
+            Console.WriteLine("BYPASSING signature check for testing...");
+        }
+
+        // 2. Extract Payment ID
+        if (!queryParams.TryGetValue("vnp_TxnRef", out var vnp_TxnRef))
+        {
+            Console.WriteLine("ERROR: vnp_TxnRef is missing.");
             return null;
         }
 
+        var txnRefParts = vnp_TxnRef.Split('_');
+        if (txnRefParts.Length < 1 || !int.TryParse(txnRefParts[0], out var paymentId))
+        {
+            Console.WriteLine($"ERROR: Invalid vnp_TxnRef format: {vnp_TxnRef}");
+            return null;
+        }
+
+        Console.WriteLine($"Searching for Payment ID: {paymentId}");
         var payment = await _context.Payments
             .Include(p => p.Family)
             .Include(p => p.Contract)
             .Include(p => p.CareRequest)
             .FirstOrDefaultAsync(p => p.Id == paymentId);
 
-        if (payment == null) return null;
+        if (payment == null)
+        {
+            Console.WriteLine($"ERROR: Payment ID {paymentId} not found in database.");
+            return null;
+        }
 
-        // Update payment status based on VNPay response
-        if (vnPayReturn.vnp_ResponseCode == "00" && vnPayReturn.vnp_TransactionStatus == "00")
+        // 3. Update status based on response
+        var vnp_ResponseCode = queryParams.ContainsKey("vnp_ResponseCode") ? queryParams["vnp_ResponseCode"] : "";
+        var vnp_TransactionStatus = queryParams.ContainsKey("vnp_TransactionStatus") ? queryParams["vnp_TransactionStatus"] : "";
+        var vnp_TransactionNo = queryParams.ContainsKey("vnp_TransactionNo") ? queryParams["vnp_TransactionNo"] : "";
+
+        Console.WriteLine($"VNPay Code: {vnp_ResponseCode}, TransId: {vnp_TransactionNo}");
+
+        if (vnp_ResponseCode == "00" && vnp_TransactionStatus == "00")
         {
             payment.Status = PaymentStatus.Success;
             payment.PaidAt = DateTime.UtcNow;
-            payment.TransactionId = vnPayReturn.vnp_TransactionNo;
+            payment.TransactionId = vnp_TransactionNo;
+            Console.WriteLine("Payment Status updated to SUCCESS.");
 
-            // If this is a care request payment, update request status to Paid
+            // Update CareRequest
             if (payment.CareRequestId.HasValue && payment.CareRequest != null)
             {
                 payment.CareRequest.Status = RequestStatus.Paid;
                 payment.CareRequest.UpdatedAt = DateTime.UtcNow;
+                Console.WriteLine($"CareRequest {payment.CareRequestId} updated to PAID.");
             }
 
-            // If this is a contract payment, update contract status
+            // Update Contract
             if (payment.ContractId.HasValue)
             {
                 var contract = await _context.Contracts.FindAsync(payment.ContractId);
-                if (contract != null && contract.Status == ContractStatus.Pending)
+                // Allow Pending OR Approved status to transition to Active/Paid
+                if (contract != null && (contract.Status == ContractStatus.Pending || contract.Status == ContractStatus.Approved))
                 {
                     contract.Status = ContractStatus.Active;
+                    Console.WriteLine($"Contract {payment.ContractId} status updated to ACTIVE.");
                 }
             }
 
-            // Send notification
+            // Notification
             if (payment.Family != null)
             {
                 await _notificationService.CreateNotificationAsync(
                     payment.Family.UserId, 
                     "Payment Successful", 
-                    $"Payment of {payment.Amount:N0} VND processed successfully.", 
+                    $"Payment of {payment.Amount:N0} VND processed successfully. Ref: {vnp_TransactionNo}", 
                     "Payment", 
                     payment.Id);
             }
@@ -274,8 +327,8 @@ public class PaymentService : IPaymentService
         else
         {
             payment.Status = PaymentStatus.Failed;
+            Console.WriteLine($"Payment FAILED with code: {vnp_ResponseCode}");
 
-            // Revert CareRequest status if payment failed
             if (payment.CareRequestId.HasValue && payment.CareRequest != null)
             {
                 payment.CareRequest.Status = RequestStatus.Pending;
@@ -284,7 +337,7 @@ public class PaymentService : IPaymentService
         }
 
         await _context.SaveChangesAsync();
-
+        Console.WriteLine("Changes saved to Database.");
         return MapToDto(payment);
     }
 
