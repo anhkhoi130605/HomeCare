@@ -46,16 +46,26 @@ const Dashboard = () => {
     const activeShift = schedules.find(s => {
         const startParts = s.startTime.split(':').map(Number);
         const endParts = s.endTime.split(':').map(Number);
-        const startMinutes = startParts[0] * 60 + startParts[1];
-        const endMinutes = endParts[0] * 60 + endParts[1];
-        return currentTimeMinutes >= startMinutes && currentTimeMinutes <= endMinutes && s.status !== 'Completed';
+        
+        const scheduleDate = new Date(s.date);
+        const start = new Date(scheduleDate);
+        start.setHours(startParts[0], startParts[1], 0, 0);
+        
+        let end = new Date(scheduleDate);
+        end.setHours(endParts[0], endParts[1], 0, 0);
+        if (end <= start) end.setDate(end.getDate() + 1);
+
+        return now >= new Date(start.getTime() - 15 * 60000) && now <= end && s.status !== 'Completed';
     });
 
     // Upcoming shifts (not yet started)
     const upcomingShifts = schedules.filter(s => {
         const startParts = s.startTime.split(':').map(Number);
-        const startMinutes = startParts[0] * 60 + startParts[1];
-        return currentTimeMinutes < startMinutes && s.status === 'Scheduled';
+        const scheduleDate = new Date(s.date);
+        const start = new Date(scheduleDate);
+        start.setHours(startParts[0], startParts[1], 0, 0);
+        
+        return now < new Date(start.getTime() - 15 * 60000) && s.status === 'Scheduled';
     });
 
     // Calculate stats
@@ -63,8 +73,9 @@ const Dashboard = () => {
     const totalHoursToday = schedules.reduce((acc, s) => {
         const startParts = s.startTime.split(':').map(Number);
         const endParts = s.endTime.split(':').map(Number);
-        const hours = (endParts[0] * 60 + endParts[1] - startParts[0] * 60 - startParts[1]) / 60;
-        return acc + hours;
+        let diffHours = (endParts[0] + endParts[1]/60) - (startParts[0] + startParts[1]/60);
+        if (diffHours < 0) diffHours += 24; // Crossed midnight
+        return acc + diffHours;
     }, 0);
 
     const formatTime = (timeStr) => formatTimeSpan(timeStr);
@@ -202,7 +213,10 @@ const Dashboard = () => {
 
                             {(activeShift || upcomingShifts[0]) && (
                                 <div className="flex-shrink-0 relative z-10 flex flex-col items-center">
-                                    <Link to="/caregiver/active-shift" className="bg-white text-[#5fa5ba] hover:bg-blue-50 px-8 py-5 rounded-2xl font-black text-lg shadow-lg flex items-center gap-3 transition-all hover:scale-105 active:scale-95 group/btn">
+                                    <Link 
+                                        to={`/caregiver/active-shift?scheduleId=${(activeShift || upcomingShifts[0])?.id}`} 
+                                        className="bg-white text-[#5fa5ba] hover:bg-blue-50 px-8 py-5 rounded-2xl font-black text-lg shadow-lg flex items-center gap-3 transition-all hover:scale-105 active:scale-95 group/btn"
+                                    >
                                         <span className="material-symbols-outlined text-2xl group-hover/btn:rotate-12 transition-transform">login</span>
                                         QUICK CHECK-IN
                                     </Link>

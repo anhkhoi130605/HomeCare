@@ -8,10 +8,17 @@ namespace BE.Services;
 public class CareLogService : ICareLogService
 {
     private readonly ApplicationDbContext _context;
+    private readonly INotificationService _notificationService;
+    private readonly IHealthReportService _healthReportService;
 
-    public CareLogService(ApplicationDbContext context)
+    public CareLogService(
+        ApplicationDbContext context, 
+        INotificationService notificationService,
+        IHealthReportService healthReportService)
     {
         _context = context;
+        _notificationService = notificationService;
+        _healthReportService = healthReportService;
     }
 
     public async Task<List<CareLogDto>> GetAllAsync()
@@ -227,11 +234,47 @@ public class CareLogService : ICareLogService
 
         await _context.SaveChangesAsync();
 
-        // Reload with navigation properties
+        // Load with navigation properties for the DTO and Logic
+        var patient = await _context.Patients
+            .Include(p => p.Family)
+            .FirstOrDefaultAsync(p => p.Id == careLog.PatientId);
+        
         await _context.Entry(careLog).Reference(c => c.Caregiver).LoadAsync();
-        await _context.Entry(careLog).Reference(c => c.Patient).LoadAsync();
+        careLog.Patient = patient!;
+
+        // 1. Notify Family & Create Report
+        if (!dto.IsDraft && patient?.Family != null)
+        {
+            await CreateHealthReportAndNotify(careLog, patient.Family.UserId);
+        }
 
         return MapToDto(careLog, dto.IsDraft);
+    }
+
+    private async Task CreateHealthReportAndNotify(CareLog careLog, int familyUserId)
+    {
+        // 1. Notify Family
+        await _notificationService.CreateNotificationAsync(
+            familyUserId,
+            "New Care Log Submitted",
+            $"Caregiver {careLog.Caregiver?.FullName ?? "Someone"} has submitted a new care log for {careLog.Patient?.FullName ?? "your patient"}.",
+            "CareLog",
+            careLog.Id
+        );
+
+        // 2. Create an automatic Health Report entry
+        await _healthReportService.CreateAsync(new CreateHealthReportDto
+        {
+            PatientId = careLog.PatientId,
+            CaregiverId = careLog.CaregiverId,
+            ReportType = "Daily Shift Summary",
+            Period = "Today",
+            Status = "Stable",
+            HealthScore = 100,
+            VitalsData = careLog.VitalSigns,
+            Notes = careLog.Activities,
+            ReportDate = careLog.LoggedAt
+        });
     }
 
     public async Task<CareLogDto?> UpdateAsync(int id, UpdateCareLogDto dto)
@@ -251,6 +294,19 @@ public class CareLogService : ICareLogService
         if (dto.Notes != null) careLog.Notes = dto.Notes;
 
         await _context.SaveChangesAsync();
+
+        // If it was a draft and now it's submitted, trigger notification and health report
+        if (dto.IsDraft == false)
+        {
+            var patient = await _context.Patients
+                .Include(p => p.Family)
+                .FirstOrDefaultAsync(p => p.Id == careLog.PatientId);
+                
+            if (patient?.Family != null)
+            {
+                await CreateHealthReportAndNotify(careLog, patient.Family.UserId);
+            }
+        }
 
         return MapToDto(careLog, dto.IsDraft ?? false);
     }

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import ScrollAnimation from "@/components/ui/scroll-animation";
 import { caregiverApi, careLogApi, authApi } from '@/lib/api';
 import { formatDateToYYYYMMDD } from '@/lib/utils';
 
 const ActiveShift = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const scheduleIdFromUrl = searchParams.get('scheduleId');
     const [timer, setTimer] = useState(6135); // Initial mock time: 01:42:15
     const [isActive, setIsActive] = useState(true);
     const [isCompleted, setIsCompleted] = useState(false);
@@ -40,8 +42,59 @@ const ActiveShift = () => {
                         phone: data.emergencyContactPhone || 'N/A',
                         relationship: 'Primary Contact'
                     });
-                    // Future: Fetch medications from API
-                    setMedications([]);
+                    // Try to get medications from the most recent care log (per user request: "phần này có trong DB")
+                    try {
+                        const logs = await careLogApi.getByPatient(selectedPatientId);
+                        if (logs && logs.length > 0) {
+                            // Find the latest real log (Id > 0) that actually has medications logged
+                            const lastLogWithMeds = logs.find(log => log.id > 0 && log.medicationsGiven && log.medicationsGiven.trim());
+                            
+                            if (lastLogWithMeds) {
+                                const medList = lastLogWithMeds.medicationsGiven.split(/[,;]/).map(m => m.trim()).filter(Boolean);
+                                setMedications(medList.map(m => ({
+                                    name: m,
+                                    dosage: 'Last record',
+                                    time: 'Scheduled',
+                                    desc: 'Basic medication from history'
+                                })));
+                            } else if (data.medicalHistory && data.medicalHistory.toLowerCase().includes('medication')) {
+                                // Fallback: Try to parse medications from medical history if no logs found
+                                const medPart = data.medicalHistory.split(/medications?:/i)[1];
+                                if (medPart) {
+                                    const medList = medPart.split(/[,;\n]/).map(m => m.trim()).filter(Boolean);
+                                    setMedications(medList.map(m => ({
+                                        name: m,
+                                        dosage: 'As prescribed',
+                                        time: 'Scheduled',
+                                        desc: 'From medical history'
+                                    })));
+                                } else {
+                                    setMedications([]);
+                                }
+                            } else {
+                                setMedications([]);
+                            }
+                        } else if (data.medicalHistory && data.medicalHistory.toLowerCase().includes('medication')) {
+                            // No logs at all, check medical history
+                            const medPart = data.medicalHistory.split(/medications?:/i)[1];
+                            if (medPart) {
+                                const medList = medPart.split(/[,;\n]/).map(m => m.trim()).filter(Boolean);
+                                setMedications(medList.map(m => ({
+                                    name: m,
+                                    dosage: 'As prescribed',
+                                    time: 'Scheduled',
+                                    desc: 'From medical history'
+                                })));
+                            } else {
+                                setMedications([]);
+                            }
+                        } else {
+                            setMedications([]);
+                        }
+                    } catch (logErr) {
+                        console.error('Failed to fetch previous logs for medications:', logErr);
+                        setMedications([]);
+                    }
                 } catch (err) {
                     console.error('Failed to fetch patient details:', err);
                 }
@@ -88,8 +141,38 @@ const ActiveShift = () => {
                     const patientsArray = Array.from(patientMap.values());
                     setPatients(patientsArray);
                     
-                    if (patientsArray.length > 0) {
-                        setSelectedPatientId(patientsArray[0].id);
+                    
+                    if (scheduleIdFromUrl) {
+                        const targetSchedule = schedulesData.find(s => s.id === parseInt(scheduleIdFromUrl));
+                        if (targetSchedule) {
+                            setSelectedPatientId(targetSchedule.patientId);
+                        } else if (patientsArray.length > 0) {
+                            setSelectedPatientId(patientsArray[0].id);
+                        }
+                    } else if (patientsArray.length > 0) {
+                        // Smart auto-selection: Find InProgress or closest upcoming shift
+                        const now = new Date();
+                        const findBestShift = () => {
+                            // 1. Priority: InProgress
+                            const inProgress = schedulesData.find(s => s.status === 'InProgress');
+                            if (inProgress) return inProgress;
+
+                            // 2. Priority: Starts within 30 mins from now
+                            return schedulesData.find(s => {
+                                const startParts = s.startTime.split(':').map(Number);
+                                const start = new Date(s.date);
+                                start.setHours(startParts[0], startParts[1], 0, 0);
+                                const diff = (start - now) / 60000;
+                                return diff >= -30 && diff <= 30;
+                            });
+                        };
+
+                        const bestShift = findBestShift();
+                        if (bestShift) {
+                            setSelectedPatientId(bestShift.patientId);
+                        } else {
+                            setSelectedPatientId(patientsArray[0].id);
+                        }
                     }
                 } else {
                     setPatients([{
