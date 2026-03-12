@@ -46,8 +46,8 @@ public class ScheduleDto
     public TimeSpan StartTime { get; set; }
     public TimeSpan EndTime { get; set; }
     public string Status { get; set; } = null!;
-    public DateTime? CheckInTime { get; set; }
-    public DateTime? CheckOutTime { get; set; }
+    public DateTimeOffset? CheckInTime { get; set; }
+    public DateTimeOffset? CheckOutTime { get; set; }
     public string? Notes { get; set; }
 }
 

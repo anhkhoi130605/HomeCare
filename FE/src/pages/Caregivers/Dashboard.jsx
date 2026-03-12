@@ -55,7 +55,8 @@ const Dashboard = () => {
         end.setHours(endParts[0], endParts[1], 0, 0);
         if (end <= start) end.setDate(end.getDate() + 1);
 
-        return now >= new Date(start.getTime() - 15 * 60000) && now <= end && s.status !== 'Completed';
+        // STRICTOR: Only active during the actual shift time
+        return now >= start && now <= end && s.status !== 'Completed';
     });
 
     // Upcoming shifts (not yet started)
@@ -65,7 +66,8 @@ const Dashboard = () => {
         const start = new Date(scheduleDate);
         start.setHours(startParts[0], startParts[1], 0, 0);
         
-        return now < new Date(start.getTime() - 15 * 60000) && s.status === 'Scheduled';
+        // Include everything that hasn't started yet
+        return now < start && s.status === 'Scheduled';
     });
 
     // Calculate stats
@@ -213,14 +215,36 @@ const Dashboard = () => {
 
                             {(activeShift || upcomingShifts[0]) && (
                                 <div className="flex-shrink-0 relative z-10 flex flex-col items-center">
-                                    <Link 
-                                        to={`/caregiver/active-shift?scheduleId=${(activeShift || upcomingShifts[0])?.id}`} 
-                                        className="bg-white text-[#5fa5ba] hover:bg-blue-50 px-8 py-5 rounded-2xl font-black text-lg shadow-lg flex items-center gap-3 transition-all hover:scale-105 active:scale-95 group/btn"
-                                    >
-                                        <span className="material-symbols-outlined text-2xl group-hover/btn:rotate-12 transition-transform">login</span>
-                                        QUICK CHECK-IN
-                                    </Link>
-                                    <p className="text-white/80 text-xs mt-3 text-center italic font-medium">Arrived at location? Tap to start log.</p>
+                                    {(() => {
+                                        const shift = activeShift || upcomingShifts[0];
+                                        const startParts = shift.startTime.split(':').map(Number);
+                                        const start = new Date(shift.date);
+                                        start.setHours(startParts[0], startParts[1], 0, 0);
+                                        const isReady = now >= start;
+
+                                        return isReady ? (
+                                            <>
+                                                <Link 
+                                                    to={`/caregiver/active-shift?scheduleId=${shift.id}`} 
+                                                    className="bg-white text-[#5fa5ba] hover:bg-blue-50 px-8 py-5 rounded-2xl font-black text-lg shadow-lg flex items-center gap-3 transition-all hover:scale-105 active:scale-95 group/btn"
+                                                >
+                                                    <span className="material-symbols-outlined text-2xl group-hover/btn:rotate-12 transition-transform">login</span>
+                                                    QUICK CHECK-IN
+                                                </Link>
+                                                <p className="text-white/80 text-xs mt-3 text-center italic font-medium">Arrived at location? Tap to start log.</p>
+                                            </>
+                                        ) : (
+                                            <div className="bg-white/10 backdrop-blur-md border border-white/20 px-8 py-5 rounded-2xl flex flex-col items-center">
+                                                <span className="text-white font-black text-lg flex items-center gap-2">
+                                                    <span className="material-symbols-outlined animate-pulse text-yellow-400">lock_clock</span>
+                                                    WAITING TO START
+                                                </span>
+                                                <p className="text-white/60 text-[10px] mt-1 font-bold uppercase tracking-wider">
+                                                    Check-in available at {formatTime(shift.startTime)}
+                                                </p>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             )}
                         </div>
@@ -279,39 +303,67 @@ const Dashboard = () => {
                                         <div key={shift.id} className="bg-white dark:bg-stone-900 p-6 rounded-[2rem] border border-stone-100 dark:border-stone-800 shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
                                             <div className="flex items-start justify-between">
                                                 <div className="flex items-center gap-5">
-                                                    <div className="w-14 h-14 rounded-2xl bg-stone-100 dark:bg-stone-800 flex items-center justify-center text-stone-400 font-bold text-lg">
-                                                        {shift.patientName?.split(' ').map(n => n[0]).join('') || '?'}
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="font-bold text-lg text-stone-800 dark:text-white">{shift.patientName}</h4>
-                                                        <p className="text-sm text-stone-500 dark:text-stone-400 flex items-center gap-1 font-medium mt-0.5">
-                                                            <span className="material-symbols-outlined text-sm">location_on</span>
-                                                            {shift.patientAddress || 'Address not provided'}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right flex flex-col items-end gap-2">
-                                                    <span className="text-sm font-black text-[#5fa5ba] bg-[#5fa5ba]/10 px-3 py-1 rounded-lg block">
-                                                        {formatTime(shift.startTime)} - {formatTime(shift.endTime)}
-                                                    </span>
-                                                    <button
-                                                        onClick={() => handleCheckIn(shift.id)}
-                                                        disabled={checkingIn === shift.id}
-                                                        className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    {/* Map Preview / Location Avatar */}
+                                                    <a 
+                                                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(shift.patientAddress || shift.patientName)}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="w-16 h-16 rounded-2xl bg-[#5fa5ba]/10 dark:bg-[#5fa5ba]/20 flex flex-col items-center justify-center text-[#5fa5ba] hover:bg-[#5fa5ba] hover:text-white transition-all group/map border border-[#5fa5ba]/20 overflow-hidden relative"
+                                                        title="Open in Google Maps"
                                                     >
-                                                        {checkingIn === shift.id ? (
-                                                            <>
-                                                                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                                                                Checking in...
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <span className="material-symbols-outlined text-sm">login</span>
-                                                                Check In
-                                                            </>
-                                                        )}
-                                                    </button>
+                                                        <span className="material-symbols-outlined text-2xl group-hover/map:scale-120 transition-transform">map</span>
+                                                        <span className="text-[8px] font-black uppercase mt-1">View Map</span>
+                                                        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#5fa5ba_1px,transparent_1px)] [background-size:8px_8px]"></div>
+                                                    </a>
+                                                    <div>
+                                                        <h4 className="font-extrabold text-lg text-stone-800 dark:text-white leading-tight">{shift.patientName}</h4>
+                                                        <a 
+                                                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(shift.patientAddress || shift.patientName)}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-xs text-stone-500 dark:text-stone-400 flex items-center gap-1 font-bold mt-1 hover:text-[#5fa5ba] transition-colors"
+                                                        >
+                                                            <span className="material-symbols-outlined text-sm">location_on</span>
+                                                            <span className="underline decoration-dotted">{shift.patientAddress || 'Address not provided'}</span>
+                                                        </a>
+                                                    </div>
                                                 </div>
+                                                    <div className="text-right flex flex-col items-end gap-2">
+                                                        <span className="text-sm font-black text-[#5fa5ba] bg-[#5fa5ba]/10 px-3 py-1 rounded-lg block">
+                                                            {formatTime(shift.startTime)} - {formatTime(shift.endTime)}
+                                                        </span>
+                                                        {(() => {
+                                                            const startParts = shift.startTime.split(':').map(Number);
+                                                            const start = new Date(shift.date);
+                                                            start.setHours(startParts[0], startParts[1], 0, 0);
+                                                            const isReady = now >= start;
+
+                                                            return isReady ? (
+                                                                <button
+                                                                    onClick={() => handleCheckIn(shift.id)}
+                                                                    disabled={checkingIn === shift.id}
+                                                                    className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                >
+                                                                    {checkingIn === shift.id ? (
+                                                                        <>
+                                                                            <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                                                            Checking in...
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <span className="material-symbols-outlined text-sm">login</span>
+                                                                            Check In
+                                                                        </>
+                                                                    )}
+                                                                </button>
+                                                            ) : (
+                                                                <span className="flex items-center gap-1.5 text-[10px] font-black text-amber-500 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100">
+                                                                    <span className="material-symbols-outlined text-sm">lock</span>
+                                                                    LOCKED
+                                                                </span>
+                                                            );
+                                                        })()}
+                                                    </div>
                                             </div>
                                         </div>
                                     ))

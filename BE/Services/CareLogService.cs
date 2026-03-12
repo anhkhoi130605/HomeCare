@@ -51,7 +51,9 @@ public class CareLogService : ICareLogService
                 PatientId = s.PatientId,
                 PatientName = s.Patient?.FullName ?? "",
                 Activities = s.Notes ?? "Completed shift log (Auto-generated entry)",
-                LoggedAt = s.CheckOutTime ?? s.Date.Date.Add(s.EndTime),
+                LoggedAt = s.CheckOutTime.HasValue 
+                    ? new DateTimeOffset(DateTime.SpecifyKind(s.CheckOutTime.Value, DateTimeKind.Utc)) 
+                    : new DateTimeOffset(DateTime.SpecifyKind(s.Date.Date.Add(s.EndTime), DateTimeKind.Utc)),
                 Status = "Submitted"
             });
         }
@@ -111,7 +113,9 @@ public class CareLogService : ICareLogService
                 PatientId = s.PatientId,
                 PatientName = s.Patient?.FullName ?? "Unknown Patient",
                 Activities = s.Notes ?? "Completed shift (Auto-generated log)",
-                LoggedAt = s.CheckOutTime ?? s.Date.Date.Add(s.EndTime),
+                LoggedAt = s.CheckOutTime.HasValue 
+                    ? new DateTimeOffset(DateTime.SpecifyKind(s.CheckOutTime.Value, DateTimeKind.Utc)) 
+                    : new DateTimeOffset(DateTime.SpecifyKind(s.Date.Date.Add(s.EndTime), DateTimeKind.Utc)),
                 Status = "Submitted"
             });
         }
@@ -158,7 +162,9 @@ public class CareLogService : ICareLogService
                 PatientId = s.PatientId,
                 PatientName = s.Patient?.FullName ?? "",
                 Activities = s.Notes ?? "Completed shift log (Auto-generated entry)",
-                LoggedAt = s.CheckOutTime ?? s.Date.Date.Add(s.EndTime),
+                LoggedAt = s.CheckOutTime.HasValue 
+                    ? new DateTimeOffset(DateTime.SpecifyKind(s.CheckOutTime.Value, DateTimeKind.Utc)) 
+                    : new DateTimeOffset(DateTime.SpecifyKind(s.Date.Date.Add(s.EndTime), DateTimeKind.Utc)),
                 Status = "Submitted"
             });
         }
@@ -188,7 +194,9 @@ public class CareLogService : ICareLogService
                 PatientId = s.PatientId,
                 PatientName = s.Patient?.FullName ?? "Unknown",
                 Activities = s.Notes ?? "Completed shift log (Auto-generated entry)",
-                LoggedAt = s.CheckOutTime ?? s.Date.Date.Add(s.EndTime),
+                LoggedAt = s.CheckOutTime.HasValue 
+                    ? new DateTimeOffset(DateTime.SpecifyKind(s.CheckOutTime.Value, DateTimeKind.Utc)) 
+                    : new DateTimeOffset(DateTime.SpecifyKind(s.Date.Date.Add(s.EndTime), DateTimeKind.Utc)),
                 Status = "Submitted"
             };
         }
@@ -337,7 +345,7 @@ public class CareLogService : ICareLogService
             VitalSigns = cl.VitalSigns,
             PatientMood = cl.PatientMood,
             Notes = cl.Notes,
-            LoggedAt = cl.LoggedAt,
+            LoggedAt = new DateTimeOffset(DateTime.SpecifyKind(cl.LoggedAt, DateTimeKind.Utc)),
             Status = isDraft ? "Draft" : "Submitted"
         };
     }

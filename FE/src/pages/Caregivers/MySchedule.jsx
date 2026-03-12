@@ -126,10 +126,8 @@ const MySchedule = () => {
         const shiftStart = new Date(now);
         shiftStart.setHours(hours, minutes, 0, 0);
 
-        // Allow check-in from 30 minutes before
-        const checkInWindowStart = new Date(shiftStart.getTime() - 30 * 60000);
-
-        return now >= checkInWindowStart;
+        // STRICT: Only allow check-in at or after the shift start time
+        return now >= shiftStart;
     };
 
     const getDisplayStatus = (schedule) => {

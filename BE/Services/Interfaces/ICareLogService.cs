@@ -29,7 +29,7 @@ public class CareLogDto
     public string? VitalSigns { get; set; }
     public string? PatientMood { get; set; }
     public string? Notes { get; set; }
-    public DateTime LoggedAt { get; set; }
+    public DateTimeOffset LoggedAt { get; set; }
     public string Status { get; set; } = "Submitted"; // Submitted or Draft
 }
 
