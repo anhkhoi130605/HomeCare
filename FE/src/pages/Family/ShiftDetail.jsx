@@ -49,7 +49,16 @@ const ShiftDetail = () => {
 
     const formatDateTime = (dateTimeStr) => {
         if (!dateTimeStr) return '--:--';
-        return new Date(dateTimeStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        try {
+            const date = new Date(dateTimeStr);
+            return date.toLocaleTimeString('en-GB', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: false 
+            });
+        } catch (e) {
+            return '--:--';
+        }
     };
 
     if (loading) return <div className="h-screen flex items-center justify-center font-['Public_Sans']"><span className="material-symbols-outlined animate-spin text-4xl text-[#5fa5ba]">progress_activity</span></div>;
