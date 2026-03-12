@@ -12,7 +12,7 @@ public class CareLogService : ICareLogService
     private readonly IHealthReportService _healthReportService;
 
     public CareLogService(
-        ApplicationDbContext context,
+        ApplicationDbContext context, 
         INotificationService notificationService,
         IHealthReportService healthReportService)
     {
@@ -28,9 +28,10 @@ public class CareLogService : ICareLogService
             .Include(cl => cl.Patient)
             .ToListAsync();
 
-        var dtos = logs.Select(MapToDto).ToList();
+        var dtos = logs.Select(cl => MapToDto(cl)).ToList();
         var loggedScheduleIds = logs.Select(l => l.ScheduleId).ToHashSet();
 
+        // Include Completed Schedules without Logs
         var extraSchedules = await _context.Schedules
             .Where(s => s.Status == ScheduleStatus.Completed && !loggedScheduleIds.Contains(s.Id))
             .Include(s => s.Caregiver)
@@ -43,15 +44,15 @@ public class CareLogService : ICareLogService
         {
             dtos.Add(new CareLogDto
             {
-                Id = -s.Id,
+                Id = -s.Id, // Negative ID to signal virtual log from schedule
                 ScheduleId = s.Id,
                 CaregiverId = s.CaregiverId,
                 CaregiverName = s.Caregiver?.FullName ?? "",
                 PatientId = s.PatientId,
                 PatientName = s.Patient?.FullName ?? "",
                 Activities = s.Notes ?? "Completed shift log (Auto-generated entry)",
-                LoggedAt = s.CheckOutTime.HasValue
-                    ? new DateTimeOffset(DateTime.SpecifyKind(s.CheckOutTime.Value, DateTimeKind.Utc))
+                LoggedAt = s.CheckOutTime.HasValue 
+                    ? new DateTimeOffset(DateTime.SpecifyKind(s.CheckOutTime.Value, DateTimeKind.Utc)) 
                     : new DateTimeOffset(DateTime.SpecifyKind(s.Date.Date.Add(s.EndTime), DateTimeKind.Utc)),
                 Status = "Submitted"
             });
@@ -69,33 +70,132 @@ public class CareLogService : ICareLogService
             .OrderByDescending(cl => cl.LoggedAt)
             .ToListAsync();
 
-        return logs.Select(MapToDto).ToList();
+        return logs.Select(cl => MapToDto(cl)).ToList();
+    }
+
+    public async Task<List<CareLogDto>> GetByCaregiverAsync(int caregiverId, DateTime? from = null, DateTime? to = null)
+    {
+        // 1. Fetch real CareLogs
+        var logsQuery = _context.CareLogs
+            .Where(cl => cl.CaregiverId == caregiverId)
+            .Include(cl => cl.Caregiver)
+            .Include(cl => cl.Patient)
+            .AsQueryable();
+
+        if (from.HasValue)
+            logsQuery = logsQuery.Where(cl => cl.LoggedAt >= from.Value);
+        if (to.HasValue)
+            logsQuery = logsQuery.Where(cl => cl.LoggedAt <= to.Value.AddDays(1));
+
+        var logs = await logsQuery.ToListAsync();
+        var dtos = logs.Select(cl => MapToDto(cl)).ToList();
+        var loggedScheduleIds = logs.Select(l => l.ScheduleId).ToHashSet();
+
+        // 2. Fetch Completed Schedules that don't have CareLogs to show them in history
+        var schedulesQuery = _context.Schedules
+            .Where(s => s.CaregiverId == caregiverId && s.Status == ScheduleStatus.Completed && !loggedScheduleIds.Contains(s.Id))
+            .Include(s => s.Caregiver)
+            .Include(s => s.Patient)
+            .AsQueryable();
+
+        if (from.HasValue) schedulesQuery = schedulesQuery.Where(s => s.Date >= from.Value);
+        if (to.HasValue) schedulesQuery = schedulesQuery.Where(s => s.Date <= to.Value);
+
+        var extraSchedules = await schedulesQuery.ToListAsync();
+        foreach (var s in extraSchedules)
+        {
+            dtos.Add(new CareLogDto
+            {
+                Id = -s.Id, // Negative ID to signal virtual log
+                ScheduleId = s.Id,
+                CaregiverId = s.CaregiverId,
+                CaregiverName = s.Caregiver?.FullName ?? "Unknown Caregiver",
+                PatientId = s.PatientId,
+                PatientName = s.Patient?.FullName ?? "Unknown Patient",
+                Activities = s.Notes ?? "Completed shift (Auto-generated log)",
+                LoggedAt = s.CheckOutTime.HasValue 
+                    ? new DateTimeOffset(DateTime.SpecifyKind(s.CheckOutTime.Value, DateTimeKind.Utc)) 
+                    : new DateTimeOffset(DateTime.SpecifyKind(s.Date.Date.Add(s.EndTime), DateTimeKind.Utc)),
+                Status = "Submitted"
+            });
+        }
+
+        return dtos.OrderByDescending(d => d.LoggedAt).ToList();
+    }
+
+    public async Task<List<CareLogDto>> GetByPatientAsync(int patientId, DateTime? from = null, DateTime? to = null)
+    {
+        var logsQuery = _context.CareLogs
+            .Where(cl => cl.PatientId == patientId)
+            .Include(cl => cl.Caregiver)
+            .Include(cl => cl.Patient)
+            .AsQueryable();
+
+        if (from.HasValue)
+            logsQuery = logsQuery.Where(cl => cl.LoggedAt >= from.Value);
+        if (to.HasValue)
+            logsQuery = logsQuery.Where(cl => cl.LoggedAt <= to.Value.AddDays(1));
+
+        var logs = await logsQuery.ToListAsync();
+        var dtos = logs.Select(cl => MapToDto(cl)).ToList();
+        var loggedScheduleIds = logs.Select(l => l.ScheduleId).ToHashSet();
+
+        // 2. Fetch Completed Schedules that don't have CareLogs
+        var schedulesQuery = _context.Schedules
+            .Where(s => s.PatientId == patientId && s.Status == ScheduleStatus.Completed && !loggedScheduleIds.Contains(s.Id))
+            .Include(s => s.Caregiver)
+            .Include(s => s.Patient)
+            .AsQueryable();
+
+        if (from.HasValue) schedulesQuery = schedulesQuery.Where(s => s.Date >= from.Value);
+        if (to.HasValue) schedulesQuery = schedulesQuery.Where(s => s.Date <= to.Value);
+
+        var extraSchedules = await schedulesQuery.ToListAsync();
+        foreach (var s in extraSchedules)
+        {
+            dtos.Add(new CareLogDto
+            {
+                Id = -s.Id, // Negative ID to signal virtual log
+                ScheduleId = s.Id,
+                CaregiverId = s.CaregiverId,
+                CaregiverName = s.Caregiver?.FullName ?? "",
+                PatientId = s.PatientId,
+                PatientName = s.Patient?.FullName ?? "",
+                Activities = s.Notes ?? "Completed shift log (Auto-generated entry)",
+                LoggedAt = s.CheckOutTime.HasValue 
+                    ? new DateTimeOffset(DateTime.SpecifyKind(s.CheckOutTime.Value, DateTimeKind.Utc)) 
+                    : new DateTimeOffset(DateTime.SpecifyKind(s.Date.Date.Add(s.EndTime), DateTimeKind.Utc)),
+                Status = "Submitted"
+            });
+        }
+
+        return dtos.OrderByDescending(d => d.LoggedAt).ToList();
     }
 
     public async Task<CareLogDto?> GetByIdAsync(int id)
     {
+        // Special case for virtual logs (negative IDs signal schedule-based logs)
         if (id < 0)
         {
             int scheduleId = -id;
-
             var s = await _context.Schedules
                 .Include(s => s.Caregiver)
                 .Include(s => s.Patient)
                 .FirstOrDefaultAsync(s => s.Id == scheduleId);
 
-            if (s == null) return null;
+            if (s == null || s.Status != ScheduleStatus.Completed) return null;
 
             return new CareLogDto
             {
                 Id = id,
                 ScheduleId = s.Id,
                 CaregiverId = s.CaregiverId,
-                CaregiverName = s.Caregiver?.FullName ?? "",
+                CaregiverName = s.Caregiver?.FullName ?? "Unknown",
                 PatientId = s.PatientId,
-                PatientName = s.Patient?.FullName ?? "",
-                Activities = s.Notes ?? "Completed shift log",
-                LoggedAt = s.CheckOutTime.HasValue
-                    ? new DateTimeOffset(DateTime.SpecifyKind(s.CheckOutTime.Value, DateTimeKind.Utc))
+                PatientName = s.Patient?.FullName ?? "Unknown",
+                Activities = s.Notes ?? "Completed shift log (Auto-generated entry)",
+                LoggedAt = s.CheckOutTime.HasValue 
+                    ? new DateTimeOffset(DateTime.SpecifyKind(s.CheckOutTime.Value, DateTimeKind.Utc)) 
                     : new DateTimeOffset(DateTime.SpecifyKind(s.Date.Date.Add(s.EndTime), DateTimeKind.Utc)),
                 Status = "Submitted"
             };
@@ -134,6 +234,7 @@ public class CareLogService : ICareLogService
 
         _context.CareLogs.Add(careLog);
 
+        // Update schedule status if not a draft
         if (!dto.IsDraft)
         {
             schedule.Status = ScheduleStatus.Completed;
@@ -141,26 +242,34 @@ public class CareLogService : ICareLogService
 
         await _context.SaveChangesAsync();
 
+        // Load with navigation properties for the DTO and Logic
         var patient = await _context.Patients
             .Include(p => p.Family)
             .FirstOrDefaultAsync(p => p.Id == careLog.PatientId);
-
+        
         await _context.Entry(careLog).Reference(c => c.Caregiver).LoadAsync();
         careLog.Patient = patient!;
+
+        if (!dto.IsDraft && patient?.Family != null)
+        {
+            await CreateHealthReportAndNotify(careLog, patient.Family.UserId);
+        }
 
         return MapToDto(careLog, dto.IsDraft);
     }
 
     private async Task CreateHealthReportAndNotify(CareLog careLog, int familyUserId)
     {
+        // 1. Notify Family
         await _notificationService.CreateNotificationAsync(
             familyUserId,
             "New Care Log Submitted",
-            $"Caregiver {careLog.Caregiver?.FullName ?? "Someone"} submitted a care log for {careLog.Patient?.FullName ?? "your patient"}",
+            $"Caregiver {careLog.Caregiver?.FullName ?? "Someone"} has submitted a new care log for {careLog.Patient?.FullName ?? "your patient"}.",
             "CareLog",
             careLog.Id
         );
 
+        // 2. Create an automatic Health Report entry
         await _healthReportService.CreateAsync(new CreateHealthReportDto
         {
             PatientId = careLog.PatientId,
@@ -169,10 +278,113 @@ public class CareLogService : ICareLogService
             Period = "Today",
             Status = "Stable",
             HealthScore = 100,
-            VitalsData = careLog.VitalSigns,
+            VitalsData = ConvertVitalSignsToJson(careLog.VitalSigns),
             Notes = careLog.Activities,
             ReportDate = careLog.LoggedAt
         });
+    }
+
+    private string ConvertVitalSignsToJson(string? vitalsStr)
+    {
+        if (string.IsNullOrEmpty(vitalsStr)) return "{}";
+
+        try
+        {
+            var parts = vitalsStr.Split(',');
+            string bp = "N/A";
+            string hr = "N/A";
+
+            foreach (var part in parts)
+            {
+                var trimmed = part.Trim();
+                if (trimmed.ToUpper().StartsWith("HR:") || trimmed.ToUpper().StartsWith("HEART RATE:"))
+                {
+                    var split = trimmed.Split(':');
+                    if (split.Length > 1) hr = split[1].Trim();
+                }
+                else if (trimmed.ToUpper().StartsWith("BP:") || trimmed.ToUpper().StartsWith("BLOOD PRESSURE:"))
+                {
+                    var split = trimmed.Split(':');
+                    if (split.Length > 1) bp = split[1].Trim();
+                }
+            }
+
+            return System.Text.Json.JsonSerializer.Serialize(new
+            {
+                bp = new { value = bp, status = "Normal" },
+                hr = new { value = hr, status = "Stable" }
+            });
+        }
+        catch
+        {
+            return "{}";
+        }
+    }
+
+    public async Task<CareLogDto?> UpdateAsync(int id, UpdateCareLogDto dto)
+    {
+        var careLog = await _context.CareLogs
+            .Include(cl => cl.Caregiver)
+            .Include(cl => cl.Patient)
+            .FirstOrDefaultAsync(cl => cl.Id == id);
+
+        if (careLog == null) return null;
+
+        if (dto.Activities != null) careLog.Activities = dto.Activities;
+        if (dto.MedicationsGiven != null) careLog.MedicationsGiven = dto.MedicationsGiven;
+        if (dto.MealsProvided != null) careLog.MealsProvided = dto.MealsProvided;
+        if (dto.VitalSigns != null) careLog.VitalSigns = dto.VitalSigns;
+        if (dto.PatientMood != null) careLog.PatientMood = dto.PatientMood;
+        if (dto.Notes != null) careLog.Notes = dto.Notes;
+
+        await _context.SaveChangesAsync();
+
+        return MapToDto(careLog, dto.IsDraft ?? false);
+    }
+
+    public async Task<bool> SendSummaryToFamilyAsync(int careLogId)
+    {
+        CareLog? careLog = null;
+
+        if (careLogId < 0)
+        {
+            // Handle virtual log
+            int scheduleId = -careLogId;
+            var s = await _context.Schedules
+                .Include(s => s.Caregiver)
+                .Include(s => s.Patient)
+                    .ThenInclude(p => p.Family)
+                .FirstOrDefaultAsync(s => s.Id == scheduleId);
+
+            if (s == null || s.Patient?.Family == null) return false;
+
+            // Create a temporary CareLog entity to satisfy the notification method
+            careLog = new CareLog
+            {
+                Id = careLogId,
+                ScheduleId = s.Id,
+                CaregiverId = s.CaregiverId,
+                Caregiver = s.Caregiver,
+                PatientId = s.PatientId,
+                Patient = s.Patient,
+                Activities = s.Notes ?? "Completed shift log (Auto-generated entry)",
+                LoggedAt = s.CheckOutTime ?? s.Date
+            };
+        }
+        else
+        {
+            careLog = await _context.CareLogs
+                .Include(cl => cl.Caregiver)
+                .Include(cl => cl.Patient)
+                    .ThenInclude(p => p.Family)
+                .FirstOrDefaultAsync(cl => cl.Id == careLogId);
+        }
+
+        if (careLog == null || careLog.Patient?.Family == null)
+            return false;
+
+        await CreateHealthReportAndNotify(careLog, careLog.Patient.Family.UserId);
+        return true;
     }
 
     public async Task<bool> DeleteAsync(int id)

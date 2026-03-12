@@ -1,3 +1,4 @@
+
 // API Configuration
 const API_BASE_URL = 'http://localhost:58773/api';
 const API_TIMEOUT = 60000; // 60 seconds timeout for TiDB Cloud latency during startup
@@ -155,7 +156,6 @@ export const authApi = {
     },
 
     getToken: () => {
-        return localStorage.getItem('authToken');
     },
 
     forgotPassword: async (email) => {

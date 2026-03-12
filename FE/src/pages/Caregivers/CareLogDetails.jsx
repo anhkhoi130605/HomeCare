@@ -25,13 +25,22 @@ const CareLogDetails = () => {
         if (id) fetchLog();
     }, [id]);
 
-    // Parse vital signs from JSON string
+    // Parse vital signs from JSON string or human-readable string
     const parseVitals = (vitalsString) => {
         if (!vitalsString) return null;
         try {
             return JSON.parse(vitalsString);
         } catch {
-            return null;
+            // Fallback for string format like "HR: 75, Temp: 36.8, BP: 120/80"
+            const result = {};
+            const parts = vitalsString.split(',').map(p => p.trim());
+            parts.forEach(part => {
+                if (part.toUpperCase().startsWith('HR:')) result.heartRate = part.split(':')[1]?.trim();
+                if (part.toUpperCase().startsWith('TEMP:')) result.temperature = part.split(':')[1]?.trim();
+                if (part.toUpperCase().startsWith('BP:')) result.bloodPressure = part.split(':')[1]?.trim();
+            });
+            // Only return if we found something
+            return Object.keys(result).length > 0 ? result : null;
         }
     };
 
@@ -150,7 +159,7 @@ const CareLogDetails = () => {
                                 <div className="bg-stone-50 dark:bg-stone-900/50 p-6 rounded-[2rem] border border-stone-100 dark:border-stone-800 flex items-center justify-between">
                                     <div>
                                         <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1.5">Temperature</p>
-                                        <p className="text-4xl font-extrabold text-stone-800 dark:text-white">{vitals.temperature} <span className="text-sm text-stone-400 font-bold">Â°C</span></p>
+                                        <p className="text-4xl font-extrabold text-stone-800 dark:text-white">{vitals.temperature} <span className="text-sm text-stone-400 font-bold">°C</span></p>
                                     </div>
                                     <span className="material-symbols-outlined text-emerald-500 text-3xl">check_circle</span>
                                 </div>

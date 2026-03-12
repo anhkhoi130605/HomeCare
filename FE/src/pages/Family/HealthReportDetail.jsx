@@ -26,22 +26,65 @@ const HealthReportDetail = () => {
         fetchReport();
     }, [id]);
 
-    // Parse vitals data from JSON string
+    // Parse vitals data from JSON string or human-readable string
     const parseVitals = (vitalsData) => {
-        if (!vitalsData) {
-            return {
-                bp: { value: "N/A", status: "Unknown" },
-                hr: { value: "N/A", status: "Unknown" }
-            };
-        }
+        const defaultVitals = {
+            bp: { value: "N/A", status: "Unknown" },
+            hr: { value: "N/A", status: "Unknown" }
+        };
+
+        if (!vitalsData) return defaultVitals;
+
+        // 1. Try JSON parsing
         try {
-            return JSON.parse(vitalsData);
-        } catch {
-            return {
-                bp: { value: "N/A", status: "Unknown" },
-                hr: { value: "N/A", status: "Unknown" }
-            };
+            const parsed = JSON.parse(vitalsData);
+
+            // Case A: Array (from seed data) - Take the last entry
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                const latest = parsed[parsed.length - 1];
+                return {
+                    bp: { value: latest.bp || latest.avgBp || latest.bloodPressure || "N/A", status: "Stable" },
+                    hr: { value: latest.hr || latest.avgHr || latest.heartRate || "N/A", status: "Stable" }
+                };
+            }
+
+            // Case B: Simple object with bp/hr keys
+            if (parsed.bp || parsed.hr) {
+                return {
+                    bp: typeof parsed.bp === 'object' ? (parsed.bp || defaultVitals.bp) : { value: parsed.bp, status: "Normal" },
+                    hr: typeof parsed.hr === 'object' ? (parsed.hr || defaultVitals.hr) : { value: parsed.hr, status: "Stable" }
+                };
+            }
+            
+            // Case C: Object with heartRate/bloodPressure keys
+            if (parsed.bloodPressure || parsed.heartRate) {
+                return {
+                    bp: { value: parsed.bloodPressure || "N/A", status: "Normal" },
+                    hr: { value: parsed.heartRate || "N/A", status: "Stable" }
+                };
+            }
+        } catch (e) {
+            // Not valid JSON, continue to string parsing
         }
+
+        // 2. Fallback: Parse human-readable string like "HR: 75, Temp: 36.8, BP: 120/80"
+        const result = {
+            bp: { value: "N/A", status: "Unknown" },
+            hr: { value: "N/A", status: "Unknown" }
+        };
+
+        const parts = vitalsData.split(',').map(p => p.trim());
+        parts.forEach(part => {
+            if (part.toUpperCase().startsWith('HR:') || part.toUpperCase().startsWith('HEART RATE:')) {
+                result.hr.value = part.split(':')[1]?.trim() || "N/A";
+                result.hr.status = 'Stable';
+            } else if (part.toUpperCase().startsWith('BP:') || part.toUpperCase().startsWith('BLOOD PRESSURE:')) {
+                result.bp.value = part.split(':')[1]?.trim() || "N/A";
+                result.bp.status = 'Normal';
+            }
+        });
+
+        return result;
     };
 
     // Get status color
