@@ -1,8 +1,10 @@
 
 // API Configuration
-const API_BASE_URL = 'http://localhost:58773/api';
+const API_BASE_URL = 'http://127.0.0.1:58773/api';
 const API_TIMEOUT = 60000; // 60 seconds timeout for TiDB Cloud latency during startup
 
+// Helper for waiting
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Custom error class for network errors
 export class NetworkError extends Error {
@@ -25,7 +27,7 @@ export class ApiError extends Error {
 }
 
 // Helper function for API calls with timeout and better error handling
-async function apiCall(endpoint, options = {}) {
+async function apiCall(endpoint, options = {}, retries = 5) {
     const url = `${API_BASE_URL}${endpoint}`;
 
     const defaultHeaders = {
@@ -46,61 +48,68 @@ async function apiCall(endpoint, options = {}) {
         },
     };
 
-    // Create abort controller for timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        // Create abort controller for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
-    try {
-        const response = await fetch(url, {
-            ...config,
-            signal: controller.signal
-        });
+        try {
+            const response = await fetch(url, {
+                ...config,
+                signal: controller.signal
+            });
 
-        clearTimeout(timeoutId);
+            clearTimeout(timeoutId);
 
-        // Handle non-JSON responses
-        const contentType = response.headers.get('content-type');
-        let data;
-        if (contentType && contentType.includes('application/json')) {
-            data = await response.json();
-        } else {
-            data = await response.text();
-        }
-
-        if (!response.ok) {
-            throw new ApiError(
-                data?.message || data || `Error ${response.status}`,
-                response.status,
-                data
-            );
-        }
-
-        return data;
-    } catch (error) {
-        clearTimeout(timeoutId);
-
-        // Handle abort/timeout
-        if (error.name === 'AbortError') {
-            throw new NetworkError('Hết thời gian kết nối. Vui lòng thử lại.');
-        }
-
-        // Handle network errors (no connection, DNS failure, etc.)
-        if (error.name === 'TypeError' && error.message.includes('fetch')) {
-            throw new NetworkError('Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng hoặc server.');
-        }
-
-        // Re-throw API errors as-is
-        if (error instanceof ApiError) {
-            if (error.status === 401) {
-                authApi.logout();
-                window.location.reload();
+            // Handle non-JSON responses
+            const contentType = response.headers.get('content-type');
+            let data;
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                data = await response.text();
             }
+
+            if (!response.ok) {
+                throw new ApiError(
+                    data?.message || data || `Error ${response.status}`,
+                    response.status,
+                    data
+                );
+            }
+
+            return data;
+        } catch (error) {
+            clearTimeout(timeoutId);
+
+            // Handle abort/timeout
+            if (error.name === 'AbortError') {
+                throw new NetworkError('Hết thời gian kết nối. Vui lòng thử lại.');
+            }
+
+            // Handle network errors (no connection, DNS failure, etc.)
+            if (error.name === 'TypeError' && (error.message.includes('fetch') || error.message.includes('Failed to fetch'))) {
+                if (attempt < retries) {
+                    console.warn(`[API] Kết nối thất bại lần ${attempt + 1}/${retries}. Đang thử lại sau 2s...`);
+                    await sleep(2000); // Wait for backend to wake up
+                    continue;
+                }
+                throw new NetworkError('Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng hoặc đảm bảo Server .NET đã chạy.');
+            }
+
+            // Re-throw API errors as-is
+            if (error instanceof ApiError) {
+                if (error.status === 401) {
+                    authApi.logout();
+                    window.location.reload();
+                }
+                throw error;
+            }
+
+            // Wrap other errors
+            console.error('API Error:', error);
             throw error;
         }
-
-        // Wrap other errors
-        console.error('API Error:', error);
-        throw error;
     }
 }
 
@@ -496,7 +505,7 @@ export const paymentApi = {
             method: 'POST',
         });
     },
-    
+
     // Add or update internal note (admin)
     addNote: async (paymentId, note) => {
         return apiCall(`/payment/${paymentId}/note`, {
