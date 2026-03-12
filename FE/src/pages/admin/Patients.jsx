@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Search, Filter, UserPlus, ChevronLeft, ChevronRight, Eye, MoreVertical, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,6 +9,9 @@ import { Input } from "@/components/ui/input";
 import AdminHeader from "@/components/layout/AdminHeader";
 import { adminApi } from "@/lib/api";
 import AddPatientModal from "./AddPatientModal";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const getRiskColor = (condition) => {
   if (!condition) return 'bg-gray-100 text-gray-800';
@@ -38,10 +42,18 @@ const formatDate = (dateStr) => {
 };
 
 const Patients = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [monitorOnly, setMonitorOnly] = useState(false);
+
+  const isOperationAdmin = location.pathname.startsWith('/operation-admin');
+  const basePath = isOperationAdmin ? '/operation-admin' : '/admin';
 
   useEffect(() => {
     const fetchPatients = async () => {
@@ -58,10 +70,16 @@ const Patients = () => {
     fetchPatients();
   }, []);
 
-  const filteredPatients = patients.filter(p =>
-    p.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.familyName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPatients = patients.filter(p => {
+    const matchesSearch =
+      p.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.familyName?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" || p.status?.toLowerCase() === statusFilter.toLowerCase();
+    const matchesRisk =
+      !monitorOnly || p.currentCondition?.toLowerCase().includes("monitor");
+    return matchesSearch && matchesStatus && matchesRisk;
+  });
 
   const stats = {
     total: patients.length,
@@ -98,7 +116,7 @@ const Patients = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-64"
             />
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowFilters(true)}>
               <Filter className="w-4 h-4" />
               Filters
             </Button>
@@ -182,7 +200,12 @@ const Patients = () => {
                       <td className="p-4 text-sm text-muted-foreground">{formatDate(patient.lastVisit)}</td>
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Button variant="outline" size="sm" className="gap-1">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="gap-1"
+                             onClick={() => navigate(`${basePath}/patients/${patient.id}/logs`)}
+                           >
                             <Activity className="w-3 h-3" />
                             View Log
                           </Button>
@@ -225,6 +248,38 @@ const Patients = () => {
           }
         }}
       />
+      <Dialog open={showFilters} onOpenChange={setShowFilters}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Filters</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Status</p>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="On Hold">On Hold</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox id="monitorOnly" checked={monitorOnly} onCheckedChange={setMonitorOnly} />
+              <label htmlFor="monitorOnly" className="text-sm">Need monitoring only</label>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => { setStatusFilter("all"); setMonitorOnly(false); }}>
+                Reset
+              </Button>
+              <Button onClick={() => setShowFilters(false)}>Apply</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

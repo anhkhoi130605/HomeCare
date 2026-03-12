@@ -94,6 +94,31 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Login with Google (UC-02 Supplemental)
+    /// </summary>
+    [HttpPost("google-login")]
+    public async Task<ActionResult<AuthResponseDto>> GoogleLogin([FromBody] GoogleLoginDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Email))
+        {
+            return BadRequest(new AuthResponseDto
+            {
+                Success = false,
+                Message = "Email is required"
+            });
+        }
+
+        var result = await _authService.LoginWithGoogleAsync(dto);
+
+        if (!result.Success)
+        {
+            return Unauthorized(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Check if email is already registered
     /// </summary>
     [HttpGet("check-email")]

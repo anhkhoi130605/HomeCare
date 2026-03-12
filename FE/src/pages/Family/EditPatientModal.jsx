@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { familyApi } from '@/lib/api';
 import { formatDateToYYYYMMDD } from '@/lib/utils';
 import { toast } from 'sonner';
+import MapPicker from '@/components/shared/MapPicker';
 
 const EditPatientModal = ({ isOpen, onClose, patient, onPatientUpdated }) => {
     const [loading, setLoading] = useState(false);
+    
+    // Form data quản lý tất cả các field, bao gồm cả address
     const [formData, setFormData] = useState({
         fullName: '',
         dateOfBirth: '',
@@ -29,13 +32,18 @@ const EditPatientModal = ({ isOpen, onClose, patient, onPatientUpdated }) => {
         }
     }, [patient, isOpen]);
 
-    if (!isOpen) return null;
-
+    // 1. HÀM XỬ LÝ KHI GÕ VÀO Ô INPUT THƯỜNG
     const handleChange = (e) => {
         const { id, value } = e.target;
         setFormData(prev => ({ ...prev, [id]: value }));
     };
 
+    // 2. HÀM XỬ LÝ RIÊNG CHO BẢN ĐỒ (Cập nhật thẳng vào formData.address)
+    const handleMapSelect = (mapAddress) => {
+        setFormData(prev => ({ ...prev, address: mapAddress }));
+    };
+
+    // 3. HÀM SUBMIT LƯU DỮ LIỆU
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -70,6 +78,9 @@ const EditPatientModal = ({ isOpen, onClose, patient, onPatientUpdated }) => {
         }
     };
 
+    if (!isOpen) return null;
+
+    // 4. GIAO DIỆN CHÍNH (Đã tích hợp MapPicker đúng chỗ)
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#0d4e5c]/40 backdrop-blur-sm animate-fade-in-up">
             <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-[#B2EBF2] flex flex-col overflow-hidden max-h-[95vh]">
@@ -118,17 +129,23 @@ const EditPatientModal = ({ isOpen, onClose, patient, onPatientUpdated }) => {
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-stone-400 ml-1 uppercase tracking-wider" htmlFor="address">📍 Care Address</label>
+                        {/* --- KHU VỰC NHẬP ĐỊA CHỈ BẢN ĐỒ --- */}
+                        <div className="space-y-2 z-10 relative">
+                            <label className="text-xs font-bold text-stone-400 ml-1 uppercase tracking-wider" htmlFor="address">📍 Care Address (Chỉ hỗ trợ Đà Nẵng)</label>
+                            
                             <input
-                                className="w-full px-6 py-4 bg-[#F8FAFC] border border-stone-100 rounded-2xl focus:ring-2 focus:ring-[#99C5D3] focus:border-[#5fa5ba] text-stone-800 transition-all outline-none font-medium"
+                                className="w-full px-6 py-4 bg-[#F8FAFC] border border-stone-100 rounded-2xl focus:ring-2 focus:ring-[#99C5D3] focus:border-[#5fa5ba] text-stone-800 transition-all outline-none font-medium mb-2"
                                 id="address"
-                                placeholder="Enter specific care location"
+                                placeholder="Nhập địa chỉ hoặc chọn trên bản đồ"
                                 type="text"
                                 value={formData.address}
                                 onChange={handleChange}
                             />
+                            
+                            {/* Gọi MapPicker ra ngay dưới ô input */}
+                            <MapPicker onAddressSelect={handleMapSelect} />
                         </div>
+                        {/* --- KẾT THÚC KHU VỰC ĐỊA CHỈ --- */}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">

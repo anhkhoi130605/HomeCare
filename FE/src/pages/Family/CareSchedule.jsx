@@ -69,6 +69,7 @@ const CareSchedule = () => {
             time: s.startTime ? formatTimeSpan(s.startTime) : '09:00 AM',
             patient: s.patientName || s.patient?.name,
             isDone: s.status === 'Completed',
+            status: s.status,
             isToday: checkDate.toDateString() === new Date().toDateString()
         }));
     };
@@ -166,16 +167,19 @@ const CareSchedule = () => {
                             </div>
                         </div>
 
-                        {/* Event Type Legend */}
+                        {/* Event Status Legend */}
                         <div className="flex flex-wrap justify-center gap-4 md:gap-6 bg-stone-50 px-4 py-2 rounded-full border border-stone-100">
                             <div className="flex items-center gap-2 text-[10px] font-bold text-stone-500 uppercase tracking-widest">
-                                <span className="w-2 h-2 rounded-full bg-[#5fa5ba]"></span> Medical
+                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Done
                             </div>
                             <div className="flex items-center gap-2 text-[10px] font-bold text-stone-500 uppercase tracking-widest">
-                                <span className="w-2 h-2 rounded-full bg-orange-400"></span> Personal
+                                <span className="w-2 h-2 rounded-full bg-blue-500"></span> Upcoming
                             </div>
                             <div className="flex items-center gap-2 text-[10px] font-bold text-stone-500 uppercase tracking-widest">
-                                <span className="w-2 h-2 rounded-full bg-stone-300"></span> Off
+                                <span className="w-2 h-2 rounded-full bg-red-500"></span> Cancelled
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] font-bold text-stone-500 uppercase tracking-widest">
+                                <span className="w-2 h-2 rounded-full bg-stone-400"></span> Failed
                             </div>
                         </div>
                     </div>
@@ -188,79 +192,178 @@ const CareSchedule = () => {
                     </div>
 
                     {/* Grid Components */}
-                    <div className="grid grid-cols-7 bg-stone-200 gap-px border-b border-stone-200">
-                        {/* Note: Using gap-px with bg-stone-200 creates the precise grid lines expected in professional apps */}
-
-                        {/* Empty Slots (Prev Month) */}
-                        {prevDays.map(day => (
-                            <div key={`prev-${day}`} className="bg-white/50 min-h-[120px] md:min-h-[160px] p-2 flex flex-col justify-end pb-4 items-center md:items-start md:justify-start md:p-3 relative">
-                                <span className="text-sm font-bold text-stone-300 pointer-events-none">{day}</span>
-                                <div className="absolute inset-0 bg-stone-50/50 pattern-grid-lg opacity-30"></div>
-                            </div>
-                        ))}
-
-                        {/* Month Days */}
-                        {days.map(day => {
-                            const dayEvents = getEventsForDay(day);
-                            const event = dayEvents[0]; // Show first event
-                            const today = new Date();
-                            const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-
-                            return (
-                                <div key={day} className={`bg-white min-h-[120px] md:min-h-[160px] p-2 md:p-3 transition-colors hover:bg-stone-50 group relative flex flex-col gap-2 ${isToday ? 'bg-sky-50/20' : ''}`}>
-
-                                    {/* Day Number */}
-                                    <div className="flex justify-center md:justify-between items-start">
-                                        <span className={`text-sm md:text-base font-bold w-7 h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-[#5fa5ba] text-white shadow-md' : 'text-stone-700'}`}>
-                                            {day}
-                                        </span>
-                                        {isToday && <span className="hidden md:inline-block text-[9px] font-bold text-[#5fa5ba] bg-[#5fa5ba]/10 px-2 py-0.5 rounded-full">TODAY</span>}
-                                    </div>
-
-                                    {/* Event Rendering */}
-                                    {event ? (
-                                        <Link to={`/family/schedule/detail/${event.id}`} className="flex-1">
-                                            {event.isDone ? (
-                                                <div className="mt-1 flex items-center justify-center md:justify-start gap-1 p-1.5 md:p-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100/50 group-hover:border-emerald-200 transition-colors">
-                                                    <div className="w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
-                                                        <span className="material-symbols-outlined text-[12px] font-bold">check</span>
-                                                    </div>
-                                                    <span className="hidden md:block text-[11px] font-bold truncate line-through opacity-60">Completed</span>
-                                                </div>
-                                            ) : (
-                                                <div className={`mt-1 p-1.5 md:p-2 rounded-lg border flex flex-col md:flex-row items-start md:items-center gap-1.5 transition-all hover:shadow-md ${event.type === 'CONTRACT' ? 'bg-[#5fa5ba]/5 border-[#5fa5ba]/20 hover:border-[#5fa5ba]/40 text-[#00695C]' : 'bg-orange-50/50 border-orange-100 hover:border-orange-200 text-orange-700'}`}>
-                                                    <div className={`w-1.5 h-full rounded-full absolute left-0 top-0 bottom-0 ${event.type === 'CONTRACT' ? 'bg-[#5fa5ba]' : 'bg-orange-400'} md:hidden`}></div>
-
-                                                    {/* Event Icon Pill */}
-                                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${event.type === 'CONTRACT' ? 'bg-white text-[#5fa5ba] shadow-sm' : 'bg-white text-orange-500 shadow-sm'}`}>
-                                                        <span className="material-symbols-outlined text-[14px]">
-                                                            {event.type === 'CONTRACT' ? 'stethoscope' : 'accessibility_new'}
-                                                        </span>
-                                                    </div>
-
-                                                    <div className="hidden md:flex flex-col min-w-0">
-                                                        <span className="text-[10px] font-bold opacity-70 leading-tight">{event.time || '09:00 AM'}</span>
-                                                        <span className="text-[11px] font-bold truncate leading-tight">{event.name}</span>
-                                                        {event.patient && (
-                                                            <span className="text-[9px] text-stone-500 truncate leading-tight mt-0.5">For: {event.patient}</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </Link>
-                                    ) : (
-                                        // Empty state click target
-                                        <Link to="/family/booking" className="flex-1 hidden group-hover:block w-full h-full cursor-cell"></Link>
-                                    )}
-
-                                    {/* Quick Add Button (Hover) */}
-                                    <Link to="/family/booking" className="absolute bottom-2 right-2 w-7 h-7 rounded-full bg-white border border-stone-200 text-stone-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-[#5fa5ba] hover:text-white hover:border-[#5fa5ba] shadow-sm z-20">
-                                        <span className="material-symbols-outlined text-[16px]">add</span>
-                                    </Link>
+                    {view === 'Monthly' && (
+                        <div className="grid grid-cols-7 bg-stone-200 gap-px border-b border-stone-200">
+                            {/* Empty Slots (Prev Month) */}
+                            {prevDays.map(day => (
+                                <div key={`prev-${day}`} className="bg-white/50 min-h-[120px] md:min-h-[160px] p-2 flex flex-col justify-end pb-4 items-center md:items-start md:justify-start md:p-3 relative">
+                                    <span className="text-sm font-bold text-stone-300 pointer-events-none">{day}</span>
+                                    <div className="absolute inset-0 bg-stone-50/50 pattern-grid-lg opacity-30"></div>
                                 </div>
-                            )
-                        })}
-                    </div>
+                            ))}
+
+                            {/* Month Days */}
+                            {days.map(day => {
+                                const dayEvents = getEventsForDay(day);
+                                const event = dayEvents[0]; // Show first event
+                                const today = new Date();
+                                const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+
+                                return (
+                                    <div key={day} className={`bg-white min-h-[120px] md:min-h-[160px] p-2 md:p-3 transition-colors hover:bg-stone-50 group relative flex flex-col gap-2 ${isToday ? 'bg-sky-50/20' : ''}`}>
+
+                                        {/* Day Number */}
+                                        <div className="flex justify-center md:justify-between items-start">
+                                            <span className={`text-sm md:text-base font-bold w-7 h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-[#5fa5ba] text-white shadow-md' : 'text-stone-700'}`}>
+                                                {day}
+                                            </span>
+                                            {isToday && <span className="hidden md:inline-block text-[9px] font-bold text-[#5fa5ba] bg-[#5fa5ba]/10 px-2 py-0.5 rounded-full">TODAY</span>}
+                                        </div>
+
+                                        {/* Event Rendering */}
+                                        {event ? (
+                                            <Link to={`/family/schedule/detail/${event.id}`} className="flex-1">
+                                                {event.status === 'Completed' ? (
+                                                    <div className="mt-1 flex items-center justify-center md:justify-start gap-1 p-1.5 md:p-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100/50 group-hover:border-emerald-200 transition-colors">
+                                                        <div className="w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
+                                                            <span className="material-symbols-outlined text-[12px] font-bold">check</span>
+                                                        </div>
+                                                        <span className="hidden md:block text-[11px] font-bold truncate line-through opacity-60">Completed</span>
+                                                    </div>
+                                                ) : event.status === 'Cancelled' ? (
+                                                    <div className="mt-1 flex items-center justify-center md:justify-start gap-1 p-1.5 md:p-2 rounded-lg bg-red-50 text-red-700 border border-red-100/50 group-hover:border-red-200 transition-colors">
+                                                        <div className="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center shrink-0">
+                                                            <span className="material-symbols-outlined text-[12px] font-bold">block</span>
+                                                        </div>
+                                                        <span className="hidden md:block text-[11px] font-bold truncate line-through opacity-60 text-red-400">Cancelled</span>
+                                                    </div>
+                                                ) : event.status === 'Failed' ? (
+                                                    <div className="mt-1 flex items-center justify-center md:justify-start gap-1 p-1.5 md:p-2 rounded-lg bg-stone-50 text-stone-600 border border-stone-200/50 group-hover:border-stone-300 transition-colors">
+                                                        <div className="w-5 h-5 bg-stone-200 rounded-full flex items-center justify-center shrink-0">
+                                                            <span className="material-symbols-outlined text-[12px] font-bold">error</span>
+                                                        </div>
+                                                        <div className="hidden md:flex flex-col min-w-0">
+                                                            <span className="text-[10px] font-bold opacity-70 leading-tight">{event.time}</span>
+                                                            <span className="text-[11px] font-bold truncate leading-tight">{event.name}</span>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="mt-1 p-1.5 md:p-2 rounded-lg border flex flex-col md:flex-row items-start md:items-center gap-1.5 transition-all hover:shadow-md bg-blue-50 border-blue-200 text-blue-700">
+                                                        <div className="w-1.5 h-full rounded-full absolute left-0 top-0 bottom-0 bg-blue-500 md:hidden"></div>
+
+                                                        {/* Event Icon Pill */}
+                                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${event.status === 'InProgress' ? 'bg-white text-blue-500 shadow-sm animate-pulse' : 'bg-white text-blue-500 shadow-sm'}`}>
+                                                            <span className="material-symbols-outlined text-[14px]">
+                                                                {event.status === 'InProgress' ? 'sync' : 'stethoscope'}
+                                                            </span>
+                                                        </div>
+
+                                                        <div className="hidden md:flex flex-col min-w-0">
+                                                            <span className="text-[10px] font-bold opacity-70 leading-tight">{event.time}</span>
+                                                            <span className="text-[11px] font-bold truncate leading-tight">{event.name}</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </Link>
+                                        ) : (
+                                            // Empty state click target
+                                            <Link to="/family/booking" className="flex-1 hidden group-hover:block w-full h-full cursor-cell"></Link>
+                                        )}
+
+                                        {/* Quick Add Button (Hover) */}
+                                        <Link to="/family/booking" className="absolute bottom-2 right-2 w-7 h-7 rounded-full bg-white border border-stone-200 text-stone-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-[#5fa5ba] hover:text-white hover:border-[#5fa5ba] shadow-sm z-20">
+                                            <span className="material-symbols-outlined text-[16px]">add</span>
+                                        </Link>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
+
+                    {view === 'Weekly' && (
+                        <div className="p-6">
+                            <div className="flex flex-col gap-4">
+                                {Array.from({ length: 7 }).map((_, i) => {
+                                    const date = new Date();
+                                    date.setDate(date.getDate() - date.getDay() + i);
+                                    const dayEvents = schedules.filter(s => new Date(s.date).toDateString() === date.toDateString());
+                                    const isToday = date.toDateString() === new Date().toDateString();
+
+                                    return (
+                                        <div key={i} className={`flex gap-4 p-4 rounded-3xl border transition-all ${isToday ? 'bg-sky-50/30 border-sky-100 shadow-sm' : 'bg-white border-stone-100 hover:border-stone-200'}`}>
+                                            <div className="flex flex-col items-center justify-center w-16 shrink-0">
+                                                <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">{date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                                                <span className={`text-xl font-black ${isToday ? 'text-[#5fa5ba]' : 'text-stone-700'}`}>{date.getDate()}</span>
+                                            </div>
+                                            <div className="flex-1 flex flex-col gap-2">
+                                                {dayEvents.length > 0 ? dayEvents.map(s => (
+                                                    <Link key={s.id} to={`/family/schedule/detail/${s.id}`} className="flex items-center justify-between p-3 rounded-2xl bg-stone-50 hover:bg-stone-100 transition-colors border border-stone-100">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-[#5fa5ba] shadow-sm">
+                                                                <span className="material-symbols-outlined text-xl">medical_services</span>
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm font-bold text-stone-800">{s.serviceName || 'Care Visit'}</p>
+                                                                <p className="text-[11px] text-stone-500 font-medium">With {s.caregiverName || 'TBD'} • For {s.patientName || 'Family Member'}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-xs font-bold text-stone-700">{s.startTime ? s.startTime.substring(0, 5) : '09:00'}</p>
+                                                            <p className={`text-[10px] font-bold uppercase tracking-wide ${s.status === 'Completed' ? 'text-emerald-500' : 'text-[#5fa5ba]'}`}>{s.status}</p>
+                                                        </div>
+                                                    </Link>
+                                                )) : (
+                                                    <div className="h-full flex items-center px-4">
+                                                        <p className="text-xs text-stone-400 font-medium">No visits scheduled</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {view === 'List' && (
+                        <div className="p-6">
+                            <div className="divide-y divide-stone-100">
+                                {schedules.sort((a, b) => new Date(a.date) - new Date(b.date)).map(s => (
+                                    <Link key={s.id} to={`/family/schedule/detail/${s.id}`} className="flex items-center justify-between py-6 group">
+                                        <div className="flex items-center gap-6">
+                                            <div className="w-16 h-16 rounded-2xl bg-stone-50 flex flex-col items-center justify-center group-hover:bg-[#5fa5ba]/10 transition-colors">
+                                                <span className="text-[10px] font-bold text-stone-400 uppercase">{new Date(s.date).toLocaleDateString('en-US', { month: 'short' })}</span>
+                                                <span className="text-xl font-black text-stone-700 group-hover:text-[#5fa5ba]">{new Date(s.date).getDate()}</span>
+                                            </div>
+                                            <div>
+                                                <h4 className="text-lg font-bold text-stone-900 group-hover:text-[#5fa5ba] transition-colors">{s.serviceName || 'Care Visit'}</h4>
+                                                <div className="flex items-center gap-4 mt-1">
+                                                    <span className="flex items-center gap-1.5 text-xs text-stone-500 font-medium">
+                                                        <span className="material-symbols-outlined text-sm">schedule</span>
+                                                        {s.startTime ? s.startTime.substring(0, 5) : '09:00'}
+                                                    </span>
+                                                    <span className="flex items-center gap-1.5 text-xs text-stone-500 font-medium">
+                                                        <span className="material-symbols-outlined text-sm">person</span>
+                                                        For: {s.patientName}
+                                                    </span>
+                                                    <span className="flex items-center gap-1.5 text-xs text-stone-500 font-medium">
+                                                        <span className="material-symbols-outlined text-sm">badge</span>
+                                                        Caregiver: {s.caregiverName || 'TBD'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${s.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-[#5fa5ba]/5 text-[#5fa5ba]'}`}>
+                                                {s.status}
+                                            </span>
+                                            <span className="material-symbols-outlined text-stone-300 group-hover:text-[#5fa5ba] group-hover:translate-x-1 transition-all">chevron_right</span>
+                                        </div>
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </ScrollAnimation>
 

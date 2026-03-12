@@ -1,6 +1,8 @@
+
 // API Configuration
 const API_BASE_URL = (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE_URL) || 'http://localhost:5000/api';
 const API_TIMEOUT = 60000; // 60 seconds timeout for TiDB Cloud latency during startup
+
 
 // Custom error class for network errors
 export class NetworkError extends Error {
@@ -89,6 +91,10 @@ async function apiCall(endpoint, options = {}) {
 
         // Re-throw API errors as-is
         if (error instanceof ApiError) {
+            if (error.status === 401) {
+                authApi.logout();
+                window.location.reload();
+            }
             throw error;
         }
 
@@ -112,6 +118,13 @@ export const authApi = {
         return apiCall('/auth/login', {
             method: 'POST',
             body: JSON.stringify(credentials),
+        });
+    },
+
+    loginWithGoogle: async (googleData) => {
+        return apiCall('/auth/google-login', {
+            method: 'POST',
+            body: JSON.stringify(googleData),
         });
     },
 
@@ -407,8 +420,23 @@ export const adminApi = {
     // Toggle user status
     toggleUserStatus: async (userId, isActive) => {
         return apiCall(`/admin/users/${userId}/status`, {
-            method: 'PATCH',
-            body: JSON.stringify(isActive),
+            method: 'PUT',
+            body: JSON.stringify({ isActive }),
+        });
+    },
+
+    // Create user
+    createUser: async (data) => {
+        return apiCall('/admin/users', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    },
+
+    // Delete user
+    deleteUser: async (userId) => {
+        return apiCall(`/admin/users/${userId}`, {
+            method: 'DELETE',
         });
     },
 
@@ -466,6 +494,14 @@ export const paymentApi = {
     getVnPayUrl: async (paymentId) => {
         return apiCall(`/payment/${paymentId}/vnpay-url`, {
             method: 'POST',
+        });
+    },
+    
+    // Add or update internal note (admin)
+    addNote: async (paymentId, note) => {
+        return apiCall(`/payment/${paymentId}/note`, {
+            method: 'PUT',
+            body: JSON.stringify({ note }),
         });
     },
 };

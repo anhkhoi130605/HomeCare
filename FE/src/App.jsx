@@ -51,6 +51,7 @@ const CareLogDetail = lazy(() => import("./pages/admin/CareLogDetail"));
 const Payments = lazy(() => import("./pages/admin/Payments"));
 const AdminIncidents = lazy(() => import("./pages/admin/Incidents"));
 const AdminContracts = lazy(() => import("./pages/admin/Contracts"));
+const PatientLogs = lazy(() => import("./pages/admin/PatientLogs"));
 
 // Operation Admin Pages (Lazy Loaded)
 const OperationDashboard = lazy(() => import("./pages/operation-admin/Dashboard"));
@@ -83,7 +84,7 @@ const FamilyProfile = lazy(() => import("./pages/Family/FamilyProfile"));
 const FamilyCareLogDetail = lazy(() => import("./pages/Family/CareLogDetail"));
 const FamilyFeedback = lazy(() => import("./pages/Family/Feedback"));
 const FamilyPaymentDetails = lazy(() => import("./pages/Family/PaymentDetails"));
-
+const FamilyChangePassword = lazy(() => import("./pages/Family/ChangePassword"));
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -118,12 +119,14 @@ const App = () => (
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="users" element={<Users />} />
                 <Route path="patients" element={<Patients />} />
+                <Route path="patients/:id/logs" element={<PatientLogs />} />
                 <Route path="caregivers" element={<Caregivers />} />
                 <Route path="requests" element={<Requests />} />
                 <Route path="schedule" element={<Schedule />} />
                 <Route path="reports" element={<Reports />} />
                 <Route path="reports/care-log/:id" element={<CareLogDetail />} />
                 <Route path="payments" element={<Payments />} />
+                <Route path="payments/:id" element={<Payments />} />
                 <Route path="incidents" element={<AdminIncidents />} />
                 <Route path="contracts" element={<AdminContracts />} />
               </Route>
@@ -133,12 +136,14 @@ const App = () => (
                 <Route index element={<OperationDashboard />} />
                 <Route path="dashboard" element={<OperationDashboard />} />
                 <Route path="patients" element={<OperationPatients />} />
+                <Route path="patients/:id/logs" element={<PatientLogs />} />
                 <Route path="caregivers" element={<OperationCaregivers />} />
                 <Route path="requests" element={<OperationRequests />} />
                 <Route path="schedule" element={<OperationSchedule />} />
                 <Route path="incidents" element={<OperationIncidents />} />
                 <Route path="contracts" element={<OperationContracts />} />
                 <Route path="reports" element={<OperationReports />} />
+                <Route path="reports/care-log/:id" element={<CareLogDetail />} />
               </Route>
 
               {/* Family Routes */}
@@ -160,6 +165,7 @@ const App = () => (
                 <Route path="requests/:id" element={<FamilyRequestDetail />} />
                 <Route path="contracts/create" element={<FamilyCreateContract />} />
                 <Route path="profile" element={<FamilyProfile />} />
+                <Route path="change-password" element={<FamilyChangePassword />} />
                 <Route path="feedback" element={<FamilyFeedback />} />
                 <Route path="payment/contract/:id" element={<FamilyPaymentDetails type="contract" />} />
                 <Route path="payment/:id" element={<FamilyPaymentDetails type="request" />} />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useLocation } from "react-router-dom";
 import { ChevronLeft, CheckCircle, Send, AlertTriangle, Activity, Pill, UtensilsCrossed, PersonStanding, Clock, User, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,9 +9,13 @@ import { careLogApi, adminApi } from "@/lib/api";
 
 const CareLogDetail = () => {
   const { id } = useParams();
+  const location = useLocation();
   const [careLog, setCareLog] = useState(null);
   const [patient, setPatient] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const isOperationAdmin = location.pathname.startsWith('/operation-admin');
+  const basePath = isOperationAdmin ? '/operation-admin' : '/admin';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -56,7 +60,7 @@ const CareLogDetail = () => {
   if (!careLog) {
     return (
       <div className="p-6">
-        <Link to="/admin/reports" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <Link to={`${basePath}/reports`} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ChevronLeft className="w-4 h-4" />
           Back to Reports
         </Link>
@@ -79,9 +83,9 @@ const CareLogDetail = () => {
       {/* Breadcrumb Header */}
       <header className="h-14 bg-background border-b border-border flex items-center justify-between px-6">
         <nav className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link to="/admin/reports" className="hover:text-foreground">Reports</Link>
+          <Link to={basePath} className="hover:text-foreground">{isOperationAdmin ? 'Operations' : 'Admin'}</Link>
           <span>›</span>
-          <Link to="/admin/reports" className="hover:text-foreground">Care Log Monitoring</Link>
+          <Link to={`${basePath}/reports`} className="hover:text-foreground">Care Log Monitoring</Link>
           <span>›</span>
           <span className="text-foreground font-medium">{careLog.patientName?.toUpperCase() || 'CARE'} LOG</span>
         </nav>
