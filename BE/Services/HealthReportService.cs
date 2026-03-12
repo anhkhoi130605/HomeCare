@@ -40,6 +40,9 @@ public class HealthReportService : IHealthReportService
 
     public async Task<List<HealthReportDto>> GetByFamilyAsync(int familyId)
     {
+        // Auto-sync: Create health reports for any care logs that don't have one yet
+        await SyncReportsFromLogsAsync(familyId);
+
         // Get all patients belonging to this family
         var patientIds = await _context.Patients
             .Where(p => p.FamilyId == familyId)
@@ -54,6 +57,61 @@ public class HealthReportService : IHealthReportService
             .ToListAsync();
 
         return reports.Select(MapToDto).ToList();
+    }
+
+    private async Task SyncReportsFromLogsAsync(int familyId)
+    {
+        var patientIds = await _context.Patients
+            .Where(p => p.FamilyId == familyId)
+            .Select(p => p.Id)
+            .ToListAsync();
+
+        if (!patientIds.Any()) return;
+
+        // Get recent care logs (last 7 days) to backfill
+        var cutoff = DateTime.UtcNow.AddDays(-7);
+        var logs = await _context.CareLogs
+            .Where(cl => patientIds.Contains(cl.PatientId) && cl.LoggedAt >= cutoff)
+            .ToListAsync();
+
+        if (!logs.Any()) return;
+
+        // Get existing health reports of shift summary type
+        var existingReports = await _context.HealthReports
+            .Where(h => patientIds.Contains(h.PatientId) && h.ReportDate >= cutoff && h.ReportType == "Daily Shift Summary")
+            .ToListAsync();
+
+        bool hasChanges = false;
+        foreach (var log in logs)
+        {
+            // Check if a report exists for the same patient around the same time
+            bool alreadyExists = existingReports.Any(r => 
+                r.PatientId == log.PatientId && 
+                Math.Abs((r.ReportDate - log.LoggedAt).TotalMinutes) < 10);
+
+            if (!alreadyExists)
+            {
+                _context.HealthReports.Add(new HealthReport
+                {
+                    PatientId = log.PatientId,
+                    CaregiverId = log.CaregiverId,
+                    ReportType = "Daily Shift Summary",
+                    Period = "Today",
+                    Status = "Stable",
+                    HealthScore = 100,
+                    VitalsData = log.VitalSigns,
+                    Notes = log.Activities,
+                    ReportDate = log.LoggedAt,
+                    CreatedAt = DateTime.UtcNow
+                });
+                hasChanges = true;
+            }
+        }
+
+        if (hasChanges)
+        {
+            await _context.SaveChangesAsync();
+        }
     }
 
     public async Task<HealthReportDto?> GetByIdAsync(int id)
