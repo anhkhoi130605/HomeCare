@@ -250,6 +250,11 @@ public class CareLogService : ICareLogService
         await _context.Entry(careLog).Reference(c => c.Caregiver).LoadAsync();
         careLog.Patient = patient!;
 
+        if (!dto.IsDraft && patient?.Family != null)
+        {
+            await CreateHealthReportAndNotify(careLog, patient.Family.UserId);
+        }
+
         return MapToDto(careLog, dto.IsDraft);
     }
 
@@ -273,10 +278,47 @@ public class CareLogService : ICareLogService
             Period = "Today",
             Status = "Stable",
             HealthScore = 100,
-            VitalsData = careLog.VitalSigns,
+            VitalsData = ConvertVitalSignsToJson(careLog.VitalSigns),
             Notes = careLog.Activities,
             ReportDate = careLog.LoggedAt
         });
+    }
+
+    private string ConvertVitalSignsToJson(string? vitalsStr)
+    {
+        if (string.IsNullOrEmpty(vitalsStr)) return "{}";
+
+        try
+        {
+            var parts = vitalsStr.Split(',');
+            string bp = "N/A";
+            string hr = "N/A";
+
+            foreach (var part in parts)
+            {
+                var trimmed = part.Trim();
+                if (trimmed.ToUpper().StartsWith("HR:") || trimmed.ToUpper().StartsWith("HEART RATE:"))
+                {
+                    var split = trimmed.Split(':');
+                    if (split.Length > 1) hr = split[1].Trim();
+                }
+                else if (trimmed.ToUpper().StartsWith("BP:") || trimmed.ToUpper().StartsWith("BLOOD PRESSURE:"))
+                {
+                    var split = trimmed.Split(':');
+                    if (split.Length > 1) bp = split[1].Trim();
+                }
+            }
+
+            return System.Text.Json.JsonSerializer.Serialize(new
+            {
+                bp = new { value = bp, status = "Normal" },
+                hr = new { value = hr, status = "Stable" }
+            });
+        }
+        catch
+        {
+            return "{}";
+        }
     }
 
     public async Task<CareLogDto?> UpdateAsync(int id, UpdateCareLogDto dto)

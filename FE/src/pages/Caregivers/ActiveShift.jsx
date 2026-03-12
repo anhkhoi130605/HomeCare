@@ -709,7 +709,7 @@ const ActiveShift = () => {
                                                     className={`w-full px-6 py-5 rounded-2xl bg-stone-50 dark:bg-stone-950 border border-stone-100 dark:border-stone-800 focus:ring-2 focus:ring-[#5fa5ba] focus:border-transparent text-2xl font-black text-stone-700 transition-all placeholder:text-stone-300 outline-none ${errors.temperature ? 'border-red-300 bg-red-50/30' : ''}`}
                                                     placeholder="--"
                                                 />
-                                                <span className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs uppercase tracking-wider">Â°F</span>
+                                                <span className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs uppercase tracking-wider">°F</span>
                                             </div>
                                         </div>
                                         <div className="space-y-3 group">
