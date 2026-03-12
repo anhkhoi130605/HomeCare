@@ -10,11 +10,11 @@ const AdminSidebar = ({ sidebarOpen = true }) => {
   const userRole = user?.role; // Backend role e.g. "Admin", "OperationAdmin"
   const displayName = user?.fullName || user?.email?.split('@')[0] || "User";
 
-  const filteredMenuItems = menuItems.filter(item => 
+  const filteredMenuItems = menuItems.filter(item =>
     !item.roles || item.roles.includes(userRole)
   );
 
-  const filteredBottomItems = bottomItems.filter(item => 
+  const filteredBottomItems = bottomItems.filter(item =>
     !item.roles || item.roles.includes(userRole)
   );
 
