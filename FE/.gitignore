@@ -22,3 +22,22 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# Build folders
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Logs
+*.log
+HomeCare.sln
+Update.md
+tmp_clean_conflicts.py
+appsettings.Jwt.json
+api.js
+package-lock.json
+package.json
+

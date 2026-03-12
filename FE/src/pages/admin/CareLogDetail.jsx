@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { careLogApi, adminApi } from "@/lib/api";
+import { toast } from "sonner";
 
 const CareLogDetail = () => {
   const { id } = useParams();
@@ -13,6 +14,7 @@ const CareLogDetail = () => {
   const [careLog, setCareLog] = useState(null);
   const [patient, setPatient] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
 
   const isOperationAdmin = location.pathname.startsWith('/operation-admin');
   const basePath = isOperationAdmin ? '/operation-admin' : '/admin';
@@ -39,6 +41,19 @@ const CareLogDetail = () => {
     fetchData();
   }, [id]);
 
+  const handleSendSummary = async () => {
+    try {
+      setSending(true);
+      await careLogApi.sendSummary(id);
+      toast.success("Summary sent successfully to family");
+    } catch (error) {
+      console.error("Failed to send summary:", error);
+      toast.error(error.message || "Failed to send summary");
+    } finally {
+      setSending(false);
+    }
+  };
+
   const formatTime = (dateStr) => {
     if (!dateStr) return '';
     return new Date(dateStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -48,6 +63,27 @@ const CareLogDetail = () => {
     if (!dateStr) return '';
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
+
+  const parseVitals = (vitalsStr) => {
+    if (!vitalsStr) return {};
+    
+    // Try JSON first
+    try {
+      return JSON.parse(vitalsStr);
+    } catch (e) {
+      // Fallback to parsing the string "HR: ..., Temp: ..., BP: ..."
+      const result = {};
+      const parts = vitalsStr.split(', ');
+      parts.forEach(part => {
+        if (part.startsWith('HR:')) result.heartRate = part.replace('HR:', '').trim();
+        if (part.startsWith('Temp:')) result.temperature = part.replace('Temp:', '').trim();
+        if (part.startsWith('BP:')) result.bloodPressure = part.replace('BP:', '').trim();
+      });
+      return result;
+    }
+  };
+
+  const vitalsData = parseVitals(careLog?.vitalSigns);
 
   if (loading) {
     return (
@@ -71,11 +107,11 @@ const CareLogDetail = () => {
     );
   }
 
-  // Parse vital signs from notes or use defaults
+  // Use structured fields or fallback to parsed vitalsData from string
   const vitalSigns = [
-    { label: "BLOOD PRESSURE", value: careLog.bloodPressure || "N/A", status: "RECORDED", statusColor: "bg-blue-100 text-blue-700", target: "Target: < 130/80 mmHg" },
-    { label: "HEART RATE", value: careLog.heartRate || "N/A", unit: "BPM", status: "STABLE", statusColor: "bg-green-100 text-green-700", target: "Resting range: 60-100" },
-    { label: "TEMPERATURE", value: careLog.temperature || "N/A", unit: "°C", status: "NORMAL", statusColor: "bg-green-100 text-green-700", target: "Normal: 36-37°C" },
+    { label: "BLOOD PRESSURE", value: careLog.bloodPressure || vitalsData.bloodPressure || "N/A", status: "RECORDED", statusColor: "bg-blue-100 text-blue-700", target: "Target: < 130/80 mmHg" },
+    { label: "HEART RATE", value: careLog.heartRate || vitalsData.heartRate || "N/A", unit: "BPM", status: "STABLE", statusColor: "bg-green-100 text-green-700", target: "Resting range: 60-100" },
+    { label: "TEMPERATURE", value: careLog.temperature || vitalsData.temperature || "N/A", unit: "°C", status: "NORMAL", statusColor: "bg-green-100 text-green-700", target: "Normal: 36-37°C" },
   ];
 
   return (
@@ -108,7 +144,7 @@ const CareLogDetail = () => {
                       </div>
                       <div className="flex items-center gap-1">
                         <Clock className="w-4 h-4" />
-                        <span>Submitted: {formatDate(careLog.createdAt)}, {formatTime(careLog.createdAt)}</span>
+                        <span>Submitted: {formatDate(careLog.loggedAt || careLog.createdAt)}, {formatTime(careLog.loggedAt || careLog.createdAt)}</span>
                       </div>
                     </div>
                   </div>
@@ -117,8 +153,17 @@ const CareLogDetail = () => {
                       <CheckCircle className="w-4 h-4" />
                       Acknowledge Log
                     </Button>
-                    <Button variant="outline" className="gap-2">
-                      <Send className="w-4 h-4" />
+                    <Button 
+                      variant="outline" 
+                      className="gap-2" 
+                      onClick={handleSendSummary}
+                      disabled={sending}
+                    >
+                      {sending ? (
+                        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
                       Send Summary
                     </Button>
                     <Button variant="destructive" className="gap-2">
@@ -173,7 +218,7 @@ const CareLogDetail = () => {
                 <div className="space-y-4">
                   <div>
                     <h4 className="text-sm font-medium text-muted-foreground mb-2">ACTIVITIES PERFORMED</h4>
-                    <p className="text-sm">{careLog.activitiesPerformed || 'No activities recorded'}</p>
+                    <p className="text-sm">{careLog.activities || careLog.activitiesPerformed || 'No activities recorded'}</p>
                   </div>
                   {careLog.notes && (
                     <div>
@@ -232,7 +277,7 @@ const CareLogDetail = () => {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Mood</span>
-                    <span className="font-medium">{careLog.moodObservation || 'Good'}</span>
+                    <span className="font-medium">{careLog.patientMood || careLog.moodObservation || 'Good'}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -288,7 +333,7 @@ const CareLogDetail = () => {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-primary-foreground/70">Log Date</span>
-                    <span className="font-medium">{formatDate(careLog.logDate || careLog.createdAt)}</span>
+                    <span className="font-medium">{formatDate(careLog.loggedAt || careLog.logDate || careLog.createdAt)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -304,7 +349,7 @@ const CareLogDetail = () => {
                   <div className="w-2 h-2 rounded-full bg-green-500" />
                   <div className="flex-1">
                     <p className="text-sm font-medium">Created</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(careLog.createdAt)} {formatTime(careLog.createdAt)}</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(careLog.loggedAt || careLog.createdAt)} {formatTime(careLog.loggedAt || careLog.createdAt)}</p>
                   </div>
                 </div>
                 {careLog.updatedAt && careLog.updatedAt !== careLog.createdAt && (

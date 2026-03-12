@@ -23,6 +23,11 @@ public interface IAdminService
     Task<AdminCaregiverDto> CreateCaregiverAsync(CreateCaregiverDto dto);
     Task<AdminCaregiverDto?> UpdateCaregiverAsync(int caregiverId, UpdateCaregiverAdminDto dto);
     Task<bool> DeleteCaregiverAsync(int caregiverId);
+
+    // Patient CRUD
+    Task<AdminPatientDto> CreatePatientAsync(CreatePatientAdminDto dto);
+    Task<AdminPatientDto?> UpdatePatientAsync(int patientId, UpdatePatientAdminDto dto);
+    Task<bool> DeletePatientAsync(int patientId);
 }
 
 public class AdminService : IAdminService
@@ -264,7 +269,8 @@ public class AdminService : IAdminService
             FullName = p.FullName,
             Age = CalculateAge(p.DateOfBirth),
             Gender = p.Gender ?? "Unknown",
-            FamilyName = p.Family.FullName,
+            FamilyId = p.FamilyId,
+            FamilyName = p.Family?.FullName ?? "Unknown Family",
             Address = !string.IsNullOrWhiteSpace(p.Address) 
                 ? p.Address 
                 : (!string.IsNullOrWhiteSpace(p.Family?.Address) 
@@ -276,6 +282,97 @@ public class AdminService : IAdminService
             Status = "Active",
             LastVisit = lastVisits.GetValueOrDefault(p.Id)
         }).ToList();
+    }
+
+    public async Task<AdminPatientDto> CreatePatientAsync(CreatePatientAdminDto dto)
+    {
+        // If no FamilyId provided, find the first family or create a default one
+        int familyId = dto.FamilyId;
+        if (familyId == 0)
+        {
+            var firstFamily = await _context.Families.FirstOrDefaultAsync();
+            if (firstFamily == null)
+            {
+                // Create a default family if none exists (unlikely in real app)
+                throw new InvalidOperationException("No family exists to assign this patient to.");
+            }
+            familyId = firstFamily.Id;
+        }
+
+        var patient = new Patient
+        {
+            FamilyId = familyId,
+            FullName = dto.FullName,
+            DateOfBirth = dto.DateOfBirth,
+            Gender = dto.Gender,
+            Address = dto.Address,
+            EmergencyContact = dto.EmergencyContact,
+            EmergencyPhone = dto.EmergencyPhone,
+            MedicalHistory = dto.MedicalHistory,
+            CurrentCondition = "Stable",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.Patients.Add(patient);
+        await _context.SaveChangesAsync();
+
+        // Reload to get family info
+        await _context.Entry(patient).Reference(p => p.Family).LoadAsync();
+
+        return new AdminPatientDto
+        {
+            Id = patient.Id,
+            FullName = patient.FullName,
+            Age = CalculateAge(patient.DateOfBirth),
+            Gender = patient.Gender ?? "Unknown",
+            FamilyId = patient.FamilyId,
+            FamilyName = patient.Family?.FullName ?? "Unknown",
+            Address = patient.Address ?? "No address",
+            Status = "Active"
+        };
+    }
+
+    public async Task<AdminPatientDto?> UpdatePatientAsync(int patientId, UpdatePatientAdminDto dto)
+    {
+        var patient = await _context.Patients
+            .Include(p => p.Family)
+            .FirstOrDefaultAsync(p => p.Id == patientId);
+
+        if (patient == null) return null;
+
+        if (dto.FullName != null) patient.FullName = dto.FullName;
+        if (dto.DateOfBirth.HasValue) patient.DateOfBirth = dto.DateOfBirth.Value;
+        if (dto.Gender != null) patient.Gender = dto.Gender;
+        if (dto.Address != null) patient.Address = dto.Address;
+        if (dto.EmergencyContact != null) patient.EmergencyContact = dto.EmergencyContact;
+        if (dto.EmergencyPhone != null) patient.EmergencyPhone = dto.EmergencyPhone;
+        if (dto.MedicalHistory != null) patient.MedicalHistory = dto.MedicalHistory;
+        if (dto.CurrentCondition != null) patient.CurrentCondition = dto.CurrentCondition;
+
+        await _context.SaveChangesAsync();
+
+        return new AdminPatientDto
+        {
+            Id = patient.Id,
+            FullName = patient.FullName,
+            Age = CalculateAge(patient.DateOfBirth),
+            Gender = patient.Gender ?? "Unknown",
+            FamilyId = patient.FamilyId,
+            FamilyName = patient.Family?.FullName ?? "Unknown",
+            Address = patient.Address ?? "No address",
+            Status = "Active",
+            CurrentCondition = patient.CurrentCondition ?? ""
+        };
+    }
+
+    public async Task<bool> DeletePatientAsync(int patientId)
+    {
+        var patient = await _context.Patients.FindAsync(patientId);
+        if (patient == null) return false;
+
+        _context.Patients.Remove(patient);
+        await _context.SaveChangesAsync();
+        return true;
     }
 
     public async Task<List<AdminCaregiverDto>> GetAllCaregiversAsync()
@@ -502,6 +599,7 @@ public class AdminPatientDto
     public string FullName { get; set; } = "";
     public int Age { get; set; }
     public string Gender { get; set; } = "";
+    public int FamilyId { get; set; }
     public string FamilyName { get; set; } = "";
     public string Address { get; set; } = "";
     public string CaregiverName { get; set; } = "";
@@ -577,5 +675,29 @@ public class CreateUserAdminDto
     public string Password { get; set; } = "";
     public string? Phone { get; set; }
     public string Role { get; set; } = "Family";
+}
+
+public class CreatePatientAdminDto
+{
+    public string FullName { get; set; } = "";
+    public DateTime DateOfBirth { get; set; }
+    public string? Gender { get; set; }
+    public string? Address { get; set; }
+    public string? EmergencyContact { get; set; }
+    public string? EmergencyPhone { get; set; }
+    public string? MedicalHistory { get; set; }
+    public int FamilyId { get; set; }
+}
+
+public class UpdatePatientAdminDto
+{
+    public string? FullName { get; set; }
+    public DateTime? DateOfBirth { get; set; }
+    public string? Gender { get; set; }
+    public string? Address { get; set; }
+    public string? EmergencyContact { get; set; }
+    public string? EmergencyPhone { get; set; }
+    public string? MedicalHistory { get; set; }
+    public string? CurrentCondition { get; set; }
 }
 

@@ -11,6 +11,7 @@ public interface ICareLogService
     Task<CareLogDto?> GetByIdAsync(int id);
     Task<CareLogDto> CreateAsync(int caregiverId, CreateCareLogDto dto);
     Task<CareLogDto?> UpdateAsync(int id, UpdateCareLogDto dto);
+    Task<bool> SendSummaryToFamilyAsync(int careLogId);
     Task<bool> DeleteAsync(int id);
 }
 
