@@ -9,6 +9,10 @@ using System.Text.Encodings.Web;
 using BE.Models.Email;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Load JWT configurations from separate file
+builder.Configuration.AddJsonFile("appsettings.Jwt.json", optional: true, reloadOnChange: true);
+
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("Smtp"));
 builder.Services.AddScoped<IEmailService, EmailService>();
 // ===== SERVICES =====
