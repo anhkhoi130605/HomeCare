@@ -9,3 +9,7 @@ obj/
 
 # Logs
 *.log
+HomeCare.sln
+Update.md
+tmp_clean_conflicts.py
+appsettings.Jwt.json
