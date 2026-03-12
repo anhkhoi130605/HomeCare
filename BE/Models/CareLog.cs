@@ -42,4 +42,7 @@ public class CareLog
     public string? Notes { get; set; }
 
     public DateTime LoggedAt { get; set; } = DateTime.UtcNow;
+    // Thêm 2 dòng này vào file CareLog.cs
+    public DateTime? CheckInTime { get; set; }  // Giờ Check-in (Có dấu ? vì lúc mới tạo có thể chưa có giờ ra)
+    public DateTime? CheckOutTime { get; set; } // Giờ Check-out
 }
