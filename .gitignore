@@ -19,4 +19,20 @@ package.json
 secret-key.txt
 .env
 requirements.txt
+# Node runtime
+node.exe
+npm
+npm.cmd
+npm.ps1
+npx
+npx.cmd
+npx.ps1
+corepack
+corepack.cmd
+nodevars.bat
 
+# Node modules
+node_modules/
+
+# Duplicate package file
+package (1).json
